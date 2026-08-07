@@ -336,14 +336,14 @@ func TestSignUp_WithCreateUserParamsExtra(t *testing.T) {
 
 	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
-			req.Params.Set("role", "admin")
-			req.Params.Set("org_id", "org_999")
+			req.Params.Set(emailpassword.ExtraKeyRole, "admin")
+			req.Params.Set(emailpassword.ExtraKeyOrgID, "org_999")
 		}
 	})
 
 	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
-			if val, ok := req.Params.Get("role"); ok {
+			if val, ok := req.Params.Get(emailpassword.ExtraKeyRole); ok {
 				interceptedRole, _ = val.(string)
 				extraFound = true
 			}

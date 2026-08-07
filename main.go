@@ -47,8 +47,16 @@ func main() {
 	}
 
 	// 2. Subscribe to EventBus lifecycle events
+	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
+		if payload != nil && payload.Params != nil {
+			payload.Params.Set(emailpassword.ExtraKeyRole, "admin")
+			payload.Params.Set(emailpassword.ExtraKeyOrgID, "org_enterprise")
+		}
+	})
+
 	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
-		fmt.Printf("📢 [Global EventBus] New user registered: %s (ID: %s)\n", payload.User.Email, payload.User.ID)
+		role, _ := payload.Params.Get(emailpassword.ExtraKeyRole)
+		fmt.Printf("📢 [Global EventBus] New user registered: %s (ID: %s, Role: %v)\n", payload.User.Email, payload.User.ID, role)
 	})
 
 	app.Events().Subscribe(twofactor.EventEnableTwoFactorAfter, func(c context.Context, payload *twofactor.EnableTwoFactorAfterEventPayload) {

@@ -172,7 +172,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	// Automatic reaction following a successful email/password sign-in
 	p.ctx.Events().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
 		if payload != nil && payload.User != nil {
-			p.ctx.Set("2fa_pending_"+payload.User.ID, true)
+			p.ctx.Set(TwoFactorPendingKey(payload.User.ID), true)
 		}
 	})
 

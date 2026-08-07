@@ -351,3 +351,62 @@ func TestTwoFactor_EventEmissions(t *testing.T) {
 		t.Error("Expected Disable events to be emitted")
 	}
 }
+
+func TestTwoFactor_EnableWithExtraAndConstants(t *testing.T) {
+	app, p, _ := setupTwoFactorTest(t)
+	ctx := context.Background()
+	userID := "usr_extra_456"
+
+	var interceptedMethod string
+	var interceptedDevID string
+	var extraCaptured bool
+
+	app.Events().Subscribe(twofactor.EventEnableTwoFactorBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.EnableTwoFactorBeforeEventPayload); ok && req.Params != nil {
+			req.Params.Set(twofactor.ExtraKeyTwoFactorMethod, twofactor.MethodTOTP)
+			req.Params.Set(twofactor.ExtraKeyDeviceID, "dev_pixel_8")
+			req.Params.Set(twofactor.ExtraKeyIPAddress, "192.168.1.100")
+
+			if method, ok := req.Params.Get(twofactor.ExtraKeyTwoFactorMethod); ok {
+				interceptedMethod, _ = method.(string)
+				extraCaptured = true
+			}
+			if devID, ok := req.Params.Get(twofactor.ExtraKeyDeviceID); ok {
+				interceptedDevID, _ = devID.(string)
+			}
+		}
+	})
+
+	enableParams := twofactor.EnableParams{
+		UserID: userID,
+	}
+
+	res, err := p.Enable(ctx, enableParams)
+	if err != nil {
+		t.Fatalf("Enable failed: %v", err)
+	}
+	if res == nil || res.TOTPURI == "" {
+		t.Fatal("Expected valid enable result")
+	}
+
+	if !extraCaptured || interceptedMethod != twofactor.MethodTOTP || interceptedDevID != "dev_pixel_8" {
+		t.Errorf("Expected ExtraKeyTwoFactorMethod=%s and ExtraKeyDeviceID=dev_pixel_8, got method=%v, devID=%v",
+			twofactor.MethodTOTP, interceptedMethod, interceptedDevID)
+	}
+
+	// Verify context helper format
+	expectedPendingKey := twofactor.ContextKeyTwoFactorPendingPrefix + userID
+	if key := twofactor.TwoFactorPendingKey(userID); key != expectedPendingKey {
+		t.Errorf("Expected TwoFactorPendingKey %s, got %s", expectedPendingKey, key)
+	}
+
+	expectedVerifiedKey := twofactor.ContextKeyTwoFactorVerifiedPrefix + userID
+	if key := twofactor.TwoFactorVerifiedKey(userID); key != expectedVerifiedKey {
+		t.Errorf("Expected TwoFactorVerifiedKey %s, got %s", expectedVerifiedKey, key)
+	}
+
+	expectedMethodKey := twofactor.ContextKeyTwoFactorMethodPrefix + userID
+	if key := twofactor.TwoFactorMethodKey(userID); key != expectedMethodKey {
+		t.Errorf("Expected TwoFactorMethodKey %s, got %s", expectedMethodKey, key)
+	}
+}
