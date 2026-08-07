@@ -1,5 +1,5 @@
 // Package plugins provides convenient factory constructors for instantiating officially supported authentication plugins,
-// such as EmailPassword and TwoFactor (TOTP).
+// such as EmailPassword (credential-based sign-in/sign-up) and TwoFactor (RFC 6238 TOTP, backup codes, challenge OTP).
 package plugins
 
 import (
@@ -31,11 +31,30 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 	return emailpassword.New(repo, opts...)
 }
 
-// TwoFactor instantiates a new TwoFactor (TOTP) authentication plugin configured with the given repository and options.
+// TwoFactor instantiates a new TwoFactor authentication plugin configured with the given repository and options.
 //
 // The TwoFactor plugin provides Time-based One-Time Password (TOTP / RFC 6238) multi-factor authentication,
-// generating secure secrets, creating otpauth:// URIs for authenticator apps (Google Authenticator, Authy, etc.),
-// and verifying 6-digit TOTP codes.
+// generating secure Base32 secrets, creating otpauth:// URIs for authenticator apps (Google Authenticator, Authy, 1Password),
+// verifying 6- or 8-digit TOTP codes, managing single-use backup recovery codes, and dispatching SMS/Email OTP challenges.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - twofactor.WithIssuer(issuer string): Issuer name shown in authenticator apps (default: "GoModularAuth").
+//   - twofactor.WithTOTPOptions(digits int, period int): Number of digits and duration period (default: 6 digits, 30s).
+//   - twofactor.WithBackupCodeOptions(amount, length int): Number and length of backup codes (default: 10 codes, 10 chars).
+//   - twofactor.WithLockoutProtection(maxAttempts int, duration time.Duration): Rate-limiting brute-force protection.
+//   - twofactor.WithSendOTP(fn twofactor.SendOTPFunc): Delivery callback for SMS/Email OTP challenges.
+//
+// Example:
+//
+//	tfPlugin := plugins.TwoFactor(
+//		myRepository,
+//		twofactor.WithIssuer("My Application"),
+//		twofactor.WithTOTPOptions(6, 30),
+//		twofactor.WithBackupCodeOptions(10, 10),
+//	)
 func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.Plugin {
 	return twofactor.New(repo, opts...)
 }

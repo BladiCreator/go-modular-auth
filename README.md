@@ -182,14 +182,24 @@ type UserModel struct {
 	UpdatedAt     time.Time
 }
 
-type SessionModel struct {
-	ID        string    `gorm:"primaryKey;type:uuid"`
+type TwoFactorModel struct {
+	ID          string     `gorm:"primaryKey;type:uuid"`
+	UserID      string     `gorm:"uniqueIndex;not null"`
+	Secret      string     `gorm:"not null"`
+	BackupCodes string     `gorm:"type:text"`
+	Verified    bool       `gorm:"default:false"`
+	Failures    int        `gorm:"default:0"`
+	LockedUntil *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type OTPChallengeModel struct {
+	Key       string    `gorm:"primaryKey"`
 	UserID    string    `gorm:"index;not null"`
-	Token     string    `gorm:"uniqueIndex;not null"`
-	IPAddress string
-	UserAgent string
+	CodeHash  string    `gorm:"not null"`
+	Attempts  int       `gorm:"default:0"`
 	ExpiresAt time.Time `gorm:"index"`
-	CreatedAt time.Time
 }
 
 // Main Repository Struct
@@ -199,7 +209,7 @@ type GormAuthRepository struct {
 
 func NewGormAuthRepository(db *gorm.DB) *GormAuthRepository {
 	// AutoMigrate creates tables automatically in PostgreSQL / MySQL / SQLite
-	_ = db.AutoMigrate(&UserModel{}, &SessionModel{})
+	_ = db.AutoMigrate(&UserModel{}, &SessionModel{}, &TwoFactorModel{}, &OTPChallengeModel{})
 	return &GormAuthRepository{db: db}
 }
 
@@ -269,17 +279,83 @@ func (r *GormAuthRepository) DeleteSession(ctx context.Context, token string) er
 
 // --- twofactor.Repository Methods ---
 
-func (r *GormAuthRepository) SaveTOTPSecret(ctx context.Context, userID string, secret string) error {
-	return r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", userID).Update("totp_secret", secret).Error
+func (r *GormAuthRepository) FindByUserID(ctx context.Context, userID string) (*twofactor.TwoFactor, error) {
+	var model TwoFactorModel
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, twofactor.ErrTwoFactorNotEnabled
+	}
+	return &twofactor.TwoFactor{
+		ID:          model.ID,
+		UserID:      model.UserID,
+		Secret:      model.Secret,
+		BackupCodes: model.BackupCodes,
+		Verified:    model.Verified,
+		Failures:    model.Failures,
+		LockedUntil: model.LockedUntil,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
+	}, err
 }
 
-func (r *GormAuthRepository) GetTOTPSecret(ctx context.Context, userID string) (string, error) {
-	var model UserModel
-	err := r.db.WithContext(ctx).Select("totp_secret").Where("id = ?", userID).First(&model).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) || model.TOTPSecret == "" {
-		return "", domain.ErrTOTPNotFound
+func (r *GormAuthRepository) Create(ctx context.Context, tf *twofactor.TwoFactor) error {
+	model := TwoFactorModel{
+		ID:          uuid.New().String(),
+		UserID:      tf.UserID,
+		Secret:      tf.Secret,
+		BackupCodes: tf.BackupCodes,
+		Verified:    tf.Verified,
+		Failures:    tf.Failures,
+		LockedUntil: tf.LockedUntil,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
-	return model.TOTPSecret, nil
+	return r.db.WithContext(ctx).Create(&model).Error
+}
+
+func (r *GormAuthRepository) Update(ctx context.Context, tf *twofactor.TwoFactor) error {
+	return r.db.WithContext(ctx).Model(&TwoFactorModel{}).Where("user_id = ?", tf.UserID).Updates(map[string]any{
+		"secret":       tf.Secret,
+		"backup_codes": tf.BackupCodes,
+		"verified":     tf.Verified,
+		"failures":     tf.Failures,
+		"locked_until": tf.LockedUntil,
+		"updated_at":   time.Now(),
+	}).Error
+}
+
+func (r *GormAuthRepository) DeleteByUserID(ctx context.Context, userID string) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&TwoFactorModel{}).Error
+}
+
+func (r *GormAuthRepository) SaveOTPChallenge(ctx context.Context, challenge *twofactor.OTPChallenge) error {
+	model := OTPChallengeModel{
+		Key:       challenge.Key,
+		UserID:    challenge.UserID,
+		CodeHash:  challenge.CodeHash,
+		Attempts:  challenge.Attempts,
+		ExpiresAt: challenge.ExpiresAt,
+	}
+	return r.db.WithContext(ctx).Save(&model).Error
+}
+
+func (r *GormAuthRepository) GetOTPChallenge(ctx context.Context, key string) (*twofactor.OTPChallenge, error) {
+	var model OTPChallengeModel
+	err := r.db.WithContext(ctx).Where("key = ?", key).First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, twofactor.ErrOTPExpired
+	}
+	return &twofactor.OTPChallenge{
+		Key:       model.Key,
+		UserID:    model.UserID,
+		CodeHash:  model.CodeHash,
+		Attempts:  model.Attempts,
+		ExpiresAt: model.ExpiresAt,
+	}, err
+}
+
+func (r *GormAuthRepository) DeleteOTPChallenge(ctx context.Context, key string) error {
+	return r.db.WithContext(ctx).Where("key = ?", key).Delete(&OTPChallengeModel{}).Error
 }
 
 // Entity mapping helpers

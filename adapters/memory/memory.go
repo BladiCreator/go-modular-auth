@@ -22,24 +22,28 @@ var (
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
 type Store struct {
-	mu           sync.RWMutex
-	users        map[string]*entity.User
-	accounts     map[string]*entity.Account            // key: accountID
-	userAccounts map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens       map[string]*entity.VerificationToken  // key: token string
-	sessions     map[string]*entity.Session
-	totpSecrets  map[string]string
+	mu            sync.RWMutex
+	users         map[string]*entity.User
+	accounts      map[string]*entity.Account            // key: accountID
+	userAccounts  map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens        map[string]*entity.VerificationToken  // key: token string
+	sessions      map[string]*entity.Session
+	totpSecrets   map[string]string
+	twoFactors    map[string]*twofactor.TwoFactor   // key: userID
+	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
 }
 
 // New instantiates a new thread-safe in-memory Store.
 func New() *Store {
 	return &Store{
-		users:        make(map[string]*entity.User),
-		accounts:     make(map[string]*entity.Account),
-		userAccounts: make(map[string]map[string]*entity.Account),
-		tokens:       make(map[string]*entity.VerificationToken),
-		sessions:     make(map[string]*entity.Session),
-		totpSecrets:  make(map[string]string),
+		users:         make(map[string]*entity.User),
+		accounts:      make(map[string]*entity.Account),
+		userAccounts:  make(map[string]map[string]*entity.Account),
+		tokens:        make(map[string]*entity.VerificationToken),
+		sessions:      make(map[string]*entity.Session),
+		totpSecrets:   make(map[string]string),
+		twoFactors:    make(map[string]*twofactor.TwoFactor),
+		otpChallenges: make(map[string]*twofactor.OTPChallenge),
 	}
 }
 
@@ -211,4 +215,58 @@ func (s *Store) GetTOTPSecret(ctx context.Context, userID string) (string, error
 		return sec, nil
 	}
 	return "", domain.ErrTOTPNotFound
+}
+
+func (s *Store) FindByUserID(ctx context.Context, userID string) (*twofactor.TwoFactor, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if tf, ok := s.twoFactors[userID]; ok {
+		return tf, nil
+	}
+	return nil, twofactor.ErrTwoFactorNotEnabled
+}
+
+func (s *Store) Create(ctx context.Context, tf *twofactor.TwoFactor) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.twoFactors[tf.UserID] = tf
+	return nil
+}
+
+func (s *Store) Update(ctx context.Context, tf *twofactor.TwoFactor) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.twoFactors[tf.UserID] = tf
+	return nil
+}
+
+func (s *Store) DeleteByUserID(ctx context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.twoFactors, userID)
+	delete(s.totpSecrets, userID)
+	return nil
+}
+
+func (s *Store) SaveOTPChallenge(ctx context.Context, challenge *twofactor.OTPChallenge) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.otpChallenges[challenge.Key] = challenge
+	return nil
+}
+
+func (s *Store) GetOTPChallenge(ctx context.Context, key string) (*twofactor.OTPChallenge, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if c, ok := s.otpChallenges[key]; ok {
+		return c, nil
+	}
+	return nil, twofactor.ErrOTPExpired
+}
+
+func (s *Store) DeleteOTPChallenge(ctx context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.otpChallenges, key)
+	return nil
 }

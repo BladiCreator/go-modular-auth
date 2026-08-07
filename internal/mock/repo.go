@@ -20,23 +20,27 @@ var (
 )
 
 type MockRepo struct {
-	mu          sync.RWMutex
-	users       map[string]*entity.User
-	accounts    map[string]*entity.Account            // key: accountID
-	userAccounts map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens      map[string]*entity.VerificationToken  // key: token string
-	sessions    map[string]*entity.Session
-	totpSecrets map[string]string
+	mu            sync.RWMutex
+	users         map[string]*entity.User
+	accounts      map[string]*entity.Account            // key: accountID
+	userAccounts  map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens        map[string]*entity.VerificationToken  // key: token string
+	sessions      map[string]*entity.Session
+	totpSecrets   map[string]string
+	twoFactors    map[string]*twofactor.TwoFactor   // key: userID
+	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
 }
 
 func NewMockRepo() *MockRepo {
 	return &MockRepo{
-		users:        make(map[string]*entity.User),
-		accounts:     make(map[string]*entity.Account),
-		userAccounts: make(map[string]map[string]*entity.Account),
-		tokens:       make(map[string]*entity.VerificationToken),
-		sessions:     make(map[string]*entity.Session),
-		totpSecrets:  make(map[string]string),
+		users:         make(map[string]*entity.User),
+		accounts:      make(map[string]*entity.Account),
+		userAccounts:  make(map[string]map[string]*entity.Account),
+		tokens:        make(map[string]*entity.VerificationToken),
+		sessions:      make(map[string]*entity.Session),
+		totpSecrets:   make(map[string]string),
+		twoFactors:    make(map[string]*twofactor.TwoFactor),
+		otpChallenges: make(map[string]*twofactor.OTPChallenge),
 	}
 }
 
@@ -215,4 +219,58 @@ func (m *MockRepo) GetTOTPSecret(ctx context.Context, userID string) (string, er
 		return sec, nil
 	}
 	return "", domain.ErrTOTPNotFound
+}
+
+func (m *MockRepo) FindByUserID(ctx context.Context, userID string) (*twofactor.TwoFactor, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if tf, ok := m.twoFactors[userID]; ok {
+		return tf, nil
+	}
+	return nil, twofactor.ErrTwoFactorNotEnabled
+}
+
+func (m *MockRepo) Create(ctx context.Context, tf *twofactor.TwoFactor) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.twoFactors[tf.UserID] = tf
+	return nil
+}
+
+func (m *MockRepo) Update(ctx context.Context, tf *twofactor.TwoFactor) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.twoFactors[tf.UserID] = tf
+	return nil
+}
+
+func (m *MockRepo) DeleteByUserID(ctx context.Context, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.twoFactors, userID)
+	delete(m.totpSecrets, userID)
+	return nil
+}
+
+func (m *MockRepo) SaveOTPChallenge(ctx context.Context, challenge *twofactor.OTPChallenge) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.otpChallenges[challenge.Key] = challenge
+	return nil
+}
+
+func (m *MockRepo) GetOTPChallenge(ctx context.Context, key string) (*twofactor.OTPChallenge, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if c, ok := m.otpChallenges[key]; ok {
+		return c, nil
+	}
+	return nil, twofactor.ErrOTPExpired
+}
+
+func (m *MockRepo) DeleteOTPChallenge(ctx context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.otpChallenges, key)
+	return nil
 }
