@@ -44,18 +44,20 @@ func New() *Store {
 }
 
 // User Methods
-func (s *Store) CreateUser(ctx context.Context, user *entity.User) error {
+func (s *Store) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if user.ID == "" {
-		user.ID = "memory:" + strconv.FormatInt(rand.Int63(), 10)
+	user := &entity.User{
+		ID:        "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		Name:      params.Name,
+		Email:     params.Email,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
 
 	s.users[user.ID] = user
-	return nil
+	return user, nil
 }
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
@@ -162,7 +164,7 @@ func (s *Store) DeleteVerificationToken(ctx context.Context, token string) error
 }
 
 // Session Methods
-func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionContext) (*entity.Session, error) {
+func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionParams) (*entity.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sessionCreated := &entity.Session{

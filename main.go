@@ -34,7 +34,7 @@ func main() {
 	})
 
 	// 3. Registro vía plugin EmailPassword
-	user, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, dto.SignUpDTO{
+	user, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, dto.SignUpParams{
 		Name:     "Gopher Go",
 		Email:    "gopher@golang.org",
 		Password: "PasswordSegura123!",
@@ -45,7 +45,7 @@ func main() {
 	fmt.Printf("✔ Usuario creado: %s (%s)\n", user.Name, user.ID)
 
 	// 4. Inicio de Sesión
-	signedInUser, err := auth.Plugin[emailpassword.Plugin](app).SignIn(ctx, dto.SignInDTO{
+	signedInUser, err := auth.Plugin[emailpassword.Plugin](app).SignIn(ctx, dto.SignInParams{
 		Email:    "gopher@golang.org",
 		Password: "PasswordSegura123!",
 	})

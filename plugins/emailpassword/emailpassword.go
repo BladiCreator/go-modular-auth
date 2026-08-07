@@ -54,7 +54,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 }
 
 // SignUp registers a new user with email and password credentials.
-func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpDTO) (*entity.User, error) {
+func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.User, error) {
 	if len(input.Password) < p.config.MinPasswordLength {
 		return nil, ErrPasswordTooShort
 	}
@@ -69,17 +69,18 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpDTO) (*entity.User,
 		return nil, err
 	}
 
-	newUser := &entity.User{
-		Email:         input.Email,
-		Name:          input.Name,
-		EmailVerified: false,
+	params := &dto.CreateUserParams{
+		Email:        input.Email,
+		Name:         input.Name,
+		PasswordHash: hashedPassword,
 	}
 
 	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignUpBefore, ctx, &SignUpEventPayload{User: newUser})
+		p.ctx.Events().Publish(EventSignUpBefore, ctx, &SignUpEventPayload{Params: params})
 	}
 
-	if err := p.repo.CreateUser(ctx, newUser); err != nil {
+	newUser, err := p.repo.CreateUser(ctx, params)
+	if err != nil {
 		return nil, err
 	}
 
@@ -94,13 +95,13 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpDTO) (*entity.User,
 	}
 
 	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignUpAfter, ctx, &SignUpEventPayload{User: newUser})
+		p.ctx.Events().Publish(EventSignUpAfter, ctx, &SignUpEventPayload{Params: params, User: newUser})
 	}
 	return newUser, nil
 }
 
 // SignIn authenticates user credentials.
-func (p *Plugin) SignIn(ctx context.Context, input dto.SignInDTO) (*entity.User, error) {
+func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.User, error) {
 	user, err := p.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil || user == nil {
 		return nil, ErrInvalidCredentials
@@ -131,7 +132,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInDTO) (*entity.User,
 }
 
 // ChangePassword changes the password of an existing user after validating current password.
-func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordDTO) error {
+func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordParams) error {
 	if len(input.NewPassword) < p.config.MinPasswordLength {
 		return ErrPasswordTooShort
 	}
@@ -166,7 +167,7 @@ func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordDTO
 }
 
 // ForgotPassword generates a secure reset token and publishes notification event.
-func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordDTO) (*entity.VerificationToken, error) {
+func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.VerificationToken, error) {
 	user, err := p.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil || user == nil {
 		return nil, ErrUserNotFound
@@ -200,7 +201,7 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordDTO
 }
 
 // ResetPassword validates the reset token and updates the user's password.
-func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordDTO) error {
+func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParams) error {
 	if len(input.NewPassword) < p.config.MinPasswordLength {
 		return ErrPasswordTooShort
 	}

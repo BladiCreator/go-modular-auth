@@ -8,7 +8,6 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
-	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/internal/mock"
 )
 
@@ -16,33 +15,33 @@ func TestMockRepo_UserOperations(t *testing.T) {
 	ctx := context.Background()
 	repo := mock.NewMockRepo()
 
-	userToCreate := &entity.User{
+	paramsToCreate := &dto.CreateUserParams{
 		Name:  "Dev User",
 		Email: "dev@example.com",
 	}
 
 	t.Run("Crear y obtener usuario existente", func(t *testing.T) {
-		err := repo.CreateUser(ctx, userToCreate)
+		createdUser, err := repo.CreateUser(ctx, paramsToCreate)
 		if err != nil {
 			t.Fatalf("no se esperaba error al crear usuario, se obtuvo: %v", err)
 		}
 
 		// Buscar por email
-		foundByEmail, err := repo.GetUserByEmail(ctx, userToCreate.Email)
+		foundByEmail, err := repo.GetUserByEmail(ctx, paramsToCreate.Email)
 		if err != nil {
 			t.Fatalf("se esperaba encontrar usuario por email, error: %v", err)
 		}
-		if foundByEmail.ID != userToCreate.ID {
-			t.Errorf("se esperaba ID %s, se obtuvo %s", userToCreate.ID, foundByEmail.ID)
+		if foundByEmail.ID != createdUser.ID {
+			t.Errorf("se esperaba ID %s, se obtuvo %s", createdUser.ID, foundByEmail.ID)
 		}
 
 		// Buscar por ID
-		foundByID, err := repo.GetUserByID(ctx, userToCreate.ID)
+		foundByID, err := repo.GetUserByID(ctx, createdUser.ID)
 		if err != nil {
 			t.Fatalf("se esperaba encontrar usuario por ID, error: %v", err)
 		}
-		if foundByID.Email != userToCreate.Email {
-			t.Errorf("se esperaba email %s, se obtuvo %s", userToCreate.Email, foundByID.Email)
+		if foundByID.Email != paramsToCreate.Email {
+			t.Errorf("se esperaba email %s, se obtuvo %s", paramsToCreate.Email, foundByID.Email)
 		}
 	})
 
@@ -63,7 +62,7 @@ func TestMockRepo_SessionOperations(t *testing.T) {
 	ctx := context.Background()
 	repo := mock.NewMockRepo()
 
-	sessionCtx := &dto.CreateSessionContext{
+	sessionParams := &dto.CreateSessionParams{
 		UserID:    "usr_123",
 		Token:     "token_secreto_abc",
 		IPAddress: "127.0.0.1",
@@ -74,7 +73,7 @@ func TestMockRepo_SessionOperations(t *testing.T) {
 
 	t.Run("Crear, consultar y eliminar sesión", func(t *testing.T) {
 		// 1. Crear sesión
-		createdSession, err := repo.CreateSession(ctx, sessionCtx)
+		createdSession, err := repo.CreateSession(ctx, sessionParams)
 		if err != nil {
 			t.Fatalf("error al crear la sesión: %v", err)
 		}

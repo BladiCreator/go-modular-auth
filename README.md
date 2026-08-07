@@ -27,7 +27,8 @@
 
 - 🧩 **Arquitectura 100% Modular basada en Plugins**: Agrega o remueve características de autenticación según los requerimientos de tu proyecto.
 - ⚡ **Tipado Fuerte mediante Genéricos (Go 1.18+)**: Acceso seguro a las APIs de cada plugin con autocompletado y sin casteos mediante `auth.Plugin[emailpassword.Plugin](app)`.
-- 📢 **Bus de Eventos Reactivo Integrado**: Suscríbete a Hooks del ciclo de vida (`emailpassword.EventSignUpAfter`, `emailpassword.EventSignInAfter`, etc.) para enviar correos asíncronos, auditar accesos o notificar a Slack/Webhooks.
+- 📦 **Patrón de Parámetros Mutables (`Params.Extra`)**: Permite a los plugins interceptar solicitudes durante el pipeline de eventos y adjuntar metadatos dinámicos (`Set`/`Get`) antes de persisitir en base de datos.
+- 📢 **Bus de Eventos Reactivo Integrado**: Suscríbete a Hooks del ciclo de vida (`emailpassword.EventSignUpBefore`, `emailpassword.EventSignUpAfter`, etc.) para modificar datos en vuelo, enviar correos asíncronos o auditar accesos.
 - 🔐 **Seguridad de Grado de Producción**: Hasheo de contraseñas con `bcrypt`, generación segura de tokens con `crypto/rand` y 2FA TOTP (RFC 6238).
 - 🗄️ **Almacenamiento Desacoplado**: Conecta cualquier base de datos (**PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**, **Redis**, **GORM**) implementando interfaces limpias. Incluye un adaptador multihilo en memoria de fábrica.
 
@@ -43,7 +44,7 @@ go get github.com/BladiCreator/go-modular-auth
 
 ## 💡 Ejemplo Práctico de Producción
 
-A continuación se muestra un ejemplo completo que demuestra el registro de un usuario, suscripción a eventos de auditoría, inicio de sesión, generación de secreto 2FA (TOTP), verificación del código 2FA y validación activa de la sesión:
+A continuación se muestra un ejemplo completo que demuestra el registro de un usuario con interceptación de parámetros dinámicos, suscripción a eventos de auditoría, inicio de sesión, generación de secreto 2FA (TOTP) y verificación del código:
 
 ```go
 package main
@@ -57,7 +58,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
-	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -81,19 +81,25 @@ func main() {
 		log.Fatalf("Error al inicializar Auth: %v", err)
 	}
 
-	// 2. Suscripción a eventos del EventBus para casos de uso reales
-	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(c context.Context, user *entity.User) {
-		log.Printf("📧 [EVENTO] Enviando correo de bienvenida a: %s", user.Email)
+	// 2. Interceptación previa al registro para añadir datos dinámicos (Roles, Organizaciones, etc.)
+	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
+		payload.Params.Set("role", "admin")
+		payload.Params.Set("org_id", "org_123")
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, user *entity.User, session *entity.Session) {
-		log.Printf("🛡️ [AUDITORÍA] Login exitoso - Usuario ID: %s | IP: %s | Agent: %s",
-			user.ID, session.IPAddress, session.UserAgent)
+	// 3. Suscripción a eventos posteriores del EventBus
+	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
+		role, _ := payload.Params.Get("role")
+		log.Printf("📧 [EVENTO] Enviando correo de bienvenida a: %s (Rol: %v)", payload.User.Email, role)
 	})
 
-	// 3. Flujo 1: Registro de un nuevo usuario
+	app.Events().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
+		log.Printf("🛡️ [AUDITORÍA] Login exitoso - Usuario ID: %s | Email: %s", payload.User.ID, payload.User.Email)
+	})
+
+	// 4. Flujo 1: Registro de un nuevo usuario
 	fmt.Println("--- 1. Registro de Usuario ---")
-	newUser, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, &dto.SignUp{
+	newUser, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, dto.SignUpParams{
 		Name:     "Carlos Mendoza",
 		Email:    "carlos@empresa.com",
 		Password: "PasswordSuperSegura123!",
@@ -103,46 +109,33 @@ func main() {
 	}
 	fmt.Printf("✔ Usuario Registrado: %s (ID: %s)\n\n", newUser.Name, newUser.ID)
 
-	// 4. Flujo 2: Inicio de sesión (Creación de Sesión)
+	// 5. Flujo 2: Inicio de sesión
 	fmt.Println("--- 2. Inicio de Sesión ---")
-	user, session, err := auth.Plugin[emailpassword.Plugin](app).SignIn(ctx, &dto.SignIn{
+	signedInUser, err := auth.Plugin[emailpassword.Plugin](app).SignIn(ctx, dto.SignInParams{
 		Email:    "carlos@empresa.com",
 		Password: "PasswordSuperSegura123!",
-	}, &dto.CreateSession{
-		IPAddress: "192.168.1.50",
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 	})
 	if err != nil {
 		log.Fatalf("Error en el login: %v", err)
 	}
-	fmt.Printf("✔ Autenticado como: %s\n", user.Email)
-	fmt.Printf("✔ Token de Sesión: %s\n\n", session.Token)
+	fmt.Printf("✔ Autenticado exitosamente como: %s (ID: %s)\n\n", signedInUser.Email, signedInUser.ID)
 
-	// 5. Flujo 3: Activación y Configuración de 2FA TOTP
+	// 6. Flujo 3: Configuración de 2FA TOTP
 	fmt.Println("--- 3. Configuración de 2FA TOTP ---")
-	otpURI, err := auth.Plugin[twofactor.Plugin](app).GenerateTOTPSecret(ctx, user.ID)
+	otpURI, err := auth.Plugin[twofactor.Plugin](app).GenerateTOTPSecret(ctx, newUser.ID)
 	if err != nil {
 		log.Fatalf("Error al generar 2FA: %v", err)
 	}
 	fmt.Printf("✔ URI para aplicación Authenticator: %s\n\n", otpURI)
 
-	// 6. Flujo 4: Verificación del código 2FA ingresado por el usuario
+	// 7. Flujo 4: Verificación del código 2FA
 	fmt.Println("--- 4. Verificación de Código 2FA ---")
-	valid, err := auth.Plugin[twofactor.Plugin](app).VerifyCode(ctx, user.ID, "123456")
+	valid, err := auth.Plugin[twofactor.Plugin](app).VerifyCode(ctx, newUser.ID, "123456")
 	if err != nil || !valid {
 		fmt.Println("❌ Código 2FA inválido")
 	} else {
 		fmt.Println("✔ Código 2FA verificado exitosamente")
 	}
-	fmt.Println()
-
-	// 7. Flujo 5: Validación activa de la sesión (Middleware HTTP)
-	fmt.Println("--- 5. Validación de Token de Sesión ---")
-	activeUser, activeSession, err := auth.Plugin[emailpassword.Plugin](app).ValidateSession(ctx, session.Token)
-	if err != nil {
-		log.Fatalf("Sesión inválida o expirada: %v", err)
-	}
-	fmt.Printf("✔ Sesión Activa perteneciente a: %s (Expira: %s)\n", activeUser.Email, activeSession.ExpiresAt)
 }
 ```
 
@@ -212,12 +205,12 @@ func NewGormAuthRepository(db *gorm.DB) *GormAuthRepository {
 
 // --- Métodos de emailpassword.Repository ---
 
-func (r *GormAuthRepository) CreateUser(ctx context.Context, u *dto.SignUp) (*entity.User, error) {
+func (r *GormAuthRepository) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error) {
 	model := UserModel{
 		ID:           uuid.New().String(),
-		Name:         u.Name,
-		Email:        u.Email,
-		PasswordHash: u.Password,
+		Name:         params.Name,
+		Email:        params.Email,
+		PasswordHash: params.PasswordHash,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -245,7 +238,7 @@ func (r *GormAuthRepository) GetUserByID(ctx context.Context, id string) (*entit
 	return toUserEntity(&model), err
 }
 
-func (r *GormAuthRepository) CreateSession(ctx context.Context, s *dto.CreateSessionContext) (*entity.Session, error) {
+func (r *GormAuthRepository) CreateSession(ctx context.Context, s *dto.CreateSessionParams) (*entity.Session, error) {
 	model := SessionModel{
 		ID:        uuid.New().String(),
 		UserID:    s.UserID,
@@ -315,82 +308,36 @@ func toSessionEntity(m *SessionModel) *entity.Session {
 }
 ```
 
-### 2. Inyección del Repositorio GORM en el Motor
-
-```go
-db, err := gorm.Open(postgres.Open("host=localhost user=postgres password=secret dbname=auth_db port=5432 sslmode=disable"))
-if err != nil {
-    log.Fatal(err)
-}
-
-gormRepo := store.NewGormAuthRepository(db)
-
-app, err := auth.New(
-    config.WithPlugins(
-        plugins.EmailPassword(gormRepo, emailpassword.WithMinPasswordLength(10)),
-        plugins.TwoFactor(gormRepo, twofactor.WithIssuer("MiAplicacion")),
-    ),
-)
-```
-
 ---
 
-## 📢 Casos de Uso Avanzados del EventBus
+## 📢 Casos de Uso Avanzados del EventBus y Parámetros Mutables
 
-El Bus de Eventos decoupled permite reaccionar a cambios en el sistema sin acoplar la lógica de tu negocio dentro de la librería.
+El Bus de Eventos decoupled permite interceptar y modificar datos en vuelo durante el flujo de registro o reaccionar de forma asíncrona tras completar las acciones.
 
-### 1. Envío Asíncrono de Correos de Bienvenida
+### 1. Interceptación y Modificación de Parámetros de Registro (`Params.Set`)
 ```go
-app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, user *entity.User) {
+app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload *emailpassword.SignUpEventPayload) {
+    // Añadir atributos de plugins (ej. Organización o Rol inicial)
+    payload.Params.Set("organization_id", "org_987")
+    payload.Params.Set("role", "member")
+})
+```
+
+### 2. Envío Asíncrono de Correos de Bienvenida
+```go
+app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload *emailpassword.SignUpEventPayload) {
     // Ejecutar en goroutine asíncrona para no bloquear la respuesta HTTP
-    go func(email, name string) {
-        mailer.SendWelcomeEmail(email, name)
-    }(user.Email, user.Name)
+    go func(user *entity.User) {
+        mailer.SendWelcomeEmail(user.Email, user.Name)
+    }(payload.User)
 })
 ```
 
-### 2. Auditoría de Seguridad & Detección de Inicios de Sesión Sospechosos
+### 3. Auditoría de Seguridad en Inicios de Sesión
 ```go
-app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, user *entity.User, session *entity.Session) {
-    if isUnknownIP(session.IPAddress) {
-        securityLogger.Warn("Login desde ubicación desconocida", 
-            "userID", user.ID, 
-            "ip", session.IPAddress, 
-            "userAgent", session.UserAgent,
-        )
-        notificationService.NotifyUserSecurityAlert(user.ID, session.IPAddress)
-    }
+app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload *emailpassword.SignInEventPayload) {
+    securityLogger.Info("Login exitoso", "userID", payload.User.ID, "email", payload.User.Email)
 })
-```
-
----
-
-## 🌐 Integración con Frameworks Web (ej. Gin / Fiber / Chi)
-
-Puedes validar el token enviado en los encabezados HTTP `Authorization: Bearer <token>` mediante un middleware:
-
-```go
-func AuthMiddleware(app *auth.Auth) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        authHeader := c.GetHeader("Authorization")
-        if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-            c.AbortWithStatusJSON(401, gin.H{"error": "Token no proporcionado"})
-            return
-        }
-
-        token := authHeader[7:]
-        user, session, err := auth.Plugin[emailpassword.Plugin](app).ValidateSession(c.Request.Context(), token)
-        if err != nil {
-            c.AbortWithStatusJSON(401, gin.H{"error": "Sesión inválida o expirada"})
-            return
-        }
-
-        // Guardar datos en el contexto de la petición
-        c.Set("currentUser", user)
-        c.Set("currentSession", session)
-        c.Next()
-    }
-}
 ```
 
 ---
@@ -398,17 +345,21 @@ func AuthMiddleware(app *auth.Auth) gin.HandlerFunc {
 ## 🔌 Referencia Completa de Plugins
 
 ### 📧 Plugin `emailpassword`
-Maneja el registro de usuarios, autenticación y sesiones.
+Maneja el registro de usuarios, autenticación y contraseñas.
 
 - **Constructor**: `plugins.EmailPassword(repo, opts...)`
 - **Opciones de Configuración**:
   - `emailpassword.WithMinPasswordLength(minLen int)` (defecto: `8`)
-  - `emailpassword.WithSessionDuration(duration time.Duration)` (defecto: `7 días`)
+  - `emailpassword.WithRequireEmailVerification(require bool)` (defecto: `false`)
+  - `emailpassword.WithResetTokenExpiry(duration time.Duration)` (defecto: `1 hora`)
 - **Eventos emitidos**:
-  - `emailpassword.EventSignUpBefore` → `(ctx context.Context, req *dto.SignUp)`
-  - `emailpassword.EventSignUpAfter` → `(ctx context.Context, user *entity.User)`
-  - `emailpassword.EventSignInBefore` → `(ctx context.Context, req *dto.SignIn)`
-  - `emailpassword.EventSignInAfter` → `(ctx context.Context, user *entity.User, session *entity.Session)`
+  - `emailpassword.EventSignUpBefore` → `(ctx context.Context, payload *emailpassword.SignUpEventPayload)` (posee `Params *dto.CreateUserParams`)
+  - `emailpassword.EventSignUpAfter` → `(ctx context.Context, payload *emailpassword.SignUpEventPayload)` (posee `Params` y `User *entity.User`)
+  - `emailpassword.EventSignInBefore` → `(ctx context.Context, payload *emailpassword.SignInEventPayload)` (posee `User *entity.User`)
+  - `emailpassword.EventSignInAfter` → `(ctx context.Context, payload *emailpassword.SignInEventPayload)` (posee `User *entity.User`)
+  - `emailpassword.EventPasswordChangeBefore` / `After` → `(ctx context.Context, payload *emailpassword.PasswordChangeEventPayload)`
+  - `emailpassword.EventPasswordResetRequested` → `(ctx context.Context, payload *emailpassword.PasswordResetRequestedEventPayload)`
+  - `emailpassword.EventPasswordResetCompleted` → `(ctx context.Context, payload *emailpassword.PasswordResetCompletedEventPayload)`
 
 ---
 
@@ -419,7 +370,7 @@ Maneja la autenticación de 2 Factores mediante contraseñas temporales TOTP (RF
 - **Opciones de Configuración**:
   - `twofactor.WithIssuer(issuer string)` (defecto: `"Auth"`)
 - **Eventos emitidos**:
-  - `twofactor.EventTOTPGenerated` → `(ctx context.Context, userID string, secret string)`
+  - `twofactor.EventTOTPGenerated` → `(ctx context.Context, payload *twofactor.TOTPGeneratedEventPayload)`
 
 ---
 

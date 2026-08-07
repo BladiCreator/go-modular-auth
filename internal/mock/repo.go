@@ -41,18 +41,20 @@ func NewMockRepo() *MockRepo {
 }
 
 // User Methods
-func (m *MockRepo) CreateUser(ctx context.Context, u *entity.User) error {
+func (m *MockRepo) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if u.ID == "" {
-		u.ID = "usr_" + strconv.FormatInt(rand.Int63(), 10)
+	user := &entity.User{
+		ID:        "usr_" + strconv.FormatInt(rand.Int63(), 10),
+		Name:      params.Name,
+		Email:     params.Email,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	u.CreatedAt = time.Now()
-	u.UpdatedAt = time.Now()
 
-	m.users[u.ID] = u
-	return nil
+	m.users[user.ID] = user
+	return user, nil
 }
 
 func (m *MockRepo) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
@@ -161,7 +163,7 @@ func (m *MockRepo) DeleteVerificationToken(ctx context.Context, token string) er
 }
 
 // Session Methods
-func (m *MockRepo) CreateSession(ctx context.Context, sessionCtx *dto.CreateSessionContext) (*entity.Session, error) {
+func (m *MockRepo) CreateSession(ctx context.Context, sessionCtx *dto.CreateSessionParams) (*entity.Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

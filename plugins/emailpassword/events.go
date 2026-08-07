@@ -3,6 +3,7 @@ package emailpassword
 import (
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 )
 
@@ -43,7 +44,8 @@ const (
 
 // SignUpEventPayload contains the data associated with a sign-up event.
 type SignUpEventPayload struct {
-	User *entity.User
+	Params *dto.CreateUserParams
+	User   *entity.User
 }
 
 // SignInEventPayload contains the data associated with a sign-in event.

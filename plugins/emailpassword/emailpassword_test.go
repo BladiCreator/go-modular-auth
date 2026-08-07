@@ -35,7 +35,7 @@ func TestSignUp(t *testing.T) {
 	ctx := context.Background()
 
 	// Short password
-	_, err := p.SignUp(ctx, dto.SignUpDTO{
+	_, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "short",
 		Name:     "Test User",
@@ -45,7 +45,7 @@ func TestSignUp(t *testing.T) {
 	}
 
 	// Successful sign up
-	user, err := p.SignUp(ctx, dto.SignUpDTO{
+	user, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "password123",
 		Name:     "Test User",
@@ -58,7 +58,7 @@ func TestSignUp(t *testing.T) {
 	}
 
 	// Duplicate sign up
-	_, err = p.SignUp(ctx, dto.SignUpDTO{
+	_, err = p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "password123",
 		Name:     "Test User",
@@ -73,7 +73,7 @@ func TestSignIn(t *testing.T) {
 	ctx := context.Background()
 
 	// Register user
-	user, err := p.SignUp(ctx, dto.SignUpDTO{
+	user, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "signin@example.com",
 		Password: "password123",
 		Name:     "SignIn User",
@@ -83,7 +83,7 @@ func TestSignIn(t *testing.T) {
 	}
 
 	// Invalid password
-	_, err = p.SignIn(ctx, dto.SignInDTO{
+	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "wrongpassword",
 	})
@@ -92,7 +92,7 @@ func TestSignIn(t *testing.T) {
 	}
 
 	// Invalid email
-	_, err = p.SignIn(ctx, dto.SignInDTO{
+	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "nonexistent@example.com",
 		Password: "password123",
 	})
@@ -101,7 +101,7 @@ func TestSignIn(t *testing.T) {
 	}
 
 	// Successful sign in
-	signedInUser, err := p.SignIn(ctx, dto.SignInDTO{
+	signedInUser, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "password123",
 	})
@@ -114,7 +114,7 @@ func TestSignIn(t *testing.T) {
 
 	// Email verification required scenario
 	_, pVerify, _ := setupTestAuth(t, emailpassword.WithRequireEmailVerification(true))
-	unverifiedUser, err := pVerify.SignUp(ctx, dto.SignUpDTO{
+	unverifiedUser, err := pVerify.SignUp(ctx, dto.SignUpParams{
 		Email:    "unverified@example.com",
 		Password: "password123",
 		Name:     "Unverified User",
@@ -123,7 +123,7 @@ func TestSignIn(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	_, err = pVerify.SignIn(ctx, dto.SignInDTO{
+	_, err = pVerify.SignIn(ctx, dto.SignInParams{
 		Email:    "unverified@example.com",
 		Password: "password123",
 	})
@@ -135,7 +135,7 @@ func TestSignIn(t *testing.T) {
 	unverifiedUser.EmailVerified = true
 	_ = repo.UpdateUser(ctx, unverifiedUser)
 
-	_, err = pVerify.SignIn(ctx, dto.SignInDTO{
+	_, err = pVerify.SignIn(ctx, dto.SignInParams{
 		Email:    "unverified@example.com",
 		Password: "password123",
 	})
@@ -148,7 +148,7 @@ func TestChangePassword(t *testing.T) {
 	_, p, _ := setupTestAuth(t)
 	ctx := context.Background()
 
-	user, err := p.SignUp(ctx, dto.SignUpDTO{
+	user, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "changepass@example.com",
 		Password: "oldPassword123",
 		Name:     "ChangePass User",
@@ -158,7 +158,7 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	// Incorrect current password
-	err = p.ChangePassword(ctx, dto.ChangePasswordDTO{
+	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "wrongPassword",
 		NewPassword:     "newPassword123",
@@ -168,7 +168,7 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	// Short new password
-	err = p.ChangePassword(ctx, dto.ChangePasswordDTO{
+	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "oldPassword123",
 		NewPassword:     "short",
@@ -178,7 +178,7 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	// Successful password change
-	err = p.ChangePassword(ctx, dto.ChangePasswordDTO{
+	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "oldPassword123",
 		NewPassword:     "newPassword123",
@@ -188,7 +188,7 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	// Verify sign in with new password
-	_, err = p.SignIn(ctx, dto.SignInDTO{
+	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "changepass@example.com",
 		Password: "newPassword123",
 	})
@@ -202,13 +202,13 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	ctx := context.Background()
 
 	// Forgot password for non-existent user
-	_, err := p.ForgotPassword(ctx, dto.ForgotPasswordDTO{Email: "unknown@example.com"})
+	_, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "unknown@example.com"})
 	if err != emailpassword.ErrUserNotFound {
 		t.Errorf("Expected ErrUserNotFound, got %v", err)
 	}
 
 	// Register user
-	_, err = p.SignUp(ctx, dto.SignUpDTO{
+	_, err = p.SignUp(ctx, dto.SignUpParams{
 		Email:    "reset@example.com",
 		Password: "originalPassword123",
 		Name:     "Reset User",
@@ -218,7 +218,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 
 	// Request forgot password
-	tokenRecord, err := p.ForgotPassword(ctx, dto.ForgotPasswordDTO{Email: "reset@example.com"})
+	tokenRecord, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "reset@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 
 	// Reset password with invalid token
-	err = p.ResetPassword(ctx, dto.ResetPasswordDTO{
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
 		Token:       "invalid_token",
 		NewPassword: "brandNewPassword123",
 	})
@@ -236,7 +236,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 
 	// Successful reset password
-	err = p.ResetPassword(ctx, dto.ResetPasswordDTO{
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
 		Token:       tokenRecord.Token,
 		NewPassword: "brandNewPassword123",
 	})
@@ -245,7 +245,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 
 	// Verify sign in with new password
-	_, err = p.SignIn(ctx, dto.SignInDTO{
+	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "reset@example.com",
 		Password: "brandNewPassword123",
 	})
@@ -254,14 +254,14 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 
 	// Test token expiry
-	tokenRecordExpiry, err := p.ForgotPassword(ctx, dto.ForgotPasswordDTO{Email: "reset@example.com"})
+	tokenRecordExpiry, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "reset@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
 
 	time.Sleep(150 * time.Millisecond)
 
-	err = p.ResetPassword(ctx, dto.ResetPasswordDTO{
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
 		Token:       tokenRecordExpiry.Token,
 		NewPassword: "anotherPassword123",
 	})
@@ -294,7 +294,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	_, err := p.SignUp(ctx, dto.SignUpDTO{
+	_, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "events@example.com",
 		Password: "password123",
 		Name:     "Events User",
@@ -303,7 +303,7 @@ func TestEventEmissions(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	_, err = p.SignIn(ctx, dto.SignInDTO{
+	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "events@example.com",
 		Password: "password123",
 	})
@@ -311,7 +311,7 @@ func TestEventEmissions(t *testing.T) {
 		t.Fatalf("SignIn failed: %v", err)
 	}
 
-	_, err = p.ForgotPassword(ctx, dto.ForgotPasswordDTO{Email: "events@example.com"})
+	_, err = p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "events@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
@@ -324,5 +324,42 @@ func TestEventEmissions(t *testing.T) {
 	}
 	if !resetRequestedEmitted {
 		t.Error("Expected EventPasswordResetRequested to be emitted")
+	}
+}
+
+func TestSignUp_WithCreateUserParamsExtra(t *testing.T) {
+	app, p, _ := setupTestAuth(t)
+	ctx := context.Background()
+
+	var interceptedRole string
+	var extraFound bool
+
+	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
+			req.Params.Set("role", "admin")
+			req.Params.Set("org_id", "org_999")
+		}
+	})
+
+	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
+			if val, ok := req.Params.Get("role"); ok {
+				interceptedRole, _ = val.(string)
+				extraFound = true
+			}
+		}
+	})
+
+	_, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "extra@example.com",
+		Password: "password123",
+		Name:     "Extra User",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	if !extraFound || interceptedRole != "admin" {
+		t.Errorf("Expected role 'admin' in CreateUserParams.Extra, got %v (found: %v)", interceptedRole, extraFound)
 	}
 }
