@@ -20,40 +20,40 @@ func TestMockRepo_UserOperations(t *testing.T) {
 		Email: "dev@example.com",
 	}
 
-	t.Run("Crear y obtener usuario existente", func(t *testing.T) {
+	t.Run("Create and retrieve existing user", func(t *testing.T) {
 		createdUser, err := repo.CreateUser(ctx, paramsToCreate)
 		if err != nil {
-			t.Fatalf("no se esperaba error al crear usuario, se obtuvo: %v", err)
+			t.Fatalf("unexpected error creating user: %v", err)
 		}
 
-		// Buscar por email
+		// Find by email
 		foundByEmail, err := repo.GetUserByEmail(ctx, paramsToCreate.Email)
 		if err != nil {
-			t.Fatalf("se esperaba encontrar usuario por email, error: %v", err)
+			t.Fatalf("expected to find user by email, got error: %v", err)
 		}
 		if foundByEmail.ID != createdUser.ID {
-			t.Errorf("se esperaba ID %s, se obtuvo %s", createdUser.ID, foundByEmail.ID)
+			t.Errorf("expected ID %s, got %s", createdUser.ID, foundByEmail.ID)
 		}
 
-		// Buscar por ID
+		// Find by ID
 		foundByID, err := repo.GetUserByID(ctx, createdUser.ID)
 		if err != nil {
-			t.Fatalf("se esperaba encontrar usuario por ID, error: %v", err)
+			t.Fatalf("expected to find user by ID, got error: %v", err)
 		}
 		if foundByID.Email != paramsToCreate.Email {
-			t.Errorf("se esperaba email %s, se obtuvo %s", paramsToCreate.Email, foundByID.Email)
+			t.Errorf("expected email %s, got %s", paramsToCreate.Email, foundByID.Email)
 		}
 	})
 
-	t.Run("Manejo de errores cuando el usuario no existe", func(t *testing.T) {
-		_, err := repo.GetUserByEmail(ctx, "desconocido@example.com")
+	t.Run("Error handling when user does not exist", func(t *testing.T) {
+		_, err := repo.GetUserByEmail(ctx, "unknown@example.com")
 		if !errors.Is(err, domain.ErrUserNotFound) {
-			t.Errorf("se esperaba domain.ErrUserNotFound por email, se obtuvo: %v", err)
+			t.Errorf("expected domain.ErrUserNotFound by email, got: %v", err)
 		}
 
 		_, err = repo.GetUserByID(ctx, "usr_unknown")
 		if !errors.Is(err, domain.ErrUserNotFound) {
-			t.Errorf("se esperaba domain.ErrUserNotFound por ID, se obtuvo: %v", err)
+			t.Errorf("expected domain.ErrUserNotFound by ID, got: %v", err)
 		}
 	})
 }
@@ -64,39 +64,39 @@ func TestMockRepo_SessionOperations(t *testing.T) {
 
 	sessionParams := &dto.CreateSessionParams{
 		UserID:    "usr_123",
-		Token:     "token_secreto_abc",
+		Token:     "secret_token_abc",
 		IPAddress: "127.0.0.1",
 		UserAgent: "TestAgent",
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 		CreatedAt: time.Now(),
 	}
 
-	t.Run("Crear, consultar y eliminar sesión", func(t *testing.T) {
-		// 1. Crear sesión
+	t.Run("Create, query, and delete session", func(t *testing.T) {
+		// 1. Create session
 		createdSession, err := repo.CreateSession(ctx, sessionParams)
 		if err != nil {
-			t.Fatalf("error al crear la sesión: %v", err)
+			t.Fatalf("error creating session: %v", err)
 		}
 
-		// 2. Obtener por token
+		// 2. Retrieve by token
 		found, err := repo.GetSessionByToken(ctx, createdSession.Token)
 		if err != nil {
-			t.Fatalf("error al obtener la sesión por token: %v", err)
+			t.Fatalf("error retrieving session by token: %v", err)
 		}
 		if found.UserID != createdSession.UserID {
-			t.Errorf("se esperaba UserID %s, se obtuvo %s", createdSession.UserID, found.UserID)
+			t.Errorf("expected UserID %s, got %s", createdSession.UserID, found.UserID)
 		}
 
-		// 3. Eliminar sesión
+		// 3. Delete session
 		err = repo.DeleteSession(ctx, createdSession.Token)
 		if err != nil {
-			t.Fatalf("error al eliminar la sesión: %v", err)
+			t.Fatalf("error deleting session: %v", err)
 		}
 
-		// 4. Verificar que ya no existe
+		// 4. Verify session no longer exists
 		_, err = repo.GetSessionByToken(ctx, createdSession.Token)
 		if !errors.Is(err, domain.ErrSessionNotFound) {
-			t.Errorf("se esperaba domain.ErrSessionNotFound tras eliminar, se obtuvo: %v", err)
+			t.Errorf("expected domain.ErrSessionNotFound after deletion, got: %v", err)
 		}
 	})
 }
@@ -105,29 +105,29 @@ func TestMockRepo_2FAOperations(t *testing.T) {
 	ctx := context.Background()
 	repo := mock.NewMockRepo()
 
-	t.Run("Guardar y obtener secreto TOTP", func(t *testing.T) {
+	t.Run("Save and retrieve TOTP secret", func(t *testing.T) {
 		userID := "usr_123"
 		secret := "KVKFKRCPNZQUYWRX"
 
 		err := repo.SaveTOTPSecret(ctx, userID, secret)
 		if err != nil {
-			t.Fatalf("no se esperaba error al guardar secreto TOTP, se obtuvo: %v", err)
+			t.Fatalf("unexpected error saving TOTP secret: %v", err)
 		}
 
 		gotSecret, err := repo.GetTOTPSecret(ctx, userID)
 		if err != nil {
-			t.Fatalf("se esperaba encontrar secreto TOTP, error: %v", err)
+			t.Fatalf("expected to retrieve TOTP secret, got error: %v", err)
 		}
 
 		if gotSecret != secret {
-			t.Errorf("se esperaba secreto %s, se obtuvo %s", secret, gotSecret)
+			t.Errorf("expected secret %s, got %s", secret, gotSecret)
 		}
 	})
 
-	t.Run("Error al obtener secreto inexistente", func(t *testing.T) {
-		_, err := repo.GetTOTPSecret(ctx, "usr_desconocido")
+	t.Run("Error retrieving non-existent secret", func(t *testing.T) {
+		_, err := repo.GetTOTPSecret(ctx, "usr_unknown")
 		if !errors.Is(err, domain.ErrTOTPNotFound) {
-			t.Errorf("se esperaba domain.ErrTOTPNotFound, se obtuvo: %v", err)
+			t.Errorf("expected domain.ErrTOTPNotFound, got: %v", err)
 		}
 	})
 }

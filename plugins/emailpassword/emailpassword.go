@@ -16,11 +16,11 @@ const (
 )
 
 var (
-	ErrPasswordTooShort   = errors.New("emailpassword: la contraseña no cumple con la longitud mínima requerida")
-	ErrInvalidCredentials = errors.New("emailpassword: credenciales inválidas")
-	ErrEmailNotVerified   = errors.New("emailpassword: el correo electrónico no ha sido verificado")
-	ErrInvalidCurrentPass = errors.New("emailpassword: la contraseña actual es incorrecta")
-	ErrTokenExpired       = errors.New("emailpassword: el token ha expirado")
+	ErrPasswordTooShort   = errors.New("emailpassword: password does not meet the minimum length requirement")
+	ErrInvalidCredentials = errors.New("emailpassword: invalid credentials")
+	ErrEmailNotVerified   = errors.New("emailpassword: email address has not been verified")
+	ErrInvalidCurrentPass = errors.New("emailpassword: current password is incorrect")
+	ErrTokenExpired       = errors.New("emailpassword: token has expired")
 )
 
 // Plugin implements plugin.Plugin interface for email/password authentication.

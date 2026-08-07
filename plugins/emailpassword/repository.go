@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	ErrUserAlreadyExists = errors.New("emailpassword: el usuario ya existe")
-	ErrUserNotFound      = errors.New("emailpassword: usuario no encontrado")
-	ErrAccountNotFound   = errors.New("emailpassword: cuenta credencial no encontrada")
-	ErrInvalidToken      = errors.New("emailpassword: token de verificación inválido o expirado")
+	ErrUserAlreadyExists = errors.New("emailpassword: user already exists")
+	ErrUserNotFound      = errors.New("emailpassword: user not found")
+	ErrAccountNotFound   = errors.New("emailpassword: credential account not found")
+	ErrInvalidToken      = errors.New("emailpassword: verification token invalid or expired")
 )
 
 // Repository defines the persistent storage contract required by the EmailPassword plugin.
