@@ -4,6 +4,7 @@ package memory
 import (
 	"context"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
+	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -20,6 +22,7 @@ var (
 	_ emailpassword.Repository = (*Store)(nil)
 	_ twofactor.Repository     = (*Store)(nil)
 	_ bearer.Repository        = (*Store)(nil)
+	_ jwt.Repository           = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -33,6 +36,7 @@ type Store struct {
 	totpSecrets   map[string]string
 	twoFactors    map[string]*twofactor.TwoFactor    // key: userID
 	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
+	jwks          map[string]*jwt.JWKRecord          // key: kid
 }
 
 // New instantiates a new thread-safe in-memory Store.
@@ -46,6 +50,7 @@ func New() *Store {
 		totpSecrets:   make(map[string]string),
 		twoFactors:    make(map[string]*twofactor.TwoFactor),
 		otpChallenges: make(map[string]*twofactor.OTPChallenge),
+		jwks:          make(map[string]*jwt.JWKRecord),
 	}
 }
 
@@ -270,5 +275,62 @@ func (s *Store) DeleteOTPChallenge(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.otpChallenges, key)
+	return nil
+}
+
+// JWKS Methods (jwt.Repository)
+func (s *Store) GetLatestKey(ctx context.Context) (*jwt.JWKRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var latest *jwt.JWKRecord
+	for _, k := range s.jwks {
+		if latest == nil || k.CreatedAt.After(latest.CreatedAt) {
+			latest = k
+		}
+	}
+	if latest == nil {
+		return nil, jwt.ErrKeyNotFound
+	}
+	return latest, nil
+}
+
+func (s *Store) GetKeyByID(ctx context.Context, id string) (*jwt.JWKRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if k, ok := s.jwks[id]; ok {
+		return k, nil
+	}
+	return nil, jwt.ErrKeyNotFound
+}
+
+func (s *Store) GetAllKeys(ctx context.Context) ([]*jwt.JWKRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	records := make([]*jwt.JWKRecord, 0, len(s.jwks))
+	for _, k := range s.jwks {
+		records = append(records, k)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].CreatedAt.After(records[j].CreatedAt)
+	})
+	return records, nil
+}
+
+func (s *Store) CreateKey(ctx context.Context, record *jwt.JWKRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.jwks[record.ID] = record
+	return nil
+}
+
+func (s *Store) DeleteKey(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.jwks, id)
 	return nil
 }

@@ -5,6 +5,7 @@ package plugins
 import (
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
+	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -84,4 +85,36 @@ func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.P
 //	)
 func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 	return bearer.New(repo, opts...)
+}
+
+// JWT instantiates a new JSON Web Token authentication plugin configured with a key repository and functional options.
+//
+// The JWT plugin provides RFC 7519 JSON Web Token issuance and RFC 7517 JSON Web Key Set (JWKS) key management,
+// supporting modern asymmetric cryptographic algorithms (Ed25519/EdDSA, ECDSA ES256/ES512, RSA RS256/PS256),
+// AES-256-GCM authenticated encryption for private keys in persistent storage, and automatic key rotation with grace periods.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - jwt.WithIssuer(issuer string): Issuer identifier ("iss" claim) in generated tokens (default: "GoModularAuth").
+//   - jwt.WithAudience(aud ...string): Audience identifiers ("aud" claim) in generated tokens.
+//   - jwt.WithExpiration(duration time.Duration): Expiration duration ("exp" claim) for tokens (default: 15 minutes).
+//   - jwt.WithAlgorithm(alg jwt.Algorithm): Asymmetric signing algorithm (default: jwt.AlgEdDSA / Ed25519).
+//   - jwt.WithSecret(secret string): Symmetric encryption secret used to protect private keys via AES-256-GCM.
+//   - jwt.WithGracePeriod(grace time.Duration): Grace period for keeping expired keys in public JWKS (default: 30 days).
+//   - jwt.WithDefinePayload(fn jwt.PayloadFunc): Callback to inject custom claims based on session and user.
+//   - jwt.WithGetSubject(fn jwt.SubjectFunc): Callback to resolve the subject ("sub") claim.
+//
+// Example:
+//
+//	jwtPlugin := plugins.JWT(
+//		myJWKRepository,
+//		jwt.WithIssuer("https://auth.example.com"),
+//		jwt.WithSecret("my-aes-encryption-secret-32b"),
+//		jwt.WithAlgorithm(jwt.AlgEdDSA),
+//		jwt.WithExpiration(30 * time.Minute),
+//	)
+func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
+	return jwt.New(repo, opts...)
 }
