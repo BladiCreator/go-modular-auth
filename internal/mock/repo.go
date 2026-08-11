@@ -27,7 +27,7 @@ type MockRepo struct {
 	tokens        map[string]*entity.VerificationToken  // key: token string
 	sessions      map[string]*entity.Session
 	totpSecrets   map[string]string
-	twoFactors    map[string]*twofactor.TwoFactor   // key: userID
+	twoFactors    map[string]*twofactor.TwoFactor    // key: userID
 	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
@@ -18,6 +19,7 @@ import (
 var (
 	_ emailpassword.Repository = (*Store)(nil)
 	_ twofactor.Repository     = (*Store)(nil)
+	_ bearer.Repository        = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -29,7 +31,7 @@ type Store struct {
 	tokens        map[string]*entity.VerificationToken  // key: token string
 	sessions      map[string]*entity.Session
 	totpSecrets   map[string]string
-	twoFactors    map[string]*twofactor.TwoFactor   // key: userID
+	twoFactors    map[string]*twofactor.TwoFactor    // key: userID
 	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
 }
 

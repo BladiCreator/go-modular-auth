@@ -183,12 +183,14 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 // persists the TwoFactor record, and returns the TOTP URI alongside unconsumed recovery codes.
 //
 // Brief Explanation:
-//   Generates a cryptographically random 20-byte secret encoded in Base32, creates the configured amount of
-//   alphanumeric backup recovery codes, stores the TwoFactor entity in the repository, and publishes
-//   EventEnableTwoFactorBefore, EventEnableTwoFactorAfter, and EventTOTPGenerated.
+//
+//	Generates a cryptographically random 20-byte secret encoded in Base32, creates the configured amount of
+//	alphanumeric backup recovery codes, stores the TwoFactor entity in the repository, and publishes
+//	EventEnableTwoFactorBefore, EventEnableTwoFactorAfter, and EventTOTPGenerated.
 //
 // Function:
-//   Initial step for enrolling a user in Two-Factor Authentication.
+//
+//	Initial step for enrolling a user in Two-Factor Authentication.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -291,10 +293,12 @@ func (p *Plugin) Enable(ctx context.Context, params EnableParams) (*EnableResult
 // Disable removes 2FA configuration for the given user, effectively deactivating two-factor enforcement.
 //
 // Brief Explanation:
-//   Deletes the user's TwoFactor record from storage and emits EventDisableTwoFactorBefore and EventDisableTwoFactorAfter.
+//
+//	Deletes the user's TwoFactor record from storage and emits EventDisableTwoFactorBefore and EventDisableTwoFactorAfter.
 //
 // Function:
-//   Deactivates MFA for a user account.
+//
+//	Deactivates MFA for a user account.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -333,10 +337,12 @@ func (p *Plugin) Disable(ctx context.Context, params DisableParams) error {
 // GetTOTPURI retrieves the TOTP setup URI for an already configured user.
 //
 // Brief Explanation:
-//   Looks up the user's stored Base32 secret and reconstructs the otpauth:// URI for re-display in settings.
+//
+//	Looks up the user's stored Base32 secret and reconstructs the otpauth:// URI for re-display in settings.
 //
 // Function:
-//   Retrieves QR code URI for existing 2FA users.
+//
+//	Retrieves QR code URI for existing 2FA users.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -372,12 +378,14 @@ func (p *Plugin) GetTOTPURI(ctx context.Context, params GetTOTPURIParams) (strin
 // VerifyTOTP validates a user-provided RFC 6238 TOTP code against their stored secret with a ±1 period drift window.
 //
 // Brief Explanation:
-//   Checks if the user account is locked due to rate limiting, calculates HMAC-SHA1 codes across the tolerance
-//   window (t-period, t, t+period), increments failure count on mismatch (locking account if limit reached),
-//   resets failures on success, marks 2FA as verified, and emits EventVerifyTOTPBefore and EventVerifyTOTPAfter.
+//
+//	Checks if the user account is locked due to rate limiting, calculates HMAC-SHA1 codes across the tolerance
+//	window (t-period, t, t+period), increments failure count on mismatch (locking account if limit reached),
+//	resets failures on success, marks 2FA as verified, and emits EventVerifyTOTPBefore and EventVerifyTOTPAfter.
 //
 // Function:
-//   Primary second-factor verification step during login or sensitive operations.
+//
+//	Primary second-factor verification step during login or sensitive operations.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -443,11 +451,13 @@ func (p *Plugin) VerifyTOTP(ctx context.Context, params VerifyTOTPParams) (bool,
 // GenerateBackupCodes regenerates a fresh set of single-use recovery codes, overwriting any previous codes.
 //
 // Brief Explanation:
-//   Generates new alphanumeric codes according to BackupCodeAmount and BackupCodeLength, serializes them to JSON,
-//   and saves the updated TwoFactor record.
+//
+//	Generates new alphanumeric codes according to BackupCodeAmount and BackupCodeLength, serializes them to JSON,
+//	and saves the updated TwoFactor record.
 //
 // Function:
-//   Allows users to regenerate recovery codes when running low or following a security reset.
+//
+//	Allows users to regenerate recovery codes when running low or following a security reset.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -491,12 +501,14 @@ func (p *Plugin) GenerateBackupCodes(ctx context.Context, params GenerateBackupC
 // VerifyBackupCode verifies and atomically consumes a single-use backup code.
 //
 // Brief Explanation:
-//   Validates the user's recovery code (case-insensitive, ignoring hyphens), removes the used code from
-//   storage so it cannot be reused, resets failure counters, and emits EventVerifyBackupCodeAfter with the
-//   number of remaining backup codes.
+//
+//	Validates the user's recovery code (case-insensitive, ignoring hyphens), removes the used code from
+//	storage so it cannot be reused, resets failure counters, and emits EventVerifyBackupCodeAfter with the
+//	number of remaining backup codes.
 //
 // Function:
-//   Account recovery when an authenticator device is lost.
+//
+//	Account recovery when an authenticator device is lost.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -573,10 +585,12 @@ func (p *Plugin) VerifyBackupCode(ctx context.Context, params VerifyBackupCodePa
 // ViewBackupCodes returns the list of active unconsumed single-use backup codes.
 //
 // Brief Explanation:
-//   Retrieves and parses the user's TwoFactor backup codes array from storage.
+//
+//	Retrieves and parses the user's TwoFactor backup codes array from storage.
 //
 // Function:
-//   Allows authenticated users to view their remaining recovery codes in profile security settings.
+//
+//	Allows authenticated users to view their remaining recovery codes in profile security settings.
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -607,11 +621,13 @@ func (p *Plugin) ViewBackupCodes(ctx context.Context, params ViewBackupCodesPara
 // SendOTP generates a short-lived numeric challenge and triggers the registered SendOTP delivery callback (SMS/Email).
 //
 // Brief Explanation:
-//   Generates a cryptographically secure random numeric string of length OTPDigits, persists an OTPChallenge record
-//   with an expiration timestamp, calls the user's SendOTP callback, and publishes EventSendOTPBefore and EventSendOTPAfter.
+//
+//	Generates a cryptographically secure random numeric string of length OTPDigits, persists an OTPChallenge record
+//	with an expiration timestamp, calls the user's SendOTP callback, and publishes EventSendOTPBefore and EventSendOTPAfter.
 //
 // Function:
-//   Out-of-band challenge-based 2FA (e.g. SMS code or Email verification).
+//
+//	Out-of-band challenge-based 2FA (e.g. SMS code or Email verification).
 //
 // Arguments:
 //   - ctx: Request cancellation context.
@@ -677,12 +693,14 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) error {
 // VerifyOTP validates a user-submitted code against an active OTP challenge.
 //
 // Brief Explanation:
-//   Retrieves the stored challenge, checks expiration and maximum attempt thresholds, validates equality,
-//   deletes the challenge on success (enforcing single use), or increments attempt counters on failure.
-//   Emits EventVerifyOTPAfter.
+//
+//	Retrieves the stored challenge, checks expiration and maximum attempt thresholds, validates equality,
+//	deletes the challenge on success (enforcing single use), or increments attempt counters on failure.
+//	Emits EventVerifyOTPAfter.
 //
 // Function:
-//   Validates temporary challenge codes delivered out-of-band.
+//
+//	Validates temporary challenge codes delivered out-of-band.
 //
 // Arguments:
 //   - ctx: Request cancellation context.

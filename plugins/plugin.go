@@ -3,6 +3,7 @@
 package plugins
 
 import (
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
@@ -57,4 +58,30 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 //	)
 func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.Plugin {
 	return twofactor.New(repo, opts...)
+}
+
+// Bearer instantiates a new Bearer authentication plugin configured with an optional session repository and functional options.
+//
+// The Bearer plugin handles RFC 7235 compliant Bearer token extraction, HMAC-SHA256 cryptographic signing and verification
+// with constant-time comparison, CORS header exposition, and seamless session resolution for API and mobile clients.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - bearer.WithSecret(secret string): Cryptographic HMAC secret key used for signing and verifying tokens.
+//   - bearer.WithRequireSignature(require bool): Enforce that incoming tokens must already have a valid HMAC signature.
+//   - bearer.WithTokenHeader(header string): Customize incoming authorization header name (default: "Authorization").
+//   - bearer.WithAuthTokenHeader(header string): Customize outgoing token header name (default: "set-auth-token").
+//   - bearer.WithExposeHeaders(expose bool): Enable CORS Access-Control-Expose-Headers propagation.
+//
+// Example:
+//
+//	bearerPlugin := plugins.Bearer(
+//		myRepository,
+//		bearer.WithSecret("my-cryptographic-secret-key"),
+//		bearer.WithRequireSignature(false),
+//	)
+func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
+	return bearer.New(repo, opts...)
 }
