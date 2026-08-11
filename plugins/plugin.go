@@ -6,6 +6,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -118,3 +119,34 @@ func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
 	return jwt.New(repo, opts...)
 }
+
+// Organization instantiates a new Organization multi-tenancy plugin configured with a repository and options.
+//
+// The Organization plugin provides multi-tenancy, organization lifecycle management, member and role management,
+// static and dynamic Role-Based Access Control (RBAC), team hierarchies (Teams), and full invitation workflows.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - organization.WithCreatorRole(role string): Role assigned to the organization creator (default: "owner").
+//   - organization.WithInvitationExpiresIn(duration time.Duration): Duration for invitation expiry (default: 48h).
+//   - organization.WithMembershipLimit(limit int): Max members per organization.
+//   - organization.WithOrganizationLimit(limit int): Max organizations created per user.
+//   - organization.WithTeams(enabled, defaultTeam, allowRemovingAll bool): Configure teams sub-module.
+//   - organization.WithDynamicAccessControl(enabled bool): Enable database-persisted dynamic roles.
+//   - organization.WithCustomRoles(roles map[string]Permissions): Define custom static roles.
+//   - organization.WithSendInvitationEmail(fn SendInvitationEmailFunc): Email delivery callback.
+//
+// Example:
+//
+//	orgPlugin := plugins.Organization(
+//		myOrgRepository,
+//		organization.WithTeams(true, true, false),
+//		organization.WithDynamicAccessControl(true),
+//		organization.WithInvitationExpiresIn(72 * time.Hour),
+//	)
+func Organization(repo organization.Repository, opts ...organization.Option) *organization.Plugin {
+	return organization.New(repo, opts...)
+}
+
