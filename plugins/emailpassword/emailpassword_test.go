@@ -2,6 +2,7 @@ package emailpassword_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,11 +32,21 @@ func setupTestAuth(t *testing.T, opts ...emailpassword.Option) (*auth.Auth, *ema
 }
 
 func TestSignUp(t *testing.T) {
-	_, p, _ := setupTestAuth(t, emailpassword.WithMinPasswordLength(8))
+	_, p, _ := setupTestAuth(t, emailpassword.WithMinPasswordLength(8), emailpassword.WithMaxPasswordLength(32))
 	ctx := context.Background()
 
-	// Short password
+	// 1. Invalid email
 	_, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "not-an-email",
+		Password: "password123",
+		Name:     "Test User",
+	})
+	if err != emailpassword.ErrInvalidEmail {
+		t.Errorf("Expected ErrInvalidEmail, got %v", err)
+	}
+
+	// 2. Short password
+	_, err = p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "short",
 		Name:     "Test User",
@@ -44,7 +55,17 @@ func TestSignUp(t *testing.T) {
 		t.Errorf("Expected ErrPasswordTooShort, got %v", err)
 	}
 
-	// Successful sign up
+	// 3. Password exceeding maximum length
+	_, err = p.SignUp(ctx, dto.SignUpParams{
+		Email:    "test@example.com",
+		Password: "thispasswordiswaytoolongtofitinthespecifiedlimit1234567890",
+		Name:     "Test User",
+	})
+	if err != emailpassword.ErrPasswordTooLong {
+		t.Errorf("Expected ErrPasswordTooLong, got %v", err)
+	}
+
+	// 4. Successful sign up
 	user, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "password123",
@@ -57,7 +78,7 @@ func TestSignUp(t *testing.T) {
 		t.Errorf("Expected email test@example.com, got %s", user.Email)
 	}
 
-	// Duplicate sign up
+	// 5. Duplicate sign up
 	_, err = p.SignUp(ctx, dto.SignUpParams{
 		Email:    "test@example.com",
 		Password: "password123",
@@ -65,6 +86,47 @@ func TestSignUp(t *testing.T) {
 	})
 	if err != emailpassword.ErrUserAlreadyExists {
 		t.Errorf("Expected ErrUserAlreadyExists, got %v", err)
+	}
+}
+
+func TestSignUp_WithSendVerificationOnSignUp(t *testing.T) {
+	var callbackInvoked bool
+	var capturedEmail, capturedToken string
+
+	_, p, _ := setupTestAuth(t,
+		emailpassword.WithSendVerificationOnSignUp(true),
+		emailpassword.WithSendVerificationEmail(func(ctx context.Context, email string, token string, expiresAt time.Time, extra map[string]any) error {
+			callbackInvoked = true
+			capturedEmail = email
+			capturedToken = token
+			return nil
+		}),
+	)
+	ctx := context.Background()
+
+	user, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "autosend@example.com",
+		Password: "password123",
+		Name:     "Auto Send",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	if !callbackInvoked {
+		t.Error("Expected SendVerificationEmail callback to be invoked on sign up")
+	}
+	if capturedEmail != "autosend@example.com" || capturedToken == "" {
+		t.Errorf("Unexpected captured email or token: %s, %s", capturedEmail, capturedToken)
+	}
+
+	// Complete verification
+	verifiedUser, err := p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: capturedToken})
+	if err != nil {
+		t.Fatalf("VerifyEmail failed: %v", err)
+	}
+	if verifiedUser.ID != user.ID || !verifiedUser.EmailVerified {
+		t.Errorf("Expected user email to be verified, got: %v", verifiedUser.EmailVerified)
 	}
 }
 
@@ -82,7 +144,7 @@ func TestSignIn(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	// Invalid password
+	// 1. Invalid password
 	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "wrongpassword",
@@ -91,7 +153,7 @@ func TestSignIn(t *testing.T) {
 		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
 	}
 
-	// Invalid email
+	// 2. Non-existent email (triggers constant-time fake hash)
 	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "nonexistent@example.com",
 		Password: "password123",
@@ -100,7 +162,7 @@ func TestSignIn(t *testing.T) {
 		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
 	}
 
-	// Successful sign in
+	// 3. Successful sign in
 	signedInUser, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "password123",
@@ -112,7 +174,7 @@ func TestSignIn(t *testing.T) {
 		t.Errorf("Expected user ID %s, got %s", user.ID, signedInUser.ID)
 	}
 
-	// Email verification required scenario
+	// 4. Email verification required scenario
 	_, pVerify, _ := setupTestAuth(t, emailpassword.WithRequireEmailVerification(true))
 	unverifiedUser, err := pVerify.SignUp(ctx, dto.SignUpParams{
 		Email:    "unverified@example.com",
@@ -157,7 +219,17 @@ func TestChangePassword(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	// Incorrect current password
+	// 1. Missing user ID
+	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
+		UserID:          "",
+		CurrentPassword: "oldPassword123",
+		NewPassword:     "newPassword123",
+	})
+	if err != emailpassword.ErrInvalidParameter {
+		t.Errorf("Expected ErrInvalidParameter, got %v", err)
+	}
+
+	// 2. Incorrect current password
 	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "wrongPassword",
@@ -167,7 +239,7 @@ func TestChangePassword(t *testing.T) {
 		t.Errorf("Expected ErrInvalidCurrentPass, got %v", err)
 	}
 
-	// Short new password
+	// 3. Short new password
 	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "oldPassword123",
@@ -177,7 +249,7 @@ func TestChangePassword(t *testing.T) {
 		t.Errorf("Expected ErrPasswordTooShort, got %v", err)
 	}
 
-	// Successful password change
+	// 4. Successful password change
 	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
 		UserID:          user.ID,
 		CurrentPassword: "oldPassword123",
@@ -187,7 +259,7 @@ func TestChangePassword(t *testing.T) {
 		t.Fatalf("ChangePassword failed: %v", err)
 	}
 
-	// Verify sign in with new password
+	// 5. Verify sign in with new password
 	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "changepass@example.com",
 		Password: "newPassword123",
@@ -198,16 +270,32 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestForgotPasswordAndResetPassword(t *testing.T) {
-	_, p, _ := setupTestAuth(t, emailpassword.WithResetTokenExpiry(100*time.Millisecond))
+	var callbackFired bool
+	var callbackToken string
+
+	_, p, _ := setupTestAuth(t,
+		emailpassword.WithResetTokenExpiry(100*time.Millisecond),
+		emailpassword.WithSendResetPasswordEmail(func(ctx context.Context, email, token string, expiresAt time.Time, extra map[string]any) error {
+			callbackFired = true
+			callbackToken = token
+			return nil
+		}),
+	)
 	ctx := context.Background()
 
-	// Forgot password for non-existent user
-	_, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "unknown@example.com"})
+	// 1. Invalid email
+	_, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "invalid-email"})
+	if err != emailpassword.ErrInvalidEmail {
+		t.Errorf("Expected ErrInvalidEmail, got %v", err)
+	}
+
+	// 2. Forgot password for non-existent user
+	_, err = p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "unknown@example.com"})
 	if err != emailpassword.ErrUserNotFound {
 		t.Errorf("Expected ErrUserNotFound, got %v", err)
 	}
 
-	// Register user
+	// 3. Register user
 	_, err = p.SignUp(ctx, dto.SignUpParams{
 		Email:    "reset@example.com",
 		Password: "originalPassword123",
@@ -217,7 +305,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	// Request forgot password
+	// 4. Request forgot password
 	tokenRecord, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "reset@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
@@ -225,8 +313,20 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	if tokenRecord.Token == "" {
 		t.Error("Expected non-empty token string")
 	}
+	if !callbackFired || callbackToken != tokenRecord.Token {
+		t.Error("Expected SendResetPasswordEmail callback to be executed with token")
+	}
 
-	// Reset password with invalid token
+	// 5. Reset password with empty token
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
+		Token:       "",
+		NewPassword: "brandNewPassword123",
+	})
+	if err != emailpassword.ErrInvalidParameter {
+		t.Errorf("Expected ErrInvalidParameter, got %v", err)
+	}
+
+	// 6. Reset password with invalid token
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
 		Token:       "invalid_token",
 		NewPassword: "brandNewPassword123",
@@ -235,7 +335,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 		t.Errorf("Expected ErrInvalidToken, got %v", err)
 	}
 
-	// Successful reset password
+	// 7. Successful reset password
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
 		Token:       tokenRecord.Token,
 		NewPassword: "brandNewPassword123",
@@ -244,7 +344,16 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 		t.Fatalf("ResetPassword failed: %v", err)
 	}
 
-	// Verify sign in with new password
+	// 8. Single-use verification: retry with same token must fail
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
+		Token:       tokenRecord.Token,
+		NewPassword: "anotherPassword123",
+	})
+	if err != emailpassword.ErrInvalidToken {
+		t.Errorf("Expected ErrInvalidToken when reusing consumed token, got %v", err)
+	}
+
+	// 9. Verify sign in with new password
 	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "reset@example.com",
 		Password: "brandNewPassword123",
@@ -253,7 +362,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 		t.Errorf("SignIn with reset password failed: %v", err)
 	}
 
-	// Test token expiry
+	// 10. Test token expiry
 	tokenRecordExpiry, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "reset@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
@@ -270,31 +379,246 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	}
 }
 
+func TestSendVerificationEmailAndVerifyEmail(t *testing.T) {
+	var callbackFired bool
+	var callbackToken string
+
+	_, p, _ := setupTestAuth(t,
+		emailpassword.WithVerificationTokenExpiry(100*time.Millisecond),
+		emailpassword.WithSendVerificationEmail(func(ctx context.Context, email, token string, expiresAt time.Time, extra map[string]any) error {
+			callbackFired = true
+			callbackToken = token
+			return nil
+		}),
+	)
+	ctx := context.Background()
+
+	// 1. Invalid email format
+	_, err := p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{Email: "bad-email"})
+	if err != emailpassword.ErrInvalidEmail {
+		t.Errorf("Expected ErrInvalidEmail, got %v", err)
+	}
+
+	// 2. Non-existent user
+	_, err = p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{Email: "unknown@example.com"})
+	if err != emailpassword.ErrUserNotFound {
+		t.Errorf("Expected ErrUserNotFound, got %v", err)
+	}
+
+	// 3. Register user
+	user, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "verifytest@example.com",
+		Password: "password123",
+		Name:     "Verify User",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+	if user.EmailVerified {
+		t.Error("Expected user.EmailVerified to be false initially")
+	}
+
+	// 4. Send verification email
+	tokenRecord, err := p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{Email: "verifytest@example.com"})
+	if err != nil {
+		t.Fatalf("SendVerificationEmail failed: %v", err)
+	}
+	if !callbackFired || callbackToken != tokenRecord.Token {
+		t.Error("Expected SendVerificationEmail callback to be executed")
+	}
+
+	// 5. Verify email with empty token
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: ""})
+	if err != emailpassword.ErrInvalidParameter {
+		t.Errorf("Expected ErrInvalidParameter, got %v", err)
+	}
+
+	// 6. Verify email with invalid token
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: "non_existent_token"})
+	if err != emailpassword.ErrInvalidToken {
+		t.Errorf("Expected ErrInvalidToken, got %v", err)
+	}
+
+	// 7. Successful verification
+	verifiedUser, err := p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Token})
+	if err != nil {
+		t.Fatalf("VerifyEmail failed: %v", err)
+	}
+	if !verifiedUser.EmailVerified {
+		t.Error("Expected EmailVerified to be true")
+	}
+
+	// 8. Single-use token verification: second consumption must fail
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Token})
+	if err != emailpassword.ErrInvalidToken {
+		t.Errorf("Expected ErrInvalidToken on reusing consumed token, got %v", err)
+	}
+
+	// 9. Token expiration test
+	tokenRecordExpiry, err := p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{Email: "verifytest@example.com"})
+	if err != nil {
+		t.Fatalf("SendVerificationEmail failed: %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecordExpiry.Token})
+	if err != emailpassword.ErrTokenExpired {
+		t.Errorf("Expected ErrTokenExpired, got %v", err)
+	}
+}
+
+func TestVerifyPassword(t *testing.T) {
+	_, p, _ := setupTestAuth(t)
+	ctx := context.Background()
+
+	// 1. Missing parameter
+	_, err := p.VerifyPassword(ctx, dto.VerifyPasswordParams{UserID: "", Password: "pwd"})
+	if err != emailpassword.ErrInvalidParameter {
+		t.Errorf("Expected ErrInvalidParameter, got %v", err)
+	}
+
+	// 2. Non-existent account
+	_, err = p.VerifyPassword(ctx, dto.VerifyPasswordParams{UserID: "unknown_id", Password: "pwd"})
+	if err != emailpassword.ErrAccountNotFound {
+		t.Errorf("Expected ErrAccountNotFound, got %v", err)
+	}
+
+	// 3. Register user
+	user, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "verifypass@example.com",
+		Password: "SuperSecret123!",
+		Name:     "VerifyPass User",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	// 4. Valid password check
+	valid, err := p.VerifyPassword(ctx, dto.VerifyPasswordParams{
+		UserID:   user.ID,
+		Password: "SuperSecret123!",
+	})
+	if err != nil {
+		t.Fatalf("VerifyPassword failed: %v", err)
+	}
+	if !valid {
+		t.Error("Expected password to be valid")
+	}
+
+	// 5. Invalid password check
+	valid, err = p.VerifyPassword(ctx, dto.VerifyPasswordParams{
+		UserID:   user.ID,
+		Password: "WrongPassword!",
+	})
+	if err != nil {
+		t.Fatalf("VerifyPassword failed: %v", err)
+	}
+	if valid {
+		t.Error("Expected password to be invalid")
+	}
+}
+
 func TestEventEmissions(t *testing.T) {
 	app, p, _ := setupTestAuth(t)
 	ctx := context.Background()
 
-	var signUpAfterEmitted, signInAfterEmitted, resetRequestedEmitted bool
+	var (
+		mu                           sync.Mutex
+		signUpBeforeEmitted          bool
+		signUpAfterEmitted           bool
+		signInBeforeEmitted          bool
+		signInAfterEmitted           bool
+		passChangeBeforeEmitted      bool
+		passChangeAfterEmitted       bool
+		resetRequestedEmitted        bool
+		resetCompletedEmitted        bool
+		emailVerifRequestedEmitted   bool
+		emailVerifiedEmitted         bool
+	)
+
+	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
+			signUpBeforeEmitted = true
+		}
+	})
 
 	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.User != nil {
 			signUpAfterEmitted = true
 		}
 	})
 
+	app.Events().Subscribe(emailpassword.EventSignInBefore, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil {
+			signInBeforeEmitted = true
+		}
+	})
+
 	app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil {
 			signInAfterEmitted = true
 		}
 	})
 
+	app.Events().Subscribe(emailpassword.EventPasswordChangeBefore, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.PasswordChangeEventPayload); ok && req.UserID != "" {
+			passChangeBeforeEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(emailpassword.EventPasswordChangeAfter, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.PasswordChangeEventPayload); ok && req.UserID != "" {
+			passChangeAfterEmitted = true
+		}
+	})
+
 	app.Events().Subscribe(emailpassword.EventPasswordResetRequested, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.PasswordResetRequestedEventPayload); ok && req.Token != "" {
 			resetRequestedEmitted = true
 		}
 	})
 
-	_, err := p.SignUp(ctx, dto.SignUpParams{
+	app.Events().Subscribe(emailpassword.EventPasswordResetCompleted, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.PasswordResetCompletedEventPayload); ok && req.UserID != "" {
+			resetCompletedEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(emailpassword.EventEmailVerificationRequested, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.EmailVerificationRequestedEventPayload); ok && req.Token != "" {
+			emailVerifRequestedEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(emailpassword.EventEmailVerified, func(ctx context.Context, payload any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if req, ok := payload.(*emailpassword.EmailVerifiedEventPayload); ok && req.User != nil {
+			emailVerifiedEmitted = true
+		}
+	})
+
+	// 1. SignUp
+	user, err := p.SignUp(ctx, dto.SignUpParams{
 		Email:    "events@example.com",
 		Password: "password123",
 		Name:     "Events User",
@@ -303,6 +627,7 @@ func TestEventEmissions(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
+	// 2. SignIn
 	_, err = p.SignIn(ctx, dto.SignInParams{
 		Email:    "events@example.com",
 		Password: "password123",
@@ -311,19 +636,71 @@ func TestEventEmissions(t *testing.T) {
 		t.Fatalf("SignIn failed: %v", err)
 	}
 
-	_, err = p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "events@example.com"})
+	// 3. ChangePassword
+	err = p.ChangePassword(ctx, dto.ChangePasswordParams{
+		UserID:          user.ID,
+		CurrentPassword: "password123",
+		NewPassword:     "newPassword456",
+	})
+	if err != nil {
+		t.Fatalf("ChangePassword failed: %v", err)
+	}
+
+	// 4. ForgotPassword & ResetPassword
+	resetToken, err := p.ForgotPassword(ctx, dto.ForgotPasswordParams{Email: "events@example.com"})
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
+	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
+		Token:       resetToken.Token,
+		NewPassword: "newerPassword789",
+	})
+	if err != nil {
+		t.Fatalf("ResetPassword failed: %v", err)
+	}
 
+	// 5. SendVerificationEmail & VerifyEmail
+	verifToken, err := p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{Email: "events@example.com"})
+	if err != nil {
+		t.Fatalf("SendVerificationEmail failed: %v", err)
+	}
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: verifToken.Token})
+	if err != nil {
+		t.Fatalf("VerifyEmail failed: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if !signUpBeforeEmitted {
+		t.Error("Expected EventSignUpBefore to be emitted")
+	}
 	if !signUpAfterEmitted {
 		t.Error("Expected EventSignUpAfter to be emitted")
+	}
+	if !signInBeforeEmitted {
+		t.Error("Expected EventSignInBefore to be emitted")
 	}
 	if !signInAfterEmitted {
 		t.Error("Expected EventSignInAfter to be emitted")
 	}
+	if !passChangeBeforeEmitted {
+		t.Error("Expected EventPasswordChangeBefore to be emitted")
+	}
+	if !passChangeAfterEmitted {
+		t.Error("Expected EventPasswordChangeAfter to be emitted")
+	}
 	if !resetRequestedEmitted {
 		t.Error("Expected EventPasswordResetRequested to be emitted")
+	}
+	if !resetCompletedEmitted {
+		t.Error("Expected EventPasswordResetCompleted to be emitted")
+	}
+	if !emailVerifRequestedEmitted {
+		t.Error("Expected EventEmailVerificationRequested to be emitted")
+	}
+	if !emailVerifiedEmitted {
+		t.Error("Expected EventEmailVerified to be emitted")
 	}
 }
 

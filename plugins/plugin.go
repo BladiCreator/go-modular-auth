@@ -13,15 +13,20 @@ import (
 // EmailPassword instantiates a new EmailPassword authentication plugin configured with the given repository and options.
 //
 // The EmailPassword plugin handles traditional user registration (sign-up), login authentication (sign-in),
-// password changes, forgot/reset password flows, and lifecycle event hooks.
+// password changes, forgot/reset password flows, email verification, active password verification, and lifecycle event hooks.
 //
 // # Configuration Options
 //
 // You can pass functional options to customize the plugin:
 //
 //   - emailpassword.WithMinPasswordLength(minLen int): Minimum password length required during registration (default: 8).
+//   - emailpassword.WithMaxPasswordLength(maxLen int): Maximum allowed password length (default: 128).
 //   - emailpassword.WithRequireEmailVerification(require bool): Require email verification before sign-in (default: false).
+//   - emailpassword.WithSendVerificationOnSignUp(send bool): Automatically dispatch verification email on sign-up (default: false).
 //   - emailpassword.WithResetTokenExpiry(duration time.Duration): Expiry duration for reset tokens (default: 15 minutes).
+//   - emailpassword.WithVerificationTokenExpiry(duration time.Duration): Expiry duration for verification tokens (default: 24 hours).
+//   - emailpassword.WithSendResetPasswordEmail(fn SendEmailFunc): Transactional email callback for reset links.
+//   - emailpassword.WithSendVerificationEmail(fn SendEmailFunc): Transactional email callback for verification links.
 //
 // Example:
 //
@@ -29,6 +34,7 @@ import (
 //		myRepository,
 //		emailpassword.WithMinPasswordLength(10),
 //		emailpassword.WithResetTokenExpiry(30 * time.Minute),
+//		emailpassword.WithRequireEmailVerification(true),
 //	)
 func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) *emailpassword.Plugin {
 	return emailpassword.New(repo, opts...)
