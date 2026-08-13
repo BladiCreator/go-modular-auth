@@ -19,6 +19,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -29,6 +30,7 @@ var (
 	_ jwt.Repository           = (*Store)(nil)
 	_ organization.Repository  = (*Store)(nil)
 	_ admin.Repository         = (*Store)(nil)
+	_ passkey.Repository       = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -53,6 +55,10 @@ type Store struct {
 	teams          map[string]*organization.Team
 	teamMembers    map[string]*organization.TeamMember // key: teamID + ":" + userID
 	orgRoles       map[string]*organization.OrganizationRole
+
+	passkeys               map[string]*entity.Passkey          // key: id
+	passkeysByCredentialID map[string]*entity.Passkey          // key: credentialID
+	passkeyChallenges      map[string]*passkey.PasskeyChallenge // key: token
 }
 
 // New instantiates a new thread-safe in-memory Store.
@@ -74,9 +80,12 @@ func New() *Store {
 		members:        make(map[string]*organization.Member),
 		membersByID:    make(map[string]*organization.Member),
 		invitations:    make(map[string]*organization.Invitation),
-		teams:          make(map[string]*organization.Team),
-		teamMembers:    make(map[string]*organization.TeamMember),
-		orgRoles:       make(map[string]*organization.OrganizationRole),
+		teams:                  make(map[string]*organization.Team),
+		teamMembers:            make(map[string]*organization.TeamMember),
+		orgRoles:               make(map[string]*organization.OrganizationRole),
+		passkeys:               make(map[string]*entity.Passkey),
+		passkeysByCredentialID: make(map[string]*entity.Passkey),
+		passkeyChallenges:      make(map[string]*passkey.PasskeyChallenge),
 	}
 }
 
@@ -1258,3 +1267,153 @@ func (s *Store) CountRoles(ctx context.Context, orgID string) (int, error) {
 	}
 	return count, nil
 }
+
+// Passkey Repository Implementation
+
+func (s *Store) CreatePasskey(ctx context.Context, pk *entity.Passkey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.passkeys[pk.ID]; exists {
+		return passkey.ErrPasskeyAlreadyExists
+	}
+	if _, exists := s.passkeysByCredentialID[pk.CredentialID]; exists {
+		return passkey.ErrPasskeyAlreadyExists
+	}
+
+	s.passkeys[pk.ID] = pk
+	s.passkeysByCredentialID[pk.CredentialID] = pk
+	return nil
+}
+
+func (s *Store) GetPasskeyByID(ctx context.Context, id string) (*entity.Passkey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if pk, ok := s.passkeys[id]; ok {
+		return pk, nil
+	}
+	return nil, passkey.ErrPasskeyNotFound
+}
+
+func (s *Store) GetPasskeyByCredentialID(ctx context.Context, credentialID string) (*entity.Passkey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if pk, ok := s.passkeysByCredentialID[credentialID]; ok {
+		return pk, nil
+	}
+	return nil, passkey.ErrPasskeyNotFound
+}
+
+func (s *Store) ListPasskeysByUserID(ctx context.Context, userID string) ([]*entity.Passkey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*entity.Passkey
+	for _, pk := range s.passkeys {
+		if pk.UserID == userID {
+			result = append(result, pk)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	})
+
+	return result, nil
+}
+
+func (s *Store) UpdatePasskey(ctx context.Context, pk *entity.Passkey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.passkeys[pk.ID]; !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	s.passkeys[pk.ID] = pk
+	s.passkeysByCredentialID[pk.CredentialID] = pk
+	return nil
+}
+
+func (s *Store) UpdatePasskeyCounter(ctx context.Context, id string, newCounter uint32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pk, ok := s.passkeys[id]
+	if !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	pk.Counter = newCounter
+	pk.UpdatedAt = time.Now()
+	return nil
+}
+
+func (s *Store) DeletePasskey(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pk, ok := s.passkeys[id]
+	if !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	delete(s.passkeys, id)
+	delete(s.passkeysByCredentialID, pk.CredentialID)
+	return nil
+}
+
+func (s *Store) DeletePasskeysByUserID(ctx context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id, pk := range s.passkeys {
+		if pk.UserID == userID {
+			delete(s.passkeys, id)
+			delete(s.passkeysByCredentialID, pk.CredentialID)
+		}
+	}
+	return nil
+}
+
+func (s *Store) SavePasskeyChallenge(ctx context.Context, challenge *passkey.PasskeyChallenge) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.passkeyChallenges[challenge.Token] = challenge
+	return nil
+}
+
+func (s *Store) GetPasskeyChallenge(ctx context.Context, token string) (*passkey.PasskeyChallenge, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if c, ok := s.passkeyChallenges[token]; ok {
+		return c, nil
+	}
+	return nil, passkey.ErrChallengeNotFound
+}
+
+func (s *Store) ConsumePasskeyChallenge(ctx context.Context, token string) (*passkey.PasskeyChallenge, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if c, ok := s.passkeyChallenges[token]; ok {
+		delete(s.passkeyChallenges, token)
+		return c, nil
+	}
+	return nil, passkey.ErrChallengeNotFound
+}
+
+func (s *Store) DeletePasskeyChallenge(ctx context.Context, token string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.passkeyChallenges, token)
+	return nil
+}
+
+
+

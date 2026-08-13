@@ -15,6 +15,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -22,6 +23,7 @@ var (
 	_ emailpassword.Repository = (*MockRepo)(nil)
 	_ twofactor.Repository     = (*MockRepo)(nil)
 	_ admin.Repository         = (*MockRepo)(nil)
+	_ passkey.Repository       = (*MockRepo)(nil)
 )
 
 type MockRepo struct {
@@ -34,8 +36,11 @@ type MockRepo struct {
 	totpSecrets    map[string]string
 	twoFactors     map[string]*twofactor.TwoFactor         // key: userID
 	otpChallenges  map[string]*twofactor.OTPChallenge      // key: challenge key
-	trustedDevices map[string]*twofactor.TrustDeviceRecord // key: userID + ":" + deviceID
-	challenges     map[string]*twofactor.ChallengeRecord   // key: token
+	trustedDevices         map[string]*twofactor.TrustDeviceRecord // key: userID + ":" + deviceID
+	challenges             map[string]*twofactor.ChallengeRecord   // key: token
+	passkeys               map[string]*entity.Passkey              // key: id
+	passkeysByCredentialID map[string]*entity.Passkey              // key: credentialID
+	passkeyChallenges      map[string]*passkey.PasskeyChallenge     // key: token
 }
 
 func NewMockRepo() *MockRepo {
@@ -48,8 +53,11 @@ func NewMockRepo() *MockRepo {
 		totpSecrets:    make(map[string]string),
 		twoFactors:     make(map[string]*twofactor.TwoFactor),
 		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
-		trustedDevices: make(map[string]*twofactor.TrustDeviceRecord),
-		challenges:     make(map[string]*twofactor.ChallengeRecord),
+		trustedDevices:         make(map[string]*twofactor.TrustDeviceRecord),
+		challenges:             make(map[string]*twofactor.ChallengeRecord),
+		passkeys:               make(map[string]*entity.Passkey),
+		passkeysByCredentialID: make(map[string]*entity.Passkey),
+		passkeyChallenges:      make(map[string]*passkey.PasskeyChallenge),
 	}
 }
 
@@ -515,3 +523,152 @@ func (m *MockRepo) DeleteChallenge(ctx context.Context, token string) error {
 	delete(m.challenges, token)
 	return nil
 }
+
+// Passkey Repository Methods
+
+func (m *MockRepo) CreatePasskey(ctx context.Context, pk *entity.Passkey) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.passkeys[pk.ID]; exists {
+		return passkey.ErrPasskeyAlreadyExists
+	}
+	if _, exists := m.passkeysByCredentialID[pk.CredentialID]; exists {
+		return passkey.ErrPasskeyAlreadyExists
+	}
+
+	m.passkeys[pk.ID] = pk
+	m.passkeysByCredentialID[pk.CredentialID] = pk
+	return nil
+}
+
+func (m *MockRepo) GetPasskeyByID(ctx context.Context, id string) (*entity.Passkey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if pk, ok := m.passkeys[id]; ok {
+		return pk, nil
+	}
+	return nil, passkey.ErrPasskeyNotFound
+}
+
+func (m *MockRepo) GetPasskeyByCredentialID(ctx context.Context, credentialID string) (*entity.Passkey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if pk, ok := m.passkeysByCredentialID[credentialID]; ok {
+		return pk, nil
+	}
+	return nil, passkey.ErrPasskeyNotFound
+}
+
+func (m *MockRepo) ListPasskeysByUserID(ctx context.Context, userID string) ([]*entity.Passkey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*entity.Passkey
+	for _, pk := range m.passkeys {
+		if pk.UserID == userID {
+			result = append(result, pk)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	})
+
+	return result, nil
+}
+
+func (m *MockRepo) UpdatePasskey(ctx context.Context, pk *entity.Passkey) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.passkeys[pk.ID]; !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	m.passkeys[pk.ID] = pk
+	m.passkeysByCredentialID[pk.CredentialID] = pk
+	return nil
+}
+
+func (m *MockRepo) UpdatePasskeyCounter(ctx context.Context, id string, newCounter uint32) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	pk, ok := m.passkeys[id]
+	if !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	pk.Counter = newCounter
+	pk.UpdatedAt = time.Now()
+	return nil
+}
+
+func (m *MockRepo) DeletePasskey(ctx context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	pk, ok := m.passkeys[id]
+	if !ok {
+		return passkey.ErrPasskeyNotFound
+	}
+
+	delete(m.passkeys, id)
+	delete(m.passkeysByCredentialID, pk.CredentialID)
+	return nil
+}
+
+func (m *MockRepo) DeletePasskeysByUserID(ctx context.Context, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, pk := range m.passkeys {
+		if pk.UserID == userID {
+			delete(m.passkeys, id)
+			delete(m.passkeysByCredentialID, pk.CredentialID)
+		}
+	}
+	return nil
+}
+
+func (m *MockRepo) SavePasskeyChallenge(ctx context.Context, challenge *passkey.PasskeyChallenge) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.passkeyChallenges[challenge.Token] = challenge
+	return nil
+}
+
+func (m *MockRepo) GetPasskeyChallenge(ctx context.Context, token string) (*passkey.PasskeyChallenge, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if c, ok := m.passkeyChallenges[token]; ok {
+		return c, nil
+	}
+	return nil, passkey.ErrChallengeNotFound
+}
+
+func (m *MockRepo) ConsumePasskeyChallenge(ctx context.Context, token string) (*passkey.PasskeyChallenge, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if c, ok := m.passkeyChallenges[token]; ok {
+		delete(m.passkeyChallenges, token)
+		return c, nil
+	}
+	return nil, passkey.ErrChallengeNotFound
+}
+
+func (m *MockRepo) DeletePasskeyChallenge(ctx context.Context, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	delete(m.passkeyChallenges, token)
+	return nil
+}
+
+

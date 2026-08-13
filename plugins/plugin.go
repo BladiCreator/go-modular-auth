@@ -8,6 +8,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -194,3 +195,39 @@ func Organization(repo organization.Repository, opts ...organization.Option) *or
 func Admin(repo admin.Repository, opts ...admin.Option) *admin.Plugin {
 	return admin.New(repo, opts...)
 }
+
+// Passkey instantiates a new Passkey (WebAuthn / FIDO2 / Passwordless) authentication plugin configured with a repository and options.
+//
+// The Passkey plugin provides biometric and security key passwordless authentication, resident keys (discoverable credentials / conditional UI),
+// AAGUID authenticator metadata lookup, replay and cloning protection via monotonic signature counters, and full lifecycle event dispatching.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - passkey.WithRPDisplayName(name string): Relying Party human-readable name (default: "GoModularAuth").
+//   - passkey.WithRPID(rpID string): Relying Party domain identifier (default: "localhost").
+//   - passkey.WithRPOrigins(origins ...string): Allowed origin URLs (e.g. "http://localhost:3000").
+//   - passkey.WithChallengeTimeout(d time.Duration): Expiry duration for ephemeral challenges (default: 5m).
+//   - passkey.WithRequireSessionOnRegistration(require bool): Enforce active user session during registration (default: true).
+//   - passkey.WithUserVerification(uv protocol.UserVerificationRequirement): Verification requirement (discouraged, preferred, required).
+//   - passkey.WithResidentKey(rk protocol.ResidentKeyRequirement): Resident key requirement (discouraged, preferred, required).
+//   - passkey.WithAttestation(att protocol.ConveyancePreference): Attestation conveyance (none, indirect, direct, enterprise).
+//   - passkey.WithAuthenticatorAttachment(att protocol.AuthenticatorAttachment): Restrict attachment (platform, cross-platform).
+//   - passkey.WithSessionDuration(d time.Duration): Duration for created user sessions (default: 7 days).
+//   - passkey.WithResolveUser(fn passkey.ResolveUserFunc): User resolution callback when registration occurs without an active session.
+//   - passkey.WithAfterRegistration(hook passkey.AfterRegistrationHook): Lifecycle callback executed after successful registration.
+//   - passkey.WithAfterAuthentication(hook passkey.AfterAuthenticationHook): Lifecycle callback executed after successful authentication.
+//
+// Example:
+//
+//	passkeyPlugin := plugins.Passkey(
+//		myPasskeyRepository,
+//		passkey.WithRPDisplayName("Acme Corp"),
+//		passkey.WithRPID("auth.acme.com"),
+//		passkey.WithRPOrigins("https://auth.acme.com", "https://app.acme.com"),
+//	)
+func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
+	return passkey.New(repo, opts...)
+}
+
