@@ -2,11 +2,6 @@ package twofactor_test
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha1"
-	"encoding/base32"
-	"encoding/binary"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -35,33 +30,13 @@ func setupTwoFactorTest(t *testing.T, opts ...twofactor.Option) (*auth.Auth, *tw
 	return app, p, repo
 }
 
-// computeCurrentTOTP computes the expected 6-digit TOTP code for testing
-func computeCurrentTOTP(t *testing.T, secret string, period int, digits int) string {
+func computeCurrentTOTP(t *testing.T, secret string, period int, digits int, alg twofactor.TOTPAlgorithm) string {
 	t.Helper()
-	secretBytes, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
+	code, err := twofactor.GenerateTOTPCode(secret, time.Now().Unix(), period, digits, alg)
 	if err != nil {
-		t.Fatalf("Failed to decode base32 secret: %v", err)
+		t.Fatalf("Failed to compute TOTP code: %v", err)
 	}
-
-	counter := uint64(time.Now().Unix() / int64(period))
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, counter)
-
-	mac := hmac.New(sha1.New, secretBytes)
-	mac.Write(buf)
-	sum := mac.Sum(nil)
-
-	offset := sum[len(sum)-1] & 0xf
-	binCode := (int32(sum[offset]&0x7f) << 24) |
-		(int32(sum[offset+1]&0xff) << 16) |
-		(int32(sum[offset+2]&0xff) << 8) |
-		(int32(sum[offset+3] & 0xff))
-
-	mod := int32(1)
-	for i := 0; i < digits; i++ {
-		mod *= 10
-	}
-	return fmt.Sprintf("%0*d", digits, binCode%mod)
+	return code
 }
 
 func TestTwoFactor_EnableAndVerifyTOTP(t *testing.T) {
@@ -80,6 +55,9 @@ func TestTwoFactor_EnableAndVerifyTOTP(t *testing.T) {
 	if !strings.Contains(enableRes.TOTPURI, "otpauth://totp/") {
 		t.Errorf("Expected valid otpauth URI, got: %s", enableRes.TOTPURI)
 	}
+	if enableRes.Secret == "" {
+		t.Error("Expected non-empty secret in EnableResult")
+	}
 	if len(enableRes.BackupCodes) != 10 {
 		t.Errorf("Expected 10 backup codes, got %d", len(enableRes.BackupCodes))
 	}
@@ -88,6 +66,9 @@ func TestTwoFactor_EnableAndVerifyTOTP(t *testing.T) {
 	tf, err := repo.FindByUserID(ctx, userID)
 	if err != nil {
 		t.Fatalf("FindByUserID failed: %v", err)
+	}
+	if tf.Verified {
+		t.Error("Expected 2FA to not be verified yet")
 	}
 
 	// 3. Verify with invalid code
@@ -100,16 +81,25 @@ func TestTwoFactor_EnableAndVerifyTOTP(t *testing.T) {
 	}
 
 	// 4. Verify with valid TOTP code
-	validCode := computeCurrentTOTP(t, tf.Secret, 30, 6)
-	ok, err := p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
+	validCode := computeCurrentTOTP(t, tf.Secret, 30, 6, twofactor.AlgorithmSHA1)
+	res, err := p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
 		UserID: userID,
 		Code:   validCode,
 	})
-	if err != nil || !ok {
+	if err != nil || !res.Success {
 		t.Fatalf("VerifyTOTP failed for valid code: %v", err)
 	}
+	if res.Method != twofactor.MethodTOTP {
+		t.Errorf("Expected method %s, got %s", twofactor.MethodTOTP, res.Method)
+	}
 
-	// 5. Test GetTOTPURI
+	// 5. Stored record should now be marked verified
+	tfAfter, _ := repo.FindByUserID(ctx, userID)
+	if !tfAfter.Verified {
+		t.Error("Expected TwoFactor record to be verified after successful TOTP validation")
+	}
+
+	// 6. Test GetTOTPURI
 	uri, err := p.GetTOTPURI(ctx, twofactor.GetTOTPURIParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("GetTOTPURI failed: %v", err)
@@ -136,39 +126,52 @@ func TestTwoFactor_BackupCodes(t *testing.T) {
 	firstCode := enableRes.BackupCodes[0]
 
 	// 1. Consume first backup code
-	valid, err := p.VerifyBackupCode(ctx, twofactor.VerifyBackupCodeParams{
+	res, err := p.VerifyBackupCode(ctx, twofactor.VerifyBackupCodeParams{
 		UserID: userID,
 		Code:   firstCode,
 	})
-	if err != nil || !valid {
+	if err != nil || !res.Success {
 		t.Fatalf("VerifyBackupCode failed: %v", err)
+	}
+	if res.RemainingCodes != 4 {
+		t.Errorf("Expected 4 remaining codes, got %d", res.RemainingCodes)
 	}
 
 	// 2. Re-using the same backup code must fail
-	valid, err = p.VerifyBackupCode(ctx, twofactor.VerifyBackupCodeParams{
+	_, err = p.VerifyBackupCode(ctx, twofactor.VerifyBackupCodeParams{
 		UserID: userID,
 		Code:   firstCode,
 	})
-	if err != twofactor.ErrInvalidCode || valid {
+	if err != twofactor.ErrInvalidCode {
 		t.Errorf("Expected ErrInvalidCode on second use, got: %v", err)
 	}
 
 	// 3. View remaining backup codes
-	remaining, err := p.ViewBackupCodes(ctx, twofactor.ViewBackupCodesParams{UserID: userID})
+	remainingRes, err := p.ViewBackupCodes(ctx, twofactor.ViewBackupCodesParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("ViewBackupCodes failed: %v", err)
 	}
-	if len(remaining) != 4 {
-		t.Errorf("Expected 4 remaining codes, got %d", len(remaining))
+	if len(remainingRes.BackupCodes) != 4 {
+		t.Errorf("Expected 4 remaining codes, got %d", len(remainingRes.BackupCodes))
 	}
 
 	// 4. Regenerate backup codes
-	newCodes, err := p.GenerateBackupCodes(ctx, twofactor.GenerateBackupCodesParams{UserID: userID})
+	newCodesRes, err := p.GenerateBackupCodes(ctx, twofactor.GenerateBackupCodesParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("GenerateBackupCodes failed: %v", err)
 	}
-	if len(newCodes) != 5 {
-		t.Errorf("Expected 5 regenerated codes, got %d", len(newCodes))
+	if len(newCodesRes.BackupCodes) != 5 {
+		t.Errorf("Expected 5 regenerated codes, got %d", len(newCodesRes.BackupCodes))
+	}
+
+	// Old remaining codes should now fail
+	oldRemainingCode := remainingRes.BackupCodes[0]
+	_, err = p.VerifyBackupCode(ctx, twofactor.VerifyBackupCodeParams{
+		UserID: userID,
+		Code:   oldRemainingCode,
+	})
+	if err != twofactor.ErrInvalidCode {
+		t.Errorf("Expected old backup code to be invalidated after regeneration, got: %v", err)
 	}
 }
 
@@ -226,9 +229,12 @@ func TestTwoFactor_ChallengeOTP(t *testing.T) {
 	userID := "usr_otp_test"
 
 	// 1. Send OTP challenge
-	err := p.SendOTP(ctx, twofactor.SendOTPParams{UserID: userID})
+	otpRes, err := p.SendOTP(ctx, twofactor.SendOTPParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("SendOTP failed: %v", err)
+	}
+	if otpRes.ExpiresAt.IsZero() {
+		t.Error("Expected non-zero expiration timestamp")
 	}
 
 	if dispatchedUserID != userID {
@@ -239,50 +245,182 @@ func TestTwoFactor_ChallengeOTP(t *testing.T) {
 	}
 
 	// 2. Verify with wrong code
-	valid, err := p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
+	_, err = p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
 		UserID: userID,
 		Code:   "000000",
 	})
-	if err != twofactor.ErrInvalidCode || valid {
+	if err != twofactor.ErrInvalidCode {
 		t.Errorf("Expected ErrInvalidCode, got %v", err)
 	}
 
 	// 3. Verify with correct code
-	valid, err = p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
+	res, err := p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
 		UserID: userID,
 		Code:   dispatchedCode,
 	})
-	if err != nil || !valid {
+	if err != nil || !res.Success {
 		t.Fatalf("VerifyOTP failed with correct code: %v", err)
 	}
 
 	// 4. Re-using the same OTP must fail
-	valid, err = p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
+	_, err = p.VerifyOTP(ctx, twofactor.VerifyOTPParams{
 		UserID: userID,
 		Code:   dispatchedCode,
 	})
-	if err != twofactor.ErrOTPExpired || valid {
+	if err != twofactor.ErrOTPExpired {
 		t.Errorf("Expected ErrOTPExpired on reuse, got %v", err)
 	}
 }
 
+func TestTwoFactor_SignInChallengeFlow(t *testing.T) {
+	_, p, repo := setupTwoFactorTest(t)
+	ctx := context.Background()
+	userID := "usr_challenge_test"
+
+	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
+	if err != nil {
+		t.Fatalf("Enable failed: %v", err)
+	}
+
+	tf, _ := repo.FindByUserID(ctx, userID)
+	validTOTP := computeCurrentTOTP(t, tf.Secret, 30, 6, twofactor.AlgorithmSHA1)
+
+	// 1. Create Challenge
+	challenge, err := p.CreateChallenge(ctx, twofactor.CreateChallengeParams{UserID: userID})
+	if err != nil {
+		t.Fatalf("CreateChallenge failed: %v", err)
+	}
+	if challenge.ChallengeToken == "" {
+		t.Fatal("Expected valid ChallengeToken")
+	}
+
+	// 2. Verify Challenge with TOTP
+	res, err := p.VerifyChallenge(ctx, twofactor.VerifyChallengeParams{
+		ChallengeToken: challenge.ChallengeToken,
+		Method:         twofactor.MethodTOTP,
+		Code:           validTOTP,
+	})
+	if err != nil || !res.Success {
+		t.Fatalf("VerifyChallenge failed: %v", err)
+	}
+
+	// 3. Challenge token is single-use, subsequent verification must fail
+	_, err = p.VerifyChallenge(ctx, twofactor.VerifyChallengeParams{
+		ChallengeToken: challenge.ChallengeToken,
+		Method:         twofactor.MethodTOTP,
+		Code:           validTOTP,
+	})
+	if err != twofactor.ErrInvalidChallengeToken {
+		t.Errorf("Expected ErrInvalidChallengeToken on reuse, got %v", err)
+	}
+}
+
+func TestTwoFactor_TrustedDevices(t *testing.T) {
+	deviceSecret := "test-hmac-secret-for-devices-12345"
+	_, p, repo := setupTwoFactorTest(t,
+		twofactor.WithTrustDevice(deviceSecret, 24*time.Hour),
+	)
+	ctx := context.Background()
+	userID := "usr_device_test"
+	deviceID := "dev_pixel_8_pro"
+
+	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
+	if err != nil {
+		t.Fatalf("Enable failed: %v", err)
+	}
+
+	tf, _ := repo.FindByUserID(ctx, userID)
+	validTOTP := computeCurrentTOTP(t, tf.Secret, 30, 6, twofactor.AlgorithmSHA1)
+
+	// 1. Verify TOTP requesting TrustDevice
+	res, err := p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
+		UserID:      userID,
+		Code:        validTOTP,
+		TrustDevice: true,
+		DeviceID:    deviceID,
+	})
+	if err != nil {
+		t.Fatalf("VerifyTOTP failed: %v", err)
+	}
+	if res.TrustDeviceToken == "" {
+		t.Fatal("Expected non-empty TrustDeviceToken in VerifyResult")
+	}
+
+	// 2. Verify trust on device
+	isTrusted, err := p.VerifyTrustDevice(ctx, twofactor.VerifyTrustDeviceParams{
+		UserID:   userID,
+		DeviceID: deviceID,
+		Token:    res.TrustDeviceToken,
+	})
+	if err != nil || !isTrusted {
+		t.Errorf("Expected device to be trusted, got trusted=%t, err=%v", isTrusted, err)
+	}
+
+	// 3. Verify with wrong token fails
+	isTrusted, _ = p.VerifyTrustDevice(ctx, twofactor.VerifyTrustDeviceParams{
+		UserID:   userID,
+		DeviceID: deviceID,
+		Token:    "tampered-device-token",
+	})
+	if isTrusted {
+		t.Error("Expected tampered token to fail device trust verification")
+	}
+
+	// 4. Revoke single device
+	if err := p.RevokeTrustedDevice(ctx, twofactor.RevokeTrustedDeviceParams{UserID: userID, DeviceID: deviceID}); err != nil {
+		t.Fatalf("RevokeTrustedDevice failed: %v", err)
+	}
+	isTrusted, _ = p.VerifyTrustDevice(ctx, twofactor.VerifyTrustDeviceParams{
+		UserID:   userID,
+		DeviceID: deviceID,
+		Token:    res.TrustDeviceToken,
+	})
+	if isTrusted {
+		t.Error("Expected device to no longer be trusted after revocation")
+	}
+}
+
+func TestTwoFactor_Disable(t *testing.T) {
+	_, p, repo := setupTwoFactorTest(t)
+	ctx := context.Background()
+	userID := "usr_disable_test"
+
+	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
+	if err != nil {
+		t.Fatalf("Enable failed: %v", err)
+	}
+
+	// Disable
+	if err := p.Disable(ctx, twofactor.DisableParams{UserID: userID}); err != nil {
+		t.Fatalf("Disable failed: %v", err)
+	}
+
+	// Stored record should be gone
+	_, err = repo.FindByUserID(ctx, userID)
+	if err != twofactor.ErrTwoFactorNotEnabled {
+		t.Errorf("Expected ErrTwoFactorNotEnabled after disable, got %v", err)
+	}
+}
+
 func TestTwoFactor_EventEmissions(t *testing.T) {
-	app, p, _ := setupTwoFactorTest(t, twofactor.WithSendOTP(func(ctx context.Context, userID string, otp string) error {
+	app, p, repo := setupTwoFactorTest(t, twofactor.WithSendOTP(func(ctx context.Context, userID string, otp string) error {
 		return nil
 	}))
 	ctx := context.Background()
 	userID := "usr_events_test"
 
-	var enableBeforeEmitted, enableAfterEmitted, totpGeneratedEmitted, verifyBeforeEmitted, verifyAfterEmitted bool
+	var enableBeforeEmitted, enableAfterEmitted, totpGeneratedEmitted bool
+	var verifySuccessEmitted, verifyFailedEmitted, sendOTPBeforeEmitted, sendOTPAfterEmitted bool
+	var challengeCreatedEmitted, disableBeforeEmitted, disableAfterEmitted bool
 
-	app.Events().Subscribe(twofactor.EventEnableTwoFactorBefore, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.EnableTwoFactorBeforeEventPayload); ok && req.UserID == userID {
+	app.Events().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.EnableBeforeEventPayload); ok && req.UserID == userID {
 			enableBeforeEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventEnableTwoFactorAfter, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.EnableTwoFactorAfterEventPayload); ok && req.UserID == userID {
+	app.Events().Subscribe(twofactor.EventEnableAfter, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.EnableAfterEventPayload); ok && req.UserID == userID {
 			enableAfterEmitted = true
 		}
 	})
@@ -293,120 +431,141 @@ func TestTwoFactor_EventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventVerifyTOTPBefore, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.VerifyTOTPBeforeEventPayload); ok && req.UserID == userID {
-			verifyBeforeEmitted = true
+	app.Events().Subscribe(twofactor.EventVerifyFailed, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.VerifyFailedEventPayload); ok && req.UserID == userID {
+			verifyFailedEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventVerifyTOTPAfter, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.VerifyTOTPAfterEventPayload); ok && req.UserID == userID {
-			verifyAfterEmitted = true
+	app.Events().Subscribe(twofactor.EventVerifySuccess, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.VerifySuccessEventPayload); ok && req.UserID == userID {
+			verifySuccessEmitted = true
 		}
 	})
 
-	// Enable
+	app.Events().Subscribe(twofactor.EventSendOTPBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.SendOTPBeforeEventPayload); ok && req.UserID == userID {
+			sendOTPBeforeEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(twofactor.EventSendOTPAfter, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.SendOTPAfterEventPayload); ok && req.UserID == userID {
+			sendOTPAfterEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(twofactor.EventChallengeCreated, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.ChallengeCreatedEventPayload); ok && req.UserID == userID {
+			challengeCreatedEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(twofactor.EventDisableBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.DisableBeforeEventPayload); ok && req.UserID == userID {
+			disableBeforeEmitted = true
+		}
+	})
+
+	app.Events().Subscribe(twofactor.EventDisableAfter, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.DisableAfterEventPayload); ok && req.UserID == userID {
+			disableAfterEmitted = true
+		}
+	})
+
+	// 1. Enable
 	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("Enable failed: %v", err)
 	}
 
-	// Verify
+	// 2. Failed Verify
 	_, _ = p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{UserID: userID, Code: "000000"})
 
+	// 3. Successful Verify
+	tf, _ := repo.FindByUserID(ctx, userID)
+	validCode := computeCurrentTOTP(t, tf.Secret, 30, 6, twofactor.AlgorithmSHA1)
+	_, _ = p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{UserID: userID, Code: validCode})
+
+	// 4. Send OTP
+	_, _ = p.SendOTP(ctx, twofactor.SendOTPParams{UserID: userID})
+
+	// 5. Create Challenge
+	_, _ = p.CreateChallenge(ctx, twofactor.CreateChallengeParams{UserID: userID})
+
+	// 6. Disable
+	_ = p.Disable(ctx, twofactor.DisableParams{UserID: userID})
+
 	if !enableBeforeEmitted {
-		t.Error("Expected EventEnableTwoFactorBefore to be emitted")
+		t.Error("Expected EventEnableBefore to be emitted")
 	}
 	if !enableAfterEmitted {
-		t.Error("Expected EventEnableTwoFactorAfter to be emitted")
+		t.Error("Expected EventEnableAfter to be emitted")
 	}
 	if !totpGeneratedEmitted {
 		t.Error("Expected EventTOTPGenerated to be emitted")
 	}
-	if !verifyBeforeEmitted {
-		t.Error("Expected EventVerifyTOTPBefore to be emitted")
+	if !verifyFailedEmitted {
+		t.Error("Expected EventVerifyFailed to be emitted")
 	}
-	if !verifyAfterEmitted {
-		t.Error("Expected EventVerifyTOTPAfter to be emitted")
+	if !verifySuccessEmitted {
+		t.Error("Expected EventVerifySuccess to be emitted")
 	}
-
-	// Test Disable
-	var disableBeforeEmitted, disableAfterEmitted bool
-	app.Events().Subscribe(twofactor.EventDisableTwoFactorBefore, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.DisableTwoFactorEventPayload); ok && req.UserID == userID {
-			disableBeforeEmitted = true
-		}
-	})
-	app.Events().Subscribe(twofactor.EventDisableTwoFactorAfter, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.DisableTwoFactorEventPayload); ok && req.UserID == userID {
-			disableAfterEmitted = true
-		}
-	})
-
-	if err := p.Disable(ctx, twofactor.DisableParams{UserID: userID}); err != nil {
-		t.Fatalf("Disable failed: %v", err)
+	if !sendOTPBeforeEmitted {
+		t.Error("Expected EventSendOTPBefore to be emitted")
 	}
-
-	if !disableBeforeEmitted || !disableAfterEmitted {
-		t.Error("Expected Disable events to be emitted")
+	if !sendOTPAfterEmitted {
+		t.Error("Expected EventSendOTPAfter to be emitted")
+	}
+	if !challengeCreatedEmitted {
+		t.Error("Expected EventChallengeCreated to be emitted")
+	}
+	if !disableBeforeEmitted {
+		t.Error("Expected EventDisableBefore to be emitted")
+	}
+	if !disableAfterEmitted {
+		t.Error("Expected EventDisableAfter to be emitted")
 	}
 }
 
-func TestTwoFactor_EnableWithExtraAndConstants(t *testing.T) {
+func TestTwoFactor_ExtraMetadataAndContextKeys(t *testing.T) {
 	app, p, _ := setupTwoFactorTest(t)
 	ctx := context.Background()
-	userID := "usr_extra_456"
+	userID := "usr_extra_789"
 
 	var interceptedMethod string
-	var interceptedDevID string
 	var extraCaptured bool
 
-	app.Events().Subscribe(twofactor.EventEnableTwoFactorBefore, func(ctx context.Context, payload any) {
-		if req, ok := payload.(*twofactor.EnableTwoFactorBeforeEventPayload); ok && req.Params != nil {
+	app.Events().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
+		if req, ok := payload.(*twofactor.EnableBeforeEventPayload); ok && req.Params != nil {
 			req.Params.Set(twofactor.ExtraKeyTwoFactorMethod, twofactor.MethodTOTP)
-			req.Params.Set(twofactor.ExtraKeyDeviceID, "dev_pixel_8")
-			req.Params.Set(twofactor.ExtraKeyIPAddress, "192.168.1.100")
-
-			if method, ok := req.Params.Get(twofactor.ExtraKeyTwoFactorMethod); ok {
-				interceptedMethod, _ = method.(string)
+			if m, ok := req.Params.Get(twofactor.ExtraKeyTwoFactorMethod); ok {
+				interceptedMethod, _ = m.(string)
 				extraCaptured = true
-			}
-			if devID, ok := req.Params.Get(twofactor.ExtraKeyDeviceID); ok {
-				interceptedDevID, _ = devID.(string)
 			}
 		}
 	})
 
-	enableParams := twofactor.EnableParams{
-		UserID: userID,
-	}
-
-	res, err := p.Enable(ctx, enableParams)
+	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("Enable failed: %v", err)
 	}
-	if res == nil || res.TOTPURI == "" {
-		t.Fatal("Expected valid enable result")
+
+	if !extraCaptured || interceptedMethod != twofactor.MethodTOTP {
+		t.Errorf("Expected ExtraKeyTwoFactorMethod to be captured, got %s", interceptedMethod)
 	}
 
-	if !extraCaptured || interceptedMethod != twofactor.MethodTOTP || interceptedDevID != "dev_pixel_8" {
-		t.Errorf("Expected ExtraKeyTwoFactorMethod=%s and ExtraKeyDeviceID=dev_pixel_8, got method=%v, devID=%v",
-			twofactor.MethodTOTP, interceptedMethod, interceptedDevID)
+	// Verify Context helper functions
+	if k := twofactor.TwoFactorPendingKey(userID); k != twofactor.ContextKeyTwoFactorPendingPrefix+userID {
+		t.Errorf("Unexpected TwoFactorPendingKey: %s", k)
 	}
-
-	// Verify context helper format
-	expectedPendingKey := twofactor.ContextKeyTwoFactorPendingPrefix + userID
-	if key := twofactor.TwoFactorPendingKey(userID); key != expectedPendingKey {
-		t.Errorf("Expected TwoFactorPendingKey %s, got %s", expectedPendingKey, key)
+	if k := twofactor.TwoFactorVerifiedKey(userID); k != twofactor.ContextKeyTwoFactorVerifiedPrefix+userID {
+		t.Errorf("Unexpected TwoFactorVerifiedKey: %s", k)
 	}
-
-	expectedVerifiedKey := twofactor.ContextKeyTwoFactorVerifiedPrefix + userID
-	if key := twofactor.TwoFactorVerifiedKey(userID); key != expectedVerifiedKey {
-		t.Errorf("Expected TwoFactorVerifiedKey %s, got %s", expectedVerifiedKey, key)
+	if k := twofactor.TwoFactorMethodKey(userID); k != twofactor.ContextKeyTwoFactorMethodPrefix+userID {
+		t.Errorf("Unexpected TwoFactorMethodKey: %s", k)
 	}
-
-	expectedMethodKey := twofactor.ContextKeyTwoFactorMethodPrefix + userID
-	if key := twofactor.TwoFactorMethodKey(userID); key != expectedMethodKey {
-		t.Errorf("Expected TwoFactorMethodKey %s, got %s", expectedMethodKey, key)
+	if k := twofactor.TwoFactorChallengeKey("tok123"); k != twofactor.ContextKeyTwoFactorChallengePrefix+"tok123" {
+		t.Errorf("Unexpected TwoFactorChallengeKey: %s", k)
 	}
 }

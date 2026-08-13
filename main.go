@@ -59,7 +59,7 @@ func main() {
 		fmt.Printf("📢 [Global EventBus] New user registered: %s (ID: %s, Role: %v)\n", payload.User.Email, payload.User.ID, role)
 	})
 
-	app.Events().Subscribe(twofactor.EventEnableTwoFactorAfter, func(c context.Context, payload *twofactor.EnableTwoFactorAfterEventPayload) {
+	app.Events().Subscribe(twofactor.EventEnableAfter, func(c context.Context, payload *twofactor.EnableAfterEventPayload) {
 		fmt.Printf("📢 [Global EventBus] User %s enabled 2FA with %d backup codes\n", payload.UserID, payload.BackupCodesCount)
 	})
 
@@ -112,7 +112,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ TOTP verification result: %v\n", validTOTP)
+	fmt.Printf("✔ TOTP verification result: %v\n", validTOTP.Success)
 
 	// 8. Verify and consume a single-use backup code
 	firstBackupCode := enableRes.BackupCodes[0]
@@ -123,10 +123,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ Backup code (%s) consumed: %v\n", firstBackupCode, validBackup)
+	fmt.Printf("✔ Backup code (%s) consumed: %v (remaining: %d)\n", firstBackupCode, validBackup.Success, validBackup.RemainingCodes)
 
 	// 9. Challenge-based OTP (SMS / Email) flow
-	if err := tfPlugin.SendOTP(ctx, twofactor.SendOTPParams{UserID: user.ID}); err != nil {
+	if _, err := tfPlugin.SendOTP(ctx, twofactor.SendOTPParams{UserID: user.ID}); err != nil {
 		panic(err)
 	}
 	validOTP, err := tfPlugin.VerifyOTP(ctx, twofactor.VerifyOTPParams{
@@ -136,7 +136,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ Out-of-band OTP verification result: %v\n", validOTP)
+	fmt.Printf("✔ Out-of-band OTP verification result: %v\n", validOTP.Success)
 	fmt.Println("\n🎉 All GoModularAuth authentication flows completed successfully!")
 }
 

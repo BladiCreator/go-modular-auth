@@ -44,16 +44,20 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 //
 // The TwoFactor plugin provides Time-based One-Time Password (TOTP / RFC 6238) multi-factor authentication,
 // generating secure Base32 secrets, creating otpauth:// URIs for authenticator apps (Google Authenticator, Authy, 1Password),
-// verifying 6- or 8-digit TOTP codes, managing single-use backup recovery codes, and dispatching SMS/Email OTP challenges.
+// verifying 6- or 8-digit TOTP codes, managing single-use backup recovery codes, issuing sign-in challenge tokens,
+// authorizing trusted client devices, and dispatching SMS/Email OTP challenges.
 //
 // # Configuration Options
 //
 // You can pass functional options to customize the plugin:
 //
 //   - twofactor.WithIssuer(issuer string): Issuer name shown in authenticator apps (default: "GoModularAuth").
+//   - twofactor.WithAlgorithm(alg twofactor.TOTPAlgorithm): Hashing algorithm (SHA1, SHA256, SHA512).
 //   - twofactor.WithTOTPOptions(digits int, period int): Number of digits and duration period (default: 6 digits, 30s).
 //   - twofactor.WithBackupCodeOptions(amount, length int): Number and length of backup codes (default: 10 codes, 10 chars).
 //   - twofactor.WithLockoutProtection(maxAttempts int, duration time.Duration): Rate-limiting brute-force protection.
+//   - twofactor.WithTrustDevice(secret string, maxAge time.Duration): Configure authorized trusted devices.
+//   - twofactor.WithChallengeExpiry(d time.Duration): Duration for sign-in 2FA challenge tokens (default: 10m).
 //   - twofactor.WithSendOTP(fn twofactor.SendOTPFunc): Delivery callback for SMS/Email OTP challenges.
 //
 // Example:
@@ -63,6 +67,7 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 //		twofactor.WithIssuer("My Application"),
 //		twofactor.WithTOTPOptions(6, 30),
 //		twofactor.WithBackupCodeOptions(10, 10),
+//		twofactor.WithTrustDevice("my-device-secret", 30*24*time.Hour),
 //	)
 func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.Plugin {
 	return twofactor.New(repo, opts...)

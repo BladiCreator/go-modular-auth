@@ -37,9 +37,11 @@ type Store struct {
 	tokens        map[string]*entity.VerificationToken  // key: token string
 	sessions      map[string]*entity.Session
 	totpSecrets   map[string]string
-	twoFactors    map[string]*twofactor.TwoFactor    // key: userID
-	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
-	jwks          map[string]*jwt.JWKRecord          // key: kid
+	twoFactors     map[string]*twofactor.TwoFactor    // key: userID
+	otpChallenges  map[string]*twofactor.OTPChallenge // key: challenge key
+	trustedDevices map[string]*twofactor.TrustDeviceRecord
+	challenges     map[string]*twofactor.ChallengeRecord
+	jwks           map[string]*jwt.JWKRecord // key: kid
 	orgs          map[string]*organization.Organization
 	orgsBySlug    map[string]string
 	members       map[string]*organization.Member // key: orgID + ":" + userID
@@ -59,9 +61,11 @@ func New() *Store {
 		tokens:        make(map[string]*entity.VerificationToken),
 		sessions:      make(map[string]*entity.Session),
 		totpSecrets:   make(map[string]string),
-		twoFactors:    make(map[string]*twofactor.TwoFactor),
-		otpChallenges: make(map[string]*twofactor.OTPChallenge),
-		jwks:          make(map[string]*jwt.JWKRecord),
+		twoFactors:     make(map[string]*twofactor.TwoFactor),
+		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
+		trustedDevices: make(map[string]*twofactor.TrustDeviceRecord),
+		challenges:     make(map[string]*twofactor.ChallengeRecord),
+		jwks:           make(map[string]*jwt.JWKRecord),
 		orgs:          make(map[string]*organization.Organization),
 		orgsBySlug:    make(map[string]string),
 		members:       make(map[string]*organization.Member),
@@ -294,6 +298,68 @@ func (s *Store) DeleteOTPChallenge(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.otpChallenges, key)
+	return nil
+}
+
+// Trusted Devices Methods (twofactor.Repository)
+func (s *Store) SaveTrustDevice(ctx context.Context, record *twofactor.TrustDeviceRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := record.UserID + ":" + record.DeviceID
+	s.trustedDevices[key] = record
+	return nil
+}
+
+func (s *Store) FindTrustDevice(ctx context.Context, userID, deviceID string) (*twofactor.TrustDeviceRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := userID + ":" + deviceID
+	if rec, ok := s.trustedDevices[key]; ok {
+		return rec, nil
+	}
+	return nil, twofactor.ErrInvalidDeviceToken
+}
+
+func (s *Store) DeleteTrustDevice(ctx context.Context, userID, deviceID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := userID + ":" + deviceID
+	delete(s.trustedDevices, key)
+	return nil
+}
+
+func (s *Store) DeleteTrustDevicesByUserID(ctx context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, rec := range s.trustedDevices {
+		if rec.UserID == userID {
+			delete(s.trustedDevices, k)
+		}
+	}
+	return nil
+}
+
+// Challenge Methods (twofactor.Repository)
+func (s *Store) SaveChallenge(ctx context.Context, challenge *twofactor.ChallengeRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.challenges[challenge.Token] = challenge
+	return nil
+}
+
+func (s *Store) GetChallenge(ctx context.Context, token string) (*twofactor.ChallengeRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if c, ok := s.challenges[token]; ok {
+		return c, nil
+	}
+	return nil, twofactor.ErrInvalidChallengeToken
+}
+
+func (s *Store) DeleteChallenge(ctx context.Context, token string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.challenges, token)
 	return nil
 }
 

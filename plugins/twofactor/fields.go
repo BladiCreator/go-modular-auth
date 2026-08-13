@@ -1,7 +1,7 @@
 package twofactor
 
 // Standard Extra metadata keys that can be set or consumed in TwoFactor parameters
-// (such as EnableParams.Extra, DisableParams.Extra, and Event payloads).
+// (such as EnableParams.Extra, VerifyChallengeParams.Extra, and Event payloads).
 const (
 	// ExtraKeyTwoFactorMethod specifies the method used for 2FA (e.g. "totp", "backup_code", "otp", "sms", "email").
 	ExtraKeyTwoFactorMethod = "two_factor_method"
@@ -15,6 +15,12 @@ const (
 	// ExtraKeyUserAgent represents the User-Agent header of the client device during 2FA operations.
 	ExtraKeyUserAgent = "user_agent"
 
+	// ExtraKeyTrustDevice indicates whether the client requests trusting the current device to bypass subsequent 2FA challenges.
+	ExtraKeyTrustDevice = "trust_device"
+
+	// ExtraKeyTrustDeviceToken represents the cryptographic HMAC token issued to an authorized trusted device.
+	ExtraKeyTrustDeviceToken = "trust_device_token"
+
 	// ExtraKeySessionID represents the session ID associated with the 2FA authentication flow.
 	ExtraKeySessionID = "session_id"
 
@@ -26,6 +32,9 @@ const (
 
 	// ExtraKeyEmail represents the destination email address for Email OTP challenges.
 	ExtraKeyEmail = "email"
+
+	// ExtraKeyChallengeToken represents the temporary challenge token issued following a primary sign-in.
+	ExtraKeyChallengeToken = "challenge_token"
 
 	// ExtraKeyTwoFactorVerified indicates if two-factor verification succeeded.
 	ExtraKeyTwoFactorVerified = "two_factor_verified"
@@ -59,6 +68,9 @@ const (
 
 	// ContextKeyTwoFactorMethodPrefix is the key prefix indicating the active 2FA method for a user.
 	ContextKeyTwoFactorMethodPrefix = "2fa_method_"
+
+	// ContextKeyTwoFactorChallengePrefix is the key prefix for temporary challenge tokens.
+	ContextKeyTwoFactorChallengePrefix = "2fa_challenge_"
 )
 
 // TwoFactorPendingKey formats the context store key used to track a pending 2FA verification for the given user.
@@ -74,4 +86,9 @@ func TwoFactorVerifiedKey(userID string) string {
 // TwoFactorMethodKey formats the context store key used to track the active 2FA method for the given user.
 func TwoFactorMethodKey(userID string) string {
 	return ContextKeyTwoFactorMethodPrefix + userID
+}
+
+// TwoFactorChallengeKey formats the context store key used to cache challenge tokens.
+func TwoFactorChallengeKey(token string) string {
+	return ContextKeyTwoFactorChallengePrefix + token
 }

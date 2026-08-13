@@ -20,27 +20,31 @@ var (
 )
 
 type MockRepo struct {
-	mu            sync.RWMutex
-	users         map[string]*entity.User
-	accounts      map[string]*entity.Account            // key: accountID
-	userAccounts  map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens        map[string]*entity.VerificationToken  // key: token string
-	sessions      map[string]*entity.Session
-	totpSecrets   map[string]string
-	twoFactors    map[string]*twofactor.TwoFactor    // key: userID
-	otpChallenges map[string]*twofactor.OTPChallenge // key: challenge key
+	mu             sync.RWMutex
+	users          map[string]*entity.User
+	accounts       map[string]*entity.Account            // key: accountID
+	userAccounts   map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens         map[string]*entity.VerificationToken  // key: token string
+	sessions       map[string]*entity.Session
+	totpSecrets    map[string]string
+	twoFactors     map[string]*twofactor.TwoFactor               // key: userID
+	otpChallenges  map[string]*twofactor.OTPChallenge            // key: challenge key
+	trustedDevices map[string]*twofactor.TrustDeviceRecord       // key: userID + ":" + deviceID
+	challenges     map[string]*twofactor.ChallengeRecord         // key: token
 }
 
 func NewMockRepo() *MockRepo {
 	return &MockRepo{
-		users:         make(map[string]*entity.User),
-		accounts:      make(map[string]*entity.Account),
-		userAccounts:  make(map[string]map[string]*entity.Account),
-		tokens:        make(map[string]*entity.VerificationToken),
-		sessions:      make(map[string]*entity.Session),
-		totpSecrets:   make(map[string]string),
-		twoFactors:    make(map[string]*twofactor.TwoFactor),
-		otpChallenges: make(map[string]*twofactor.OTPChallenge),
+		users:          make(map[string]*entity.User),
+		accounts:       make(map[string]*entity.Account),
+		userAccounts:   make(map[string]map[string]*entity.Account),
+		tokens:         make(map[string]*entity.VerificationToken),
+		sessions:       make(map[string]*entity.Session),
+		totpSecrets:    make(map[string]string),
+		twoFactors:     make(map[string]*twofactor.TwoFactor),
+		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
+		trustedDevices: make(map[string]*twofactor.TrustDeviceRecord),
+		challenges:     make(map[string]*twofactor.ChallengeRecord),
 	}
 }
 
@@ -272,5 +276,67 @@ func (m *MockRepo) DeleteOTPChallenge(ctx context.Context, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.otpChallenges, key)
+	return nil
+}
+
+// Trusted Devices Methods
+func (m *MockRepo) SaveTrustDevice(ctx context.Context, record *twofactor.TrustDeviceRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := record.UserID + ":" + record.DeviceID
+	m.trustedDevices[key] = record
+	return nil
+}
+
+func (m *MockRepo) FindTrustDevice(ctx context.Context, userID, deviceID string) (*twofactor.TrustDeviceRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	key := userID + ":" + deviceID
+	if rec, ok := m.trustedDevices[key]; ok {
+		return rec, nil
+	}
+	return nil, twofactor.ErrInvalidDeviceToken
+}
+
+func (m *MockRepo) DeleteTrustDevice(ctx context.Context, userID, deviceID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := userID + ":" + deviceID
+	delete(m.trustedDevices, key)
+	return nil
+}
+
+func (m *MockRepo) DeleteTrustDevicesByUserID(ctx context.Context, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k, rec := range m.trustedDevices {
+		if rec.UserID == userID {
+			delete(m.trustedDevices, k)
+		}
+	}
+	return nil
+}
+
+// Challenge Methods
+func (m *MockRepo) SaveChallenge(ctx context.Context, challenge *twofactor.ChallengeRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.challenges[challenge.Token] = challenge
+	return nil
+}
+
+func (m *MockRepo) GetChallenge(ctx context.Context, token string) (*twofactor.ChallengeRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if c, ok := m.challenges[token]; ok {
+		return c, nil
+	}
+	return nil, twofactor.ErrInvalidChallengeToken
+}
+
+func (m *MockRepo) DeleteChallenge(ctx context.Context, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.challenges, token)
 	return nil
 }

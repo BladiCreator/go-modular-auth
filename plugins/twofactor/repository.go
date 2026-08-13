@@ -10,8 +10,8 @@ var (
 	// ErrTwoFactorNotEnabled is returned when 2FA operations are attempted for a user without active 2FA configuration.
 	ErrTwoFactorNotEnabled = errors.New("twofactor: two-factor authentication is not enabled for this user")
 
-	// ErrTwoFactorAlreadyOn is returned when attempting to enable 2FA on an account that already has verified 2FA active.
-	ErrTwoFactorAlreadyOn = errors.New("twofactor: two-factor authentication is already enabled")
+	// ErrTwoFactorAlreadyEnabled is returned when attempting to enable 2FA on an account that already has verified 2FA active.
+	ErrTwoFactorAlreadyEnabled = errors.New("twofactor: two-factor authentication is already enabled")
 
 	// ErrInvalidCode is returned when a provided TOTP or backup code is invalid or does not match stored credentials.
 	ErrInvalidCode = errors.New("twofactor: invalid verification code")
@@ -25,11 +25,20 @@ var (
 	// ErrOTPExpired is returned when attempting to verify an OTP challenge that has expired or does not exist.
 	ErrOTPExpired = errors.New("twofactor: OTP challenge has expired or does not exist")
 
-	// ErrTooManyAttempts is returned when the maximum number of failed attempts on an active OTP challenge has been exceeded.
-	ErrTooManyAttempts = errors.New("twofactor: maximum OTP attempt limit reached")
+	// ErrTooManyAttempts is returned when the maximum number of failed attempts on an active OTP challenge or lockout threshold has been exceeded.
+	ErrTooManyAttempts = errors.New("twofactor: maximum attempt limit reached")
 
 	// ErrPasswordRequired is returned when an operation strictly requires password confirmation before proceeding.
 	ErrPasswordRequired = errors.New("twofactor: password is required for this operation")
+
+	// ErrInvalidDeviceToken is returned when a trusted device token signature fails validation or has expired.
+	ErrInvalidDeviceToken = errors.New("twofactor: trusted device token is invalid or expired")
+
+	// ErrChallengeExpired is returned when a sign-in challenge token has passed its expiration time.
+	ErrChallengeExpired = errors.New("twofactor: challenge token has expired")
+
+	// ErrInvalidChallengeToken is returned when a submitted sign-in challenge token does not exist in storage.
+	ErrInvalidChallengeToken = errors.New("twofactor: invalid challenge token")
 )
 
 // TwoFactor represents the persistent storage entity containing a user's 2FA configuration, secrets, and security state.
@@ -80,8 +89,44 @@ type OTPChallenge struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// TrustDeviceRecord stores a persistent authorization record for a recognized client device.
+type TrustDeviceRecord struct {
+	// ID is the primary key identifier for the trusted device entry.
+	ID string `json:"id"`
+
+	// UserID is the owner user's unique identifier.
+	UserID string `json:"user_id"`
+
+	// DeviceID is the unique client hardware or browser installation identifier.
+	DeviceID string `json:"device_id"`
+
+	// TokenHash is the cryptographic hash or signature of the trusted device token.
+	TokenHash string `json:"token_hash"`
+
+	// ExpiresAt specifies when this device trust authorization expires.
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// CreatedAt is the timestamp when the device was initially authorized.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ChallengeRecord represents a temporary sign-in challenge issued after primary credential validation.
+type ChallengeRecord struct {
+	// Token is the unique challenge token string.
+	Token string `json:"token"`
+
+	// UserID is the target user required to fulfill the 2FA challenge.
+	UserID string `json:"user_id"`
+
+	// ExpiresAt is the timestamp after which this challenge token becomes invalid.
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// CreatedAt is the timestamp when the challenge was generated.
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Repository defines the persistent storage contract required by the TwoFactor plugin.
-// Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, MongoDB, GORM).
+// Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, SQLite, MongoDB, GORM).
 //
 // # Implementation Example (GORM / database/sql):
 //
@@ -181,7 +226,7 @@ type Repository interface {
 	// Returns:
 	//   - error: Nil on success, or database error on failure.
 	//
-	// Example SQL / Redis:
+	// Example SQL:
 	//   INSERT INTO otp_challenges (key, user_id, code_hash, attempts, expires_at)
 	//   VALUES ($1, $2, $3, $4, $5) ON CONFLICT (key) DO UPDATE SET attempts = $4;
 	SaveOTPChallenge(ctx context.Context, challenge *OTPChallenge) error
@@ -218,4 +263,124 @@ type Repository interface {
 	// Example SQL:
 	//   DELETE FROM otp_challenges WHERE key = $1;
 	DeleteOTPChallenge(ctx context.Context, key string) error
+
+	// SaveTrustDevice stores or updates an authorized trusted device record.
+	//
+	// Function:
+	//   Called when a user marks "Trust this device" during 2FA verification or calls TrustDevice.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - record: The TrustDeviceRecord to insert or update.
+	//
+	// Returns:
+	//   - error: Nil on success, or database error on failure.
+	//
+	// Example SQL:
+	//   INSERT INTO trusted_devices (id, user_id, device_id, token_hash, expires_at, created_at)
+	//   VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (user_id, device_id) DO UPDATE SET token_hash = $4, expires_at = $5;
+	SaveTrustDevice(ctx context.Context, record *TrustDeviceRecord) error
+
+	// FindTrustDevice retrieves an authorized device record by user ID and device ID.
+	//
+	// Function:
+	//   Called during VerifyTrustDevice or challenge creation to check if 2FA can be safely bypassed.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Target user ID.
+	//   - deviceID: Target client hardware/device ID.
+	//
+	// Returns:
+	//   - *TrustDeviceRecord: The matching record.
+	//   - error: ErrInvalidDeviceToken if not found or expired, or database error.
+	//
+	// Example SQL:
+	//   SELECT id, user_id, device_id, token_hash, expires_at, created_at
+	//   FROM trusted_devices WHERE user_id = $1 AND device_id = $2 LIMIT 1;
+	FindTrustDevice(ctx context.Context, userID, deviceID string) (*TrustDeviceRecord, error)
+
+	// DeleteTrustDevice revokes trust for a single device.
+	//
+	// Function:
+	//   Called during RevokeTrustedDevice to unauthorize a specific client device.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Owner user ID.
+	//   - deviceID: Device identifier to unauthorize.
+	//
+	// Returns:
+	//   - error: Nil on success, or database error on failure.
+	//
+	// Example SQL:
+	//   DELETE FROM trusted_devices WHERE user_id = $1 AND device_id = $2;
+	DeleteTrustDevice(ctx context.Context, userID, deviceID string) error
+
+	// DeleteTrustDevicesByUserID revokes all authorized devices for a user.
+	//
+	// Function:
+	//   Called during Disable or security credential reset to invalidate all trusted client sessions.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Target user ID.
+	//
+	// Returns:
+	//   - error: Nil on success, or database error on failure.
+	//
+	// Example SQL:
+	//   DELETE FROM trusted_devices WHERE user_id = $1;
+	DeleteTrustDevicesByUserID(ctx context.Context, userID string) error
+
+	// SaveChallenge stores a temporary sign-in challenge token.
+	//
+	// Function:
+	//   Called during CreateChallenge after primary login when 2FA is required.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - challenge: The ChallengeRecord to persist.
+	//
+	// Returns:
+	//   - error: Nil on success, or database error on failure.
+	//
+	// Example SQL:
+	//   INSERT INTO two_factor_challenges (token, user_id, expires_at, created_at)
+	//   VALUES ($1, $2, $3, $4);
+	SaveChallenge(ctx context.Context, challenge *ChallengeRecord) error
+
+	// GetChallenge retrieves an active sign-in challenge token record.
+	//
+	// Function:
+	//   Called during VerifyChallenge to validate challenge validity and expiration.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - token: The challenge token string.
+	//
+	// Returns:
+	//   - *ChallengeRecord: The matching challenge record.
+	//   - error: ErrInvalidChallengeToken if missing, ErrChallengeExpired if past expiration, or database error.
+	//
+	// Example SQL:
+	//   SELECT token, user_id, expires_at, created_at
+	//   FROM two_factor_challenges WHERE token = $1 LIMIT 1;
+	GetChallenge(ctx context.Context, token string) (*ChallengeRecord, error)
+
+	// DeleteChallenge removes a consumed or expired sign-in challenge.
+	//
+	// Function:
+	//   Called upon successful challenge verification or explicit cancellation.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - token: The challenge token string to delete.
+	//
+	// Returns:
+	//   - error: Nil on success, or database error on failure.
+	//
+	// Example SQL:
+	//   DELETE FROM two_factor_challenges WHERE token = $1;
+	DeleteChallenge(ctx context.Context, token string) error
 }
