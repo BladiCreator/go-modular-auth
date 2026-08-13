@@ -3,6 +3,7 @@
 package plugins
 
 import (
+	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
@@ -161,3 +162,35 @@ func Organization(repo organization.Repository, opts ...organization.Option) *or
 	return organization.New(repo, opts...)
 }
 
+// Admin instantiates a new Admin governance plugin configured with a repository and options.
+//
+// The Admin plugin provides role-based access control (RBAC), user moderation (ban/unban with automatic expiry),
+// CRUD operations on users, password administration, active session management and revocation, and user impersonation.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - admin.WithDefaultRole(role string): Default role for new users (default: "user").
+//   - admin.WithAdminRoles(roles ...string): Roles recognized with administrator privileges (default: ["admin"]).
+//   - admin.WithAdminUserIDs(userIDs ...string): Explicit user IDs granted unrestricted administrator access.
+//   - admin.WithDefaultBanReason(reason string): Fallback reason for account suspensions.
+//   - admin.WithDefaultBanExpiresIn(duration time.Duration): Default duration for temporary account suspensions (0 = permanent).
+//   - admin.WithImpersonationSessionDuration(duration time.Duration): Duration for masquerade sessions (default: 1h).
+//   - admin.WithBannedUserMessage(msg string): User-facing error message for suspended users.
+//   - admin.WithAllowImpersonatingAdmins(allow bool): Allow administrators to masquerade as other administrators.
+//   - admin.WithPasswordLength(min, max int): Minimum and maximum allowed password lengths for administrative updates.
+//   - admin.WithCustomRoles(roles map[string]admin.Role): Configure custom static RBAC roles and statements.
+//   - admin.WithRole(role admin.Role): Register or override an individual role definition.
+//
+// Example:
+//
+//	adminPlugin := plugins.Admin(
+//		myAdminRepository,
+//		admin.WithAdminRoles("admin", "superadmin"),
+//		admin.WithImpersonationSessionDuration(2 * time.Hour),
+//		admin.WithPasswordLength(8, 64),
+//	)
+func Admin(repo admin.Repository, opts ...admin.Option) *admin.Plugin {
+	return admin.New(repo, opts...)
+}

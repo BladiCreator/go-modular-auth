@@ -9,6 +9,8 @@ type Session struct {
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	CreatedAt time.Time `json:"createdAt"`
-	IPAddress string    `json:"ipAddress,omitempty"`
-	UserAgent string    `json:"userAgent,omitempty"`
+	IPAddress      string     `json:"ipAddress,omitempty"`
+	UserAgent      string     `json:"userAgent,omitempty"`
+	ImpersonatedBy *string    `json:"impersonatedBy,omitempty"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
 }

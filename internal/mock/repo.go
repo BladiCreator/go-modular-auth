@@ -2,14 +2,18 @@ package mock
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
@@ -17,6 +21,7 @@ import (
 var (
 	_ emailpassword.Repository = (*MockRepo)(nil)
 	_ twofactor.Repository     = (*MockRepo)(nil)
+	_ admin.Repository         = (*MockRepo)(nil)
 )
 
 type MockRepo struct {
@@ -27,10 +32,10 @@ type MockRepo struct {
 	tokens         map[string]*entity.VerificationToken  // key: token string
 	sessions       map[string]*entity.Session
 	totpSecrets    map[string]string
-	twoFactors     map[string]*twofactor.TwoFactor               // key: userID
-	otpChallenges  map[string]*twofactor.OTPChallenge            // key: challenge key
-	trustedDevices map[string]*twofactor.TrustDeviceRecord       // key: userID + ":" + deviceID
-	challenges     map[string]*twofactor.ChallengeRecord         // key: token
+	twoFactors     map[string]*twofactor.TwoFactor         // key: userID
+	otpChallenges  map[string]*twofactor.OTPChallenge      // key: challenge key
+	trustedDevices map[string]*twofactor.TrustDeviceRecord // key: userID + ":" + deviceID
+	challenges     map[string]*twofactor.ChallengeRecord   // key: token
 }
 
 func NewMockRepo() *MockRepo {
@@ -54,11 +59,13 @@ func (m *MockRepo) CreateUser(ctx context.Context, params *dto.CreateUserParams)
 	defer m.mu.Unlock()
 
 	user := &entity.User{
-		ID:        "usr_" + strconv.FormatInt(rand.Int63(), 10),
-		Name:      params.Name,
-		Email:     params.Email,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:           "usr_" + strconv.FormatInt(rand.Int63(), 10),
+		Name:         params.Name,
+		Email:        params.Email,
+		Role:         params.Role,
+		PasswordHash: params.PasswordHash,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	m.users[user.ID] = user
@@ -70,7 +77,7 @@ func (m *MockRepo) GetUserByEmail(ctx context.Context, email string) (*entity.Us
 	defer m.mu.RUnlock()
 
 	for _, u := range m.users {
-		if u.Email == email {
+		if strings.EqualFold(u.Email, email) {
 			return u, nil
 		}
 	}
@@ -96,6 +103,144 @@ func (m *MockRepo) UpdateUser(ctx context.Context, u *entity.User) error {
 	}
 	u.UpdatedAt = time.Now()
 	m.users[u.ID] = u
+	return nil
+}
+
+func (m *MockRepo) DeleteUser(ctx context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.users[id]; !ok {
+		return admin.ErrUserNotFound
+	}
+	delete(m.users, id)
+	delete(m.userAccounts, id)
+	return nil
+}
+
+func (m *MockRepo) ListUsers(ctx context.Context, filter admin.ListUsersFilter) ([]*entity.User, int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var matched []*entity.User
+	for _, u := range m.users {
+		if filter.FilterField != "" && filter.FilterValue != nil {
+			switch strings.ToLower(filter.FilterField) {
+			case "role":
+				valStr := fmt.Sprintf("%v", filter.FilterValue)
+				if filter.FilterOperator == "ne" {
+					if u.Role == valStr {
+						continue
+					}
+				} else {
+					if u.Role != valStr && !strings.Contains(u.Role, valStr) {
+						continue
+					}
+				}
+			case "banned":
+				if bVal, ok := filter.FilterValue.(bool); ok {
+					if u.Banned != bVal {
+						continue
+					}
+				}
+			}
+		}
+
+		if filter.SearchValue != "" {
+			query := strings.ToLower(filter.SearchValue)
+			target := ""
+			switch strings.ToLower(filter.SearchField) {
+			case "email":
+				target = strings.ToLower(u.Email)
+			case "name":
+				target = strings.ToLower(u.Name)
+			default:
+				target = strings.ToLower(u.Name + " " + u.Email)
+			}
+
+			matches := false
+			switch strings.ToLower(filter.SearchOperator) {
+			case "exact":
+				matches = (target == query)
+			case "starts_with":
+				matches = strings.HasPrefix(target, query)
+			case "ends_with":
+				matches = strings.HasSuffix(target, query)
+			default:
+				matches = strings.Contains(target, query)
+			}
+
+			if !matches {
+				continue
+			}
+		}
+
+		cloned := *u
+		matched = append(matched, &cloned)
+	}
+
+	sort.Slice(matched, func(i, j int) bool {
+		asc := strings.ToLower(filter.SortDirection) == "asc"
+		switch strings.ToLower(filter.SortBy) {
+		case "email":
+			if asc {
+				return matched[i].Email < matched[j].Email
+			}
+			return matched[i].Email > matched[j].Email
+		case "name":
+			if asc {
+				return matched[i].Name < matched[j].Name
+			}
+			return matched[i].Name > matched[j].Name
+		default:
+			if asc {
+				return matched[i].CreatedAt.Before(matched[j].CreatedAt)
+			}
+			return matched[i].CreatedAt.After(matched[j].CreatedAt)
+		}
+	})
+
+	total := int64(len(matched))
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(matched) {
+		return []*entity.User{}, total, nil
+	}
+
+	end := len(matched)
+	if filter.Limit > 0 && offset+filter.Limit < len(matched) {
+		end = offset + filter.Limit
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockRepo) LinkCredentialAccount(ctx context.Context, userID, passwordHash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.userAccounts[userID]; !ok {
+		m.userAccounts[userID] = make(map[string]*entity.Account)
+	}
+
+	if acc, ok := m.userAccounts[userID]["credential"]; ok {
+		acc.Password = passwordHash
+		acc.UpdatedAt = time.Now()
+		return nil
+	}
+
+	acc := &entity.Account{
+		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:    userID,
+		Provider:  "credential",
+		Password:  passwordHash,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	m.accounts[acc.ID] = acc
+	m.userAccounts[userID]["credential"] = acc
 	return nil
 }
 
@@ -176,13 +321,14 @@ func (m *MockRepo) CreateSession(ctx context.Context, sessionCtx *dto.CreateSess
 	defer m.mu.Unlock()
 
 	sess := &entity.Session{
-		ID:        "sess_" + strconv.FormatInt(rand.Int63(), 10),
-		UserID:    sessionCtx.UserID,
-		Token:     sessionCtx.Token,
-		IPAddress: sessionCtx.IPAddress,
-		UserAgent: sessionCtx.UserAgent,
-		ExpiresAt: sessionCtx.ExpiresAt,
-		CreatedAt: sessionCtx.CreatedAt,
+		ID:             "sess_" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:         sessionCtx.UserID,
+		Token:          sessionCtx.Token,
+		IPAddress:      sessionCtx.IPAddress,
+		UserAgent:      sessionCtx.UserAgent,
+		ImpersonatedBy: sessionCtx.ImpersonatedBy,
+		ExpiresAt:      sessionCtx.ExpiresAt,
+		CreatedAt:      sessionCtx.CreatedAt,
 	}
 	m.sessions[sess.Token] = sess
 	return sess, nil
@@ -198,11 +344,40 @@ func (m *MockRepo) GetSessionByToken(ctx context.Context, token string) (*entity
 	return nil, domain.ErrSessionNotFound
 }
 
+func (m *MockRepo) ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*entity.Session
+	for _, sess := range m.sessions {
+		if sess.UserID == userID {
+			cloned := *sess
+			result = append(result, &cloned)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
+	return result, nil
+}
+
 func (m *MockRepo) DeleteSession(ctx context.Context, token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	delete(m.sessions, token)
+	return nil
+}
+
+func (m *MockRepo) DeleteSessionsByUserID(ctx context.Context, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for token, sess := range m.sessions {
+		if sess.UserID == userID {
+			delete(m.sessions, token)
+		}
+	}
 	return nil
 }
 

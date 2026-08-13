@@ -69,6 +69,7 @@ type (
 		Email        string         `json:"email"`
 		PasswordHash string         `json:"-"`
 		Name         string         `json:"name"`
+		Role         string         `json:"role,omitempty"`
 		Extra        map[string]any `json:"extra,omitempty"`
 	}
 )
@@ -225,4 +226,3 @@ func (p *CreateUserParams) Get(key string) (any, bool) {
 	val, ok := p.Extra[key]
 	return val, ok
 }
-

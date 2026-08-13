@@ -11,6 +11,10 @@ type User struct {
 	PasswordHash     string    `json:"-"`
 	EmailVerified    bool      `json:"emailVerified"`
 	TwoFactorEnabled bool      `json:"twoFactorEnabled"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	Role             string     `json:"role,omitempty"`
+	Banned           bool       `json:"banned"`
+	BanReason        *string    `json:"banReason,omitempty"`
+	BanExpires       *time.Time `json:"banExpires,omitempty"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }

@@ -8,11 +8,12 @@ type (
 		UserID    string         `json:"user_id" binding:"required"`
 		DeviceID  string         `json:"device_id"`
 		Token     string         `json:"token" binding:"required"`
-		IPAddress string         `json:"ip_address"`
-		UserAgent string         `json:"user_agent"`
-		ExpiresAt time.Time      `json:"expires_at" binding:"required"`
-		CreatedAt time.Time      `json:"created_at" binding:"required"`
-		Extra     map[string]any `json:"extra,omitempty"`
+		IPAddress      string         `json:"ip_address"`
+		UserAgent      string         `json:"user_agent"`
+		ImpersonatedBy *string        `json:"impersonated_by,omitempty"`
+		ExpiresAt      time.Time      `json:"expires_at" binding:"required"`
+		CreatedAt      time.Time      `json:"created_at" binding:"required"`
+		Extra          map[string]any `json:"extra,omitempty"`
 	}
 )
 

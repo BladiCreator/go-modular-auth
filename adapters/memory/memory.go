@@ -3,6 +3,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
@@ -26,54 +28,55 @@ var (
 	_ bearer.Repository        = (*Store)(nil)
 	_ jwt.Repository           = (*Store)(nil)
 	_ organization.Repository  = (*Store)(nil)
+	_ admin.Repository         = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
 type Store struct {
-	mu            sync.RWMutex
-	users         map[string]*entity.User
-	accounts      map[string]*entity.Account            // key: accountID
-	userAccounts  map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens        map[string]*entity.VerificationToken  // key: token string
-	sessions      map[string]*entity.Session
-	totpSecrets   map[string]string
+	mu             sync.RWMutex
+	users          map[string]*entity.User
+	accounts       map[string]*entity.Account            // key: accountID
+	userAccounts   map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens         map[string]*entity.VerificationToken  // key: token string
+	sessions       map[string]*entity.Session
+	totpSecrets    map[string]string
 	twoFactors     map[string]*twofactor.TwoFactor    // key: userID
 	otpChallenges  map[string]*twofactor.OTPChallenge // key: challenge key
 	trustedDevices map[string]*twofactor.TrustDeviceRecord
 	challenges     map[string]*twofactor.ChallengeRecord
 	jwks           map[string]*jwt.JWKRecord // key: kid
-	orgs          map[string]*organization.Organization
-	orgsBySlug    map[string]string
-	members       map[string]*organization.Member // key: orgID + ":" + userID
-	membersByID   map[string]*organization.Member // key: memberID
-	invitations   map[string]*organization.Invitation
-	teams         map[string]*organization.Team
-	teamMembers   map[string]*organization.TeamMember // key: teamID + ":" + userID
-	orgRoles      map[string]*organization.OrganizationRole
+	orgs           map[string]*organization.Organization
+	orgsBySlug     map[string]string
+	members        map[string]*organization.Member // key: orgID + ":" + userID
+	membersByID    map[string]*organization.Member // key: memberID
+	invitations    map[string]*organization.Invitation
+	teams          map[string]*organization.Team
+	teamMembers    map[string]*organization.TeamMember // key: teamID + ":" + userID
+	orgRoles       map[string]*organization.OrganizationRole
 }
 
 // New instantiates a new thread-safe in-memory Store.
 func New() *Store {
 	return &Store{
-		users:         make(map[string]*entity.User),
-		accounts:      make(map[string]*entity.Account),
-		userAccounts:  make(map[string]map[string]*entity.Account),
-		tokens:        make(map[string]*entity.VerificationToken),
-		sessions:      make(map[string]*entity.Session),
-		totpSecrets:   make(map[string]string),
+		users:          make(map[string]*entity.User),
+		accounts:       make(map[string]*entity.Account),
+		userAccounts:   make(map[string]map[string]*entity.Account),
+		tokens:         make(map[string]*entity.VerificationToken),
+		sessions:       make(map[string]*entity.Session),
+		totpSecrets:    make(map[string]string),
 		twoFactors:     make(map[string]*twofactor.TwoFactor),
 		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
 		trustedDevices: make(map[string]*twofactor.TrustDeviceRecord),
 		challenges:     make(map[string]*twofactor.ChallengeRecord),
 		jwks:           make(map[string]*jwt.JWKRecord),
-		orgs:          make(map[string]*organization.Organization),
-		orgsBySlug:    make(map[string]string),
-		members:       make(map[string]*organization.Member),
-		membersByID:   make(map[string]*organization.Member),
-		invitations:   make(map[string]*organization.Invitation),
-		teams:         make(map[string]*organization.Team),
-		teamMembers:   make(map[string]*organization.TeamMember),
-		orgRoles:      make(map[string]*organization.OrganizationRole),
+		orgs:           make(map[string]*organization.Organization),
+		orgsBySlug:     make(map[string]string),
+		members:        make(map[string]*organization.Member),
+		membersByID:    make(map[string]*organization.Member),
+		invitations:    make(map[string]*organization.Invitation),
+		teams:          make(map[string]*organization.Team),
+		teamMembers:    make(map[string]*organization.TeamMember),
+		orgRoles:       make(map[string]*organization.OrganizationRole),
 	}
 }
 
@@ -83,11 +86,13 @@ func (s *Store) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*
 	defer s.mu.Unlock()
 
 	user := &entity.User{
-		ID:        "memory:" + strconv.FormatInt(rand.Int63(), 10),
-		Name:      params.Name,
-		Email:     params.Email,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:           "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		Name:         params.Name,
+		Email:        params.Email,
+		Role:         params.Role,
+		PasswordHash: params.PasswordHash,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	s.users[user.ID] = user
@@ -98,7 +103,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*entity.User,
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, u := range s.users {
-		if u.Email == email {
+		if strings.EqualFold(u.Email, email) {
 			return u, nil
 		}
 	}
@@ -123,6 +128,147 @@ func (s *Store) UpdateUser(ctx context.Context, user *entity.User) error {
 	}
 	user.UpdatedAt = time.Now()
 	s.users[user.ID] = user
+	return nil
+}
+
+func (s *Store) DeleteUser(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.users[id]; !ok {
+		return admin.ErrUserNotFound
+	}
+	delete(s.users, id)
+	delete(s.userAccounts, id)
+	return nil
+}
+
+func (s *Store) ListUsers(ctx context.Context, filter admin.ListUsersFilter) ([]*entity.User, int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var matched []*entity.User
+	for _, u := range s.users {
+		// Filter by field
+		if filter.FilterField != "" && filter.FilterValue != nil {
+			switch strings.ToLower(filter.FilterField) {
+			case "role":
+				valStr := fmt.Sprintf("%v", filter.FilterValue)
+				if filter.FilterOperator == "ne" {
+					if u.Role == valStr {
+						continue
+					}
+				} else {
+					if u.Role != valStr && !strings.Contains(u.Role, valStr) {
+						continue
+					}
+				}
+			case "banned":
+				if bVal, ok := filter.FilterValue.(bool); ok {
+					if u.Banned != bVal {
+						continue
+					}
+				}
+			}
+		}
+
+		// Search
+		if filter.SearchValue != "" {
+			query := strings.ToLower(filter.SearchValue)
+			target := ""
+			switch strings.ToLower(filter.SearchField) {
+			case "email":
+				target = strings.ToLower(u.Email)
+			case "name":
+				target = strings.ToLower(u.Name)
+			default:
+				target = strings.ToLower(u.Name + " " + u.Email)
+			}
+
+			matches := false
+			switch strings.ToLower(filter.SearchOperator) {
+			case "exact":
+				matches = (target == query)
+			case "starts_with":
+				matches = strings.HasPrefix(target, query)
+			case "ends_with":
+				matches = strings.HasSuffix(target, query)
+			default: // "contains"
+				matches = strings.Contains(target, query)
+			}
+
+			if !matches {
+				continue
+			}
+		}
+
+		cloned := *u
+		matched = append(matched, &cloned)
+	}
+
+	// Sort
+	sort.Slice(matched, func(i, j int) bool {
+		asc := strings.ToLower(filter.SortDirection) == "asc"
+		switch strings.ToLower(filter.SortBy) {
+		case "email":
+			if asc {
+				return matched[i].Email < matched[j].Email
+			}
+			return matched[i].Email > matched[j].Email
+		case "name":
+			if asc {
+				return matched[i].Name < matched[j].Name
+			}
+			return matched[i].Name > matched[j].Name
+		default: // created_at
+			if asc {
+				return matched[i].CreatedAt.Before(matched[j].CreatedAt)
+			}
+			return matched[i].CreatedAt.After(matched[j].CreatedAt)
+		}
+	})
+
+	total := int64(len(matched))
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(matched) {
+		return []*entity.User{}, total, nil
+	}
+
+	end := len(matched)
+	if filter.Limit > 0 && offset+filter.Limit < len(matched) {
+		end = offset + filter.Limit
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (s *Store) LinkCredentialAccount(ctx context.Context, userID, passwordHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.userAccounts[userID]; !ok {
+		s.userAccounts[userID] = make(map[string]*entity.Account)
+	}
+
+	if acc, ok := s.userAccounts[userID]["credential"]; ok {
+		acc.Password = passwordHash
+		acc.UpdatedAt = time.Now()
+		return nil
+	}
+
+	acc := &entity.Account{
+		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:    userID,
+		Provider:  "credential",
+		Password:  passwordHash,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	s.accounts[acc.ID] = acc
+	s.userAccounts[userID]["credential"] = acc
 	return nil
 }
 
@@ -202,13 +348,14 @@ func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionPar
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sessionCreated := &entity.Session{
-		ID:        "memory:" + strconv.FormatInt(rand.Int63(), 10),
-		UserID:    session.UserID,
-		Token:     session.Token,
-		IPAddress: session.IPAddress,
-		UserAgent: session.UserAgent,
-		ExpiresAt: session.ExpiresAt,
-		CreatedAt: session.CreatedAt,
+		ID:             "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:         session.UserID,
+		Token:          session.Token,
+		IPAddress:      session.IPAddress,
+		UserAgent:      session.UserAgent,
+		ImpersonatedBy: session.ImpersonatedBy,
+		ExpiresAt:      session.ExpiresAt,
+		CreatedAt:      session.CreatedAt,
 	}
 	s.sessions[session.Token] = sessionCreated
 	return sessionCreated, nil
@@ -223,10 +370,39 @@ func (s *Store) GetSessionByToken(ctx context.Context, token string) (*entity.Se
 	return nil, domain.ErrSessionNotFound
 }
 
+func (s *Store) ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*entity.Session
+	for _, sess := range s.sessions {
+		if sess.UserID == userID {
+			cloned := *sess
+			result = append(result, &cloned)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
+	return result, nil
+}
+
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.sessions, token)
+	return nil
+}
+
+func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for token, sess := range s.sessions {
+		if sess.UserID == userID {
+			delete(s.sessions, token)
+		}
+	}
 	return nil
 }
 
@@ -1082,4 +1258,3 @@ func (s *Store) CountRoles(ctx context.Context, orgID string) (int, error) {
 	}
 	return count, nil
 }
-
