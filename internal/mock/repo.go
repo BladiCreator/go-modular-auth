@@ -27,32 +27,32 @@ var (
 )
 
 type MockRepo struct {
-	mu             sync.RWMutex
-	users          map[string]*entity.User
-	accounts       map[string]*entity.Account            // key: accountID
-	userAccounts   map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens         map[string]*entity.VerificationToken  // key: token string
-	sessions       map[string]*entity.Session
-	totpSecrets    map[string]string
-	twoFactors     map[string]*twofactor.TwoFactor         // key: userID
-	otpChallenges  map[string]*twofactor.OTPChallenge      // key: challenge key
+	mu                     sync.RWMutex
+	users                  map[string]*entity.User
+	accounts               map[string]*entity.Account            // key: accountID
+	userAccounts           map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens                 map[string]*entity.VerificationToken  // key: token string
+	sessions               map[string]*entity.Session
+	totpSecrets            map[string]string
+	twoFactors             map[string]*twofactor.TwoFactor         // key: userID
+	otpChallenges          map[string]*twofactor.OTPChallenge      // key: challenge key
 	trustedDevices         map[string]*twofactor.TrustDeviceRecord // key: userID + ":" + deviceID
 	challenges             map[string]*twofactor.ChallengeRecord   // key: token
 	passkeys               map[string]*entity.Passkey              // key: id
 	passkeysByCredentialID map[string]*entity.Passkey              // key: credentialID
-	passkeyChallenges      map[string]*passkey.PasskeyChallenge     // key: token
+	passkeyChallenges      map[string]*passkey.PasskeyChallenge    // key: token
 }
 
 func NewMockRepo() *MockRepo {
 	return &MockRepo{
-		users:          make(map[string]*entity.User),
-		accounts:       make(map[string]*entity.Account),
-		userAccounts:   make(map[string]map[string]*entity.Account),
-		tokens:         make(map[string]*entity.VerificationToken),
-		sessions:       make(map[string]*entity.Session),
-		totpSecrets:    make(map[string]string),
-		twoFactors:     make(map[string]*twofactor.TwoFactor),
-		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
+		users:                  make(map[string]*entity.User),
+		accounts:               make(map[string]*entity.Account),
+		userAccounts:           make(map[string]map[string]*entity.Account),
+		tokens:                 make(map[string]*entity.VerificationToken),
+		sessions:               make(map[string]*entity.Session),
+		totpSecrets:            make(map[string]string),
+		twoFactors:             make(map[string]*twofactor.TwoFactor),
+		otpChallenges:          make(map[string]*twofactor.OTPChallenge),
 		trustedDevices:         make(map[string]*twofactor.TrustDeviceRecord),
 		challenges:             make(map[string]*twofactor.ChallengeRecord),
 		passkeys:               make(map[string]*entity.Passkey),
@@ -670,5 +670,3 @@ func (m *MockRepo) DeletePasskeyChallenge(ctx context.Context, token string) err
 	delete(m.passkeyChallenges, token)
 	return nil
 }
-
-

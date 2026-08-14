@@ -5,6 +5,7 @@ package plugins
 import (
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
+	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
@@ -231,3 +232,36 @@ func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
 	return passkey.New(repo, opts...)
 }
 
+// EmailOTP instantiates a new Email OTP authentication plugin configured with a repository and functional options.
+//
+// The EmailOTP plugin handles passwordless authentication (sign-in and automatic sign-up), email address verification,
+// secure password reset flows, and verified email change requests via cryptographically secure one-time numeric passwords.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - emailotp.WithSendVerificationOTP(fn SendVerificationOTPFunc): Required delivery callback to send emails.
+//   - emailotp.WithOTPLength(length int): Number of numeric digits for generated OTPs (default: 6).
+//   - emailotp.WithExpiresIn(d time.Duration): Expiration lifetime of generated OTPs (default: 5m).
+//   - emailotp.WithAllowedAttempts(attempts int): Max incorrect verification attempts before invalidation (default: 3).
+//   - emailotp.WithStoreOTP(mode StoreOTPMode, secretKey ...string): Storage mode ("plain", "hashed", "encrypted").
+//   - emailotp.WithResendStrategy(strategy ResendStrategy): Resend policy ("rotate" or "reuse", default: "rotate").
+//   - emailotp.WithDisableSignUp(disable bool): Prevent auto-creating new users on sign-in (default: false).
+//   - emailotp.WithAutoSignInAfterVerification(auto bool): Automatically create session upon email verification (default: true).
+//   - emailotp.WithRevokeSessionsOnPasswordReset(revoke bool): Invalidate all active sessions on password reset (default: true).
+//   - emailotp.WithChangeEmail(enabled, verifyCurrent bool): Configure email change flow parameters.
+//
+// Example:
+//
+//	otpPlugin := plugins.EmailOTP(
+//		myRepository,
+//		emailotp.WithSendVerificationOTP(func(ctx context.Context, data emailotp.SendEmailData) error {
+//			return mailer.Send(data.Email, "Your OTP Code", data.OTP)
+//		}),
+//		emailotp.WithStoreOTP(emailotp.StoreOTPHashed),
+//		emailotp.WithAllowedAttempts(3),
+//	)
+func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugin {
+	return emailotp.New(repo, opts...)
+}
