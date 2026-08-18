@@ -10,6 +10,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
+	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
@@ -264,4 +265,43 @@ func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
 //	)
 func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugin {
 	return emailotp.New(repo, opts...)
+}
+
+// PhoneNumber instantiates a new Phone Number (SMS OTP) authentication plugin configured with a repository and options.
+//
+// The PhoneNumber plugin handles passwordless SMS OTP authentication, phone number verification and updates,
+// credentialed phone + password sign-in, secure password resets via SMS, attempt budgeting, and anti-replay protection.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - phonenumber.WithSendOTP(fn SendOTPFunc): Required delivery callback to dispatch SMS messages.
+//   - phonenumber.WithVerifyOTP(fn VerifyOTPFunc): Optional delegated verification callback (e.g. Twilio Verify).
+//   - phonenumber.WithSendPasswordResetOTP(fn SendOTPFunc): Optional dedicated callback for password reset SMS OTPs.
+//   - phonenumber.WithOTPLength(length int): Number of numeric digits for generated OTPs (default: 6).
+//   - phonenumber.WithExpiresIn(d time.Duration): Expiration lifetime of generated OTPs (default: 5m).
+//   - phonenumber.WithAllowedAttempts(attempts int): Max incorrect verification attempts before invalidation (default: 3).
+//   - phonenumber.WithStoreOTP(mode StoreOTPMode, secretKey ...string): Storage mode ("plain", "hashed", "encrypted").
+//   - phonenumber.WithResendStrategy(strategy ResendStrategy): Resend policy ("rotate" or "reuse", default: "rotate").
+//   - phonenumber.WithRequireVerification(require bool): Enforce verified phone before password login (default: false).
+//   - phonenumber.WithDisableSignUp(disable bool): Prevent auto-creating new users on verification (default: false).
+//   - phonenumber.WithRevokeSessionsOnPasswordReset(revoke bool): Invalidate all active sessions on password reset (default: true).
+//   - phonenumber.WithPhoneNumberValidator(fn PhoneNumberValidatorFunc): Custom validator for phone number formats (e.g. E.164).
+//   - phonenumber.WithSignUpOnVerification(cfg SignUpOnVerificationConfig): Custom temporary email/name generators for auto-signup.
+//   - phonenumber.WithCallbackOnVerification(fn CallbackOnVerificationFunc): Hook executed after phone verification.
+//   - phonenumber.WithOnPasswordReset(fn OnPasswordResetFunc): Hook executed after password reset confirmation.
+//
+// Example:
+//
+//	phonePlugin := plugins.PhoneNumber(
+//		myRepository,
+//		phonenumber.WithSendOTP(func(ctx context.Context, data phonenumber.SendOTPData) error {
+//			return smsClient.SendSMS(data.PhoneNumber, "Your code is: " + data.Code)
+//		}),
+//		phonenumber.WithStoreOTP(phonenumber.StoreOTPHashed),
+//		phonenumber.WithAllowedAttempts(3),
+//	)
+func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phonenumber.Plugin {
+	return phonenumber.New(repo, opts...)
 }
