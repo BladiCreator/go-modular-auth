@@ -8,6 +8,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
@@ -305,3 +306,41 @@ func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugi
 func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phonenumber.Plugin {
 	return phonenumber.New(repo, opts...)
 }
+
+// OAuth2 instantiates a new OAuth 2.1 & OpenID Connect Provider authentication plugin.
+//
+// The OAuth2 plugin provides full compliance with OAuth 2.1 (mandatory PKCE S256, single-use atomic code exchange,
+// RFC 9207 issuer identification, refresh token rotation with family revocation) and OpenID Connect Core 1.0
+// (ID Token issuance with at_hash/c_hash, UserInfo endpoint, RP-Initiated Logout, Dynamic Client Registration,
+// and Discovery Metadata).
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - oauth2.WithIssuer(issuer string): Authorization server base URL ("iss" claim).
+//   - oauth2.WithAccessTokenType(t oauth2.AccessTokenType): Issue RFC 9068 JWT or opaque access tokens.
+//   - oauth2.WithJWTSigner(signer oauth2.JWTSigner): Custom JWT signer (compatible with plugins/jwt or RSA/EdDSA).
+//   - oauth2.WithPages(loginPage, consentPage string): Interactive UI redirect paths.
+//   - oauth2.WithScopes(scopes ...string): Supported OAuth/OIDC scopes.
+//   - oauth2.WithGrantTypes(types ...oauth2.GrantType): Enabled grant types.
+//   - oauth2.WithTokenExpirations(code, access, refresh, idToken time.Duration): Token validity lifetimes.
+//   - oauth2.WithStoreModes(secretMode, tokenMode oauth2.StoreMode, secretKey string): Persistence security modes.
+//   - oauth2.WithPairwiseSecret(secret string): Secret salt for pairwise pseudonymous sub derivation.
+//   - oauth2.WithDynamicClientRegistration(allow, allowUnauthenticated bool): RFC 7591 client registration.
+//   - oauth2.WithCustomAccessTokenClaims(fn oauth2.CustomClaimsFunc): Application-specific JWT access token claims.
+//   - oauth2.WithCustomIDTokenClaims(fn oauth2.CustomClaimsFunc): Application-specific OIDC ID token claims.
+//   - oauth2.WithCustomUserInfoClaims(fn oauth2.CustomClaimsFunc): Application-specific UserInfo claims.
+//
+// Example:
+//
+//	oauthPlugin := plugins.OAuth2(
+//		myOAuthRepository,
+//		oauth2.WithIssuer("https://auth.example.com"),
+//		oauth2.WithAccessTokenType(oauth2.AccessTokenTypeJWT),
+//		oauth2.WithPages("/sign-in", "/consent"),
+//	)
+func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
+	return oauth2.New(repo, opts...)
+}
+

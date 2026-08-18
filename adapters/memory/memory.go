@@ -18,6 +18,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -31,6 +32,7 @@ var (
 	_ organization.Repository  = (*Store)(nil)
 	_ admin.Repository         = (*Store)(nil)
 	_ passkey.Repository       = (*Store)(nil)
+	_ oauth2.Repository        = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -59,33 +61,48 @@ type Store struct {
 	passkeys               map[string]*entity.Passkey          // key: id
 	passkeysByCredentialID map[string]*entity.Passkey          // key: credentialID
 	passkeyChallenges      map[string]*passkey.PasskeyChallenge // key: token
+
+	oauthClients        map[string]*oauth2.OAuthClient            // key: client_id
+	oauthClientsByID    map[string]*oauth2.OAuthClient            // key: id
+	oauthCodes          map[string]*oauth2.OAuthAuthorizationCode // key: code
+	oauthAccessTokens   map[string]*oauth2.OAuthAccessToken       // key: tokenHash
+	oauthRefreshTokens  map[string]*oauth2.OAuthRefreshToken      // key: tokenHash
+	oauthConsents       map[string]*oauth2.OAuthConsent           // key: client_id + ":" + user_id
+	oauthConsentsByID   map[string]*oauth2.OAuthConsent           // key: id
 }
 
 // New instantiates a new thread-safe in-memory Store.
 func New() *Store {
 	return &Store{
-		users:          make(map[string]*entity.User),
-		accounts:       make(map[string]*entity.Account),
-		userAccounts:   make(map[string]map[string]*entity.Account),
-		tokens:         make(map[string]*entity.VerificationToken),
-		sessions:       make(map[string]*entity.Session),
-		totpSecrets:    make(map[string]string),
-		twoFactors:     make(map[string]*twofactor.TwoFactor),
-		otpChallenges:  make(map[string]*twofactor.OTPChallenge),
-		trustedDevices: make(map[string]*twofactor.TrustDeviceRecord),
-		challenges:     make(map[string]*twofactor.ChallengeRecord),
-		jwks:           make(map[string]*jwt.JWKRecord),
-		orgs:           make(map[string]*organization.Organization),
-		orgsBySlug:     make(map[string]string),
-		members:        make(map[string]*organization.Member),
-		membersByID:    make(map[string]*organization.Member),
-		invitations:    make(map[string]*organization.Invitation),
+		users:                  make(map[string]*entity.User),
+		accounts:               make(map[string]*entity.Account),
+		userAccounts:           make(map[string]map[string]*entity.Account),
+		tokens:                 make(map[string]*entity.VerificationToken),
+		sessions:               make(map[string]*entity.Session),
+		totpSecrets:            make(map[string]string),
+		twoFactors:             make(map[string]*twofactor.TwoFactor),
+		otpChallenges:          make(map[string]*twofactor.OTPChallenge),
+		trustedDevices:         make(map[string]*twofactor.TrustDeviceRecord),
+		challenges:             make(map[string]*twofactor.ChallengeRecord),
+		jwks:                   make(map[string]*jwt.JWKRecord),
+		orgs:                   make(map[string]*organization.Organization),
+		orgsBySlug:             make(map[string]string),
+		members:                make(map[string]*organization.Member),
+		membersByID:            make(map[string]*organization.Member),
+		invitations:            make(map[string]*organization.Invitation),
 		teams:                  make(map[string]*organization.Team),
 		teamMembers:            make(map[string]*organization.TeamMember),
 		orgRoles:               make(map[string]*organization.OrganizationRole),
 		passkeys:               make(map[string]*entity.Passkey),
 		passkeysByCredentialID: make(map[string]*entity.Passkey),
 		passkeyChallenges:      make(map[string]*passkey.PasskeyChallenge),
+		oauthClients:           make(map[string]*oauth2.OAuthClient),
+		oauthClientsByID:       make(map[string]*oauth2.OAuthClient),
+		oauthCodes:             make(map[string]*oauth2.OAuthAuthorizationCode),
+		oauthAccessTokens:      make(map[string]*oauth2.OAuthAccessToken),
+		oauthRefreshTokens:     make(map[string]*oauth2.OAuthRefreshToken),
+		oauthConsents:          make(map[string]*oauth2.OAuthConsent),
+		oauthConsentsByID:      make(map[string]*oauth2.OAuthConsent),
 	}
 }
 
@@ -1414,6 +1431,240 @@ func (s *Store) DeletePasskeyChallenge(ctx context.Context, token string) error 
 	delete(s.passkeyChallenges, token)
 	return nil
 }
+
+// OAuth 2.1 & OpenID Connect Repository Methods
+
+func (s *Store) FindClientByClientID(ctx context.Context, clientID string) (*oauth2.OAuthClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if client, ok := s.oauthClients[clientID]; ok {
+		return client, nil
+	}
+	return nil, oauth2.ErrClientNotFound
+}
+
+func (s *Store) FindClientByID(ctx context.Context, id string) (*oauth2.OAuthClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if client, ok := s.oauthClientsByID[id]; ok {
+		return client, nil
+	}
+	return nil, oauth2.ErrClientNotFound
+}
+
+func (s *Store) ListClientsByUserID(ctx context.Context, userID string) ([]*oauth2.OAuthClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*oauth2.OAuthClient
+	for _, client := range s.oauthClients {
+		if client.UserID != nil && *client.UserID == userID {
+			result = append(result, client)
+		}
+	}
+	return result, nil
+}
+
+func (s *Store) CreateClient(ctx context.Context, client *oauth2.OAuthClient) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthClients[client.ClientID] = client
+	s.oauthClientsByID[client.ID] = client
+	return nil
+}
+
+func (s *Store) UpdateClient(ctx context.Context, client *oauth2.OAuthClient) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthClients[client.ClientID] = client
+	s.oauthClientsByID[client.ID] = client
+	return nil
+}
+
+func (s *Store) DeleteClient(ctx context.Context, clientID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if client, ok := s.oauthClients[clientID]; ok {
+		delete(s.oauthClientsByID, client.ID)
+		delete(s.oauthClients, clientID)
+	}
+	return nil
+}
+
+func (s *Store) CreateAuthorizationCode(ctx context.Context, code *oauth2.OAuthAuthorizationCode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthCodes[code.Code] = code
+	return nil
+}
+
+func (s *Store) ConsumeAuthorizationCode(ctx context.Context, code string) (*oauth2.OAuthAuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if authCode, ok := s.oauthCodes[code]; ok {
+		delete(s.oauthCodes, code)
+		return authCode, nil
+	}
+	return nil, oauth2.ErrInvalidAuthorizationCode
+}
+
+func (s *Store) CreateAccessToken(ctx context.Context, token *oauth2.OAuthAccessToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthAccessTokens[token.Token] = token
+	return nil
+}
+
+func (s *Store) FindAccessToken(ctx context.Context, tokenHash string) (*oauth2.OAuthAccessToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if token, ok := s.oauthAccessTokens[tokenHash]; ok {
+		return token, nil
+	}
+	return nil, oauth2.ErrInvalidAccessToken
+}
+
+func (s *Store) DeleteAccessToken(ctx context.Context, tokenHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.oauthAccessTokens, tokenHash)
+	return nil
+}
+
+func (s *Store) CreateRefreshToken(ctx context.Context, token *oauth2.OAuthRefreshToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthRefreshTokens[token.Token] = token
+	return nil
+}
+
+func (s *Store) FindRefreshToken(ctx context.Context, tokenHash string) (*oauth2.OAuthRefreshToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if token, ok := s.oauthRefreshTokens[tokenHash]; ok {
+		return token, nil
+	}
+	return nil, oauth2.ErrInvalidRefreshToken
+}
+
+func (s *Store) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.oauthRefreshTokens, tokenHash)
+	return nil
+}
+
+func (s *Store) RevokeRefreshTokenFamily(ctx context.Context, familyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	for _, token := range s.oauthRefreshTokens {
+		if token.FamilyID == familyID {
+			token.RevokedAt = &now
+		}
+	}
+	return nil
+}
+
+func (s *Store) FindConsent(ctx context.Context, clientID, userID string) (*oauth2.OAuthConsent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	key := clientID + ":" + userID
+	if consent, ok := s.oauthConsents[key]; ok {
+		return consent, nil
+	}
+	return nil, oauth2.ErrConsentRequired
+}
+
+func (s *Store) ListConsentsByUserID(ctx context.Context, userID string) ([]*oauth2.OAuthConsent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*oauth2.OAuthConsent
+	for _, consent := range s.oauthConsents {
+		if consent.UserID == userID {
+			result = append(result, consent)
+		}
+	}
+	return result, nil
+}
+
+func (s *Store) CreateConsent(ctx context.Context, consent *oauth2.OAuthConsent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := consent.ClientID + ":" + consent.UserID
+	s.oauthConsents[key] = consent
+	s.oauthConsentsByID[consent.ID] = consent
+	return nil
+}
+
+func (s *Store) UpdateConsent(ctx context.Context, consent *oauth2.OAuthConsent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := consent.ClientID + ":" + consent.UserID
+	s.oauthConsents[key] = consent
+	s.oauthConsentsByID[consent.ID] = consent
+	return nil
+}
+
+func (s *Store) DeleteConsent(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if consent, ok := s.oauthConsentsByID[id]; ok {
+		key := consent.ClientID + ":" + consent.UserID
+		delete(s.oauthConsents, key)
+		delete(s.oauthConsentsByID, id)
+	}
+	return nil
+}
+
+func (s *Store) FindUserByID(ctx context.Context, userID string) (*entity.User, error) {
+	return s.GetUserByID(ctx, userID)
+}
+
+func (s *Store) FindSessionByID(ctx context.Context, sessionID string) (*entity.Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if sess, ok := s.sessions[sessionID]; ok {
+		return sess, nil
+	}
+	return nil, domain.ErrSessionNotFound
+}
+
+func (s *Store) DeleteSessionByID(ctx context.Context, sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.sessions, sessionID)
+	return nil
+}
+
+func (s *Store) SaveSession(session *entity.Session) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sessions[session.ID] = session
+}
+
 
 
 
