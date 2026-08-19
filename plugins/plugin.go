@@ -3,6 +3,7 @@
 package plugins
 
 import (
+	"github.com/BladiCreator/go-modular-auth/plugins/access"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
@@ -343,4 +344,38 @@ func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phone
 func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 	return oauth2.New(repo, opts...)
 }
+
+// Access instantiates a new Access Control (Granular Permissions & RBAC/ABAC) plugin configured with master statements and options.
+//
+// The Access plugin provides sub-microsecond in-memory permission evaluation, boolean logic combinators (AND/OR),
+// wildcard matching ('*'), multi-role subject aggregation, dynamic role inheritance (Extend/Merge), thread-safe runtime
+// role registration, JSON persistence serialization, and execution guards for HTTP/gRPC middlewares.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - access.WithMasterStatements(stmts access.Statements): Define the global master schema of valid resources and permitted actions.
+//   - access.WithInitialRoles(roles map[string]access.Statements): Pre-register initial static or dynamic roles on startup.
+//   - access.WithAllowWildcards(allow bool): Enable or disable wildcard ('*') matching for resources and actions (default: true).
+//   - access.WithStrictResources(strict bool): Enforce that registered roles must strictly match MasterStatements (default: false).
+//
+// Example:
+//
+//	statement := access.Statements{
+//		"project": {"create", "read", "update", "delete"},
+//		"user":    {"create", "read", "update", "delete"},
+//	}
+//
+//	accessPlugin := plugins.Access(
+//		statement,
+//		access.WithInitialRoles(map[string]access.Statements{
+//			"admin": {"*": {"*"}},
+//			"user":  {"project": {"read"}, "user": {"read"}},
+//		}),
+//	)
+func Access(masterStatements access.Statements, opts ...access.Option) *access.Plugin {
+	return access.New(masterStatements, opts...)
+}
+
 
