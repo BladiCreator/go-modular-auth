@@ -21,6 +21,17 @@ import (
 // The EmailPassword plugin handles traditional user registration (sign-up), login authentication (sign-in),
 // password changes, forgot/reset password flows, email verification, active password verification, and lifecycle event hooks.
 //
+// # Available Methods
+//
+//   - SignUp(ctx context.Context, input dto.SignUpParams) (*entity.User, error): Register a new user with email and password.
+//   - SignIn(ctx context.Context, input dto.SignInParams) (*entity.User, error): Authenticate an existing user with email and password credentials.
+//   - ChangePassword(ctx context.Context, input dto.ChangePasswordParams) error: Update the password for an authenticated user.
+//   - ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.VerificationToken, error): Generate a secure password reset token and dispatch email.
+//   - ResetPassword(ctx context.Context, input dto.ResetPasswordParams) error: Reset a user password using a valid reset token.
+//   - SendVerificationEmail(ctx context.Context, input dto.SendVerificationEmailParams) (*entity.VerificationToken, error): Issue and send an email verification token.
+//   - VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (*entity.User, error): Confirm user email address using a verification token.
+//   - VerifyPassword(ctx context.Context, input dto.VerifyPasswordParams) (bool, error): Verify if a given plaintext password matches user hash.
+//
 // # Configuration Options
 //
 // You can pass functional options to customize the plugin:
@@ -36,12 +47,25 @@ import (
 //
 // Example:
 //
-//	epPlugin := plugins.EmailPassword(
-//		myRepository,
-//		emailpassword.WithMinPasswordLength(10),
-//		emailpassword.WithResetTokenExpiry(30 * time.Minute),
-//		emailpassword.WithRequireEmailVerification(true),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.EmailPassword(storage, emailpassword.WithMinPasswordLength(8)),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	user, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, dto.SignUpParams{
+//		Name:     "Gopher Go",
+//		Email:    "gopher@golang.org",
+//		Password: "SecurePassword123!",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) *emailpassword.Plugin {
 	return emailpassword.New(repo, opts...)
 }
@@ -52,6 +76,26 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 // generating secure Base32 secrets, creating otpauth:// URIs for authenticator apps (Google Authenticator, Authy, 1Password),
 // verifying 6- or 8-digit TOTP codes, managing single-use backup recovery codes, issuing sign-in challenge tokens,
 // authorizing trusted client devices, and dispatching SMS/Email OTP challenges.
+//
+// # Available Methods
+//
+//   - Enable(ctx context.Context, params EnableParams) (*EnableResult, error): Initialize 2FA enrollment, generating secret, TOTP URI, and backup codes.
+//   - Disable(ctx context.Context, params DisableParams) error: Deactivate two-factor authentication for a user.
+//   - GetTOTPURI(ctx context.Context, params GetTOTPURIParams) (string, error): Retrieve otpauth:// URI for an enrolled user.
+//   - VerifyTOTP(ctx context.Context, params VerifyTOTPParams) (*VerifyResult, error): Validate a time-based 6-digit TOTP code.
+//   - VerifyBackupCode(ctx context.Context, params VerifyBackupCodeParams) (*VerifyResult, error): Consume and validate a single-use backup recovery code.
+//   - GenerateBackupCodes(ctx context.Context, params GenerateBackupCodesParams) (*BackupCodesResult, error): Regenerate a fresh set of recovery backup codes.
+//   - ViewBackupCodes(ctx context.Context, params ViewBackupCodesParams) (*BackupCodesResult, error): View active unconsumed backup codes.
+//   - SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPResult, error): Dispatch SMS/Email OTP code for 2FA verification.
+//   - VerifyOTP(ctx context.Context, params VerifyOTPParams) (*VerifyResult, error): Verify an SMS/Email OTP challenge code.
+//   - CreateChallenge(ctx context.Context, params CreateChallengeParams) (*ChallengeResult, error): Create a temporary sign-in challenge token.
+//   - VerifyChallenge(ctx context.Context, params VerifyChallengeParams) (*VerifyResult, error): Complete authentication by verifying challenge token and 2FA code.
+//   - TrustDevice(ctx context.Context, params TrustDeviceParams) (*TrustDeviceResult, error): Authorize and issue a trusted client device cookie/token.
+//   - VerifyTrustDevice(ctx context.Context, params VerifyTrustDeviceParams) (bool, error): Check if a client device token is valid and trusted.
+//   - RevokeTrustedDevice(ctx context.Context, params RevokeTrustedDeviceParams) error: Revoke authorization for a specific trusted device.
+//   - RevokeAllTrustedDevices(ctx context.Context, userID string) error: Invalidate all trusted devices for a user.
+//   - GenerateTOTPSecret(ctx context.Context, userID string) (string, error): Generate a raw Base32 TOTP secret.
+//   - VerifyCode(ctx context.Context, userID, code string) (bool, error): Simple validation helper for TOTP or backup codes.
 //
 // # Configuration Options
 //
@@ -68,13 +112,27 @@ func EmailPassword(repo emailpassword.Repository, opts ...emailpassword.Option) 
 //
 // Example:
 //
-//	tfPlugin := plugins.TwoFactor(
-//		myRepository,
-//		twofactor.WithIssuer("My Application"),
-//		twofactor.WithTOTPOptions(6, 30),
-//		twofactor.WithBackupCodeOptions(10, 10),
-//		twofactor.WithTrustDevice("my-device-secret", 30*24*time.Hour),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.TwoFactor(
+//				storage,
+//				twofactor.WithIssuer("GoModularAuth"),
+//				twofactor.WithTOTPOptions(6, 30),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	res, err := auth.Plugin[twofactor.Plugin](app).Enable(ctx, twofactor.EnableParams{
+//		UserID: "usr_123",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.Plugin {
 	return twofactor.New(repo, opts...)
 }
@@ -83,6 +141,16 @@ func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.P
 //
 // The Bearer plugin handles RFC 7235 compliant Bearer token extraction, HMAC-SHA256 cryptographic signing and verification
 // with constant-time comparison, CORS header exposition, and seamless session resolution for API and mobile clients.
+//
+// # Available Methods
+//
+//   - Verify(ctx context.Context, params VerifyParams) (*VerifyResult, error): Cryptographically verify and parse an incoming Bearer token.
+//   - CreateToken(ctx context.Context, params CreateTokenParams) (*CreateTokenResult, error): Generate and sign an HMAC-SHA256 authenticated Bearer token.
+//   - ResolveSession(ctx context.Context, params ResolveSessionParams) (*ResolveSessionResult, error): Extract token, verify HMAC signature, and retrieve database session.
+//   - ExtractToken(headerValue string) (string, error): Parse raw token from an HTTP Authorization header ("Bearer <token>").
+//   - FormatHeader(token string) string: Format a token into standard "Bearer <token>" header value.
+//   - FormatAuthTokenHeader(token string) (headerName, headerValue string): Generate "set-auth-token" response header.
+//   - ExposedHeaders() string: Return CORS headers to expose to browsers ("set-auth-token").
 //
 // # Configuration Options
 //
@@ -96,11 +164,27 @@ func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.P
 //
 // Example:
 //
-//	bearerPlugin := plugins.Bearer(
-//		myRepository,
-//		bearer.WithSecret("my-cryptographic-secret-key"),
-//		bearer.WithRequireSignature(false),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Bearer(
+//				storage,
+//				bearer.WithSecret("my-cryptographic-secret-key"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	tokenRes, err := auth.Plugin[bearer.Plugin](app).CreateToken(ctx, bearer.CreateTokenParams{
+//		Token:  "session_token_xyz",
+//		UserID: "usr_123",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 	return bearer.New(repo, opts...)
 }
@@ -110,6 +194,14 @@ func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 // The JWT plugin provides RFC 7519 JSON Web Token issuance and RFC 7517 JSON Web Key Set (JWKS) key management,
 // supporting modern asymmetric cryptographic algorithms (Ed25519/EdDSA, ECDSA ES256/ES512, RSA RS256/PS256),
 // AES-256-GCM authenticated encryption for private keys in persistent storage, and automatic key rotation with grace periods.
+//
+// # Available Methods
+//
+//   - Sign(ctx context.Context, params SignParams) (*SignResult, error): Construct and sign an RFC 7519 compact JWT token with active signing key.
+//   - Verify(ctx context.Context, params VerifyParams) (*VerifyResult, error): Verify cryptographic signature and claims (iss, aud, exp, nbf) of a JWT.
+//   - GetJWKS(ctx context.Context, params GetJWKSParams) (*GetJWKSResult, error): Serve RFC 7517 JSON Web Key Set containing active and valid grace-period public keys.
+//   - GetToken(ctx context.Context, params GetTokenParams) (*GetTokenResult, error): Issue a signed JWT for an authenticated user session.
+//   - RotateKeys(ctx context.Context, params RotateKeysParams) (*RotateKeysResult, error): Perform on-demand cryptographic key rotation, generating new active key pair.
 //
 // # Configuration Options
 //
@@ -126,13 +218,28 @@ func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 //
 // Example:
 //
-//	jwtPlugin := plugins.JWT(
-//		myJWKRepository,
-//		jwt.WithIssuer("https://auth.example.com"),
-//		jwt.WithSecret("my-aes-encryption-secret-32b"),
-//		jwt.WithAlgorithm(jwt.AlgEdDSA),
-//		jwt.WithExpiration(30 * time.Minute),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.JWT(
+//				storage,
+//				jwt.WithIssuer("https://auth.example.com"),
+//				jwt.WithSecret("my-aes-encryption-secret-32b"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	jwtRes, err := auth.Plugin[jwt.Plugin](app).Sign(ctx, jwt.SignParams{
+//		Subject: "usr_123",
+//		Payload: map[string]any{"role": "admin"},
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
 	return jwt.New(repo, opts...)
 }
@@ -141,6 +248,60 @@ func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
 //
 // The Organization plugin provides multi-tenancy, organization lifecycle management, member and role management,
 // static and dynamic Role-Based Access Control (RBAC), team hierarchies (Teams), and full invitation workflows.
+//
+// # Available Methods
+//
+//   - Organization Lifecycle:
+//     - CreateOrganization(ctx context.Context, params CreateOrganizationParams) (*CreateOrganizationResult, error): Create a new organization entity and assign creator role.
+//     - GetOrganization(ctx context.Context, params GetOrganizationParams) (*GetOrganizationResult, error): Retrieve organization details by ID.
+//     - GetOrganizationBySlug(ctx context.Context, params GetOrganizationBySlugParams) (*GetOrganizationBySlugResult, error): Retrieve organization details by URL slug.
+//     - GetFullOrganization(ctx context.Context, params GetFullOrganizationParams) (*GetFullOrganizationResult, error): Fetch organization alongside its members, teams, and invitations.
+//     - UpdateOrganization(ctx context.Context, params UpdateOrganizationParams) (*UpdateOrganizationResult, error): Update organization metadata (name, slug, logo, metadata).
+//     - DeleteOrganization(ctx context.Context, params DeleteOrganizationParams) (*DeleteOrganizationResult, error): Permanently delete an organization and cascade delete child records.
+//     - ListOrganizations(ctx context.Context, params ListOrganizationsParams) (*ListOrganizationsResult, error): List all organizations where a user is an active member.
+//     - CheckSlug(ctx context.Context, params CheckSlugParams) (*CheckSlugResult, error): Validate slug availability and format.
+//     - SetActiveOrganization(ctx context.Context, params SetActiveOrganizationParams) (*SetActiveOrganizationResult, error): Switch the active organization context on a session.
+//     - GetActiveOrganization(ctx context.Context, params GetActiveOrganizationParams) (*GetActiveOrganizationResult, error): Retrieve the currently active organization for a session.
+//
+//   - Member Management:
+//     - AddMember(ctx context.Context, params AddMemberParams) (*AddMemberResult, error): Directly add a user to an organization with a specific role.
+//     - GetMember(ctx context.Context, params GetMemberParams) (*GetMemberResult, error): Retrieve membership record for a user in an organization.
+//     - GetActiveMember(ctx context.Context, params GetActiveMemberParams) (*GetActiveMemberResult, error): Retrieve active membership details from the current session.
+//     - GetActiveMemberRole(ctx context.Context, params GetActiveMemberRoleParams) (*GetActiveMemberRoleResult, error): Retrieve active member's assigned role.
+//     - UpdateMemberRole(ctx context.Context, params UpdateMemberRoleParams) (*UpdateMemberRoleResult, error): Modify a member's role within an organization.
+//     - RemoveMember(ctx context.Context, params RemoveMemberParams) (*RemoveMemberResult, error): Remove a user from an organization.
+//     - LeaveOrganization(ctx context.Context, params LeaveOrganizationParams) (*LeaveOrganizationResult, error): Allow a member to voluntarily depart an organization.
+//     - ListMembers(ctx context.Context, params ListMembersParams) (*ListMembersResult, error): List all members with pagination.
+//
+//   - Invitation Workflows:
+//     - CreateInvitation(ctx context.Context, params CreateInvitationParams) (*CreateInvitationResult, error): Issue an email invitation with secure token.
+//     - GetInvitation(ctx context.Context, params GetInvitationParams) (*GetInvitationResult, error): Retrieve invitation details by ID or token.
+//     - AcceptInvitation(ctx context.Context, params AcceptInvitationParams) (*AcceptInvitationResult, error): Accept an invitation and join organization.
+//     - RejectInvitation(ctx context.Context, params RejectInvitationParams) (*RejectInvitationResult, error): Decline an incoming organization invitation.
+//     - CancelInvitation(ctx context.Context, params CancelInvitationParams) (*CancelInvitationResult, error): Revoke a pending invitation.
+//     - ListInvitations(ctx context.Context, params ListInvitationsParams) (*ListInvitationsResult, error): List pending invitations for an organization.
+//     - ListUserInvitations(ctx context.Context, params ListUserInvitationsParams) (*ListUserInvitationsResult, error): List all pending invitations addressed to a user.
+//
+//   - Teams:
+//     - CreateTeam(ctx context.Context, params CreateTeamParams) (*CreateTeamResult, error): Create a team sub-unit within an organization.
+//     - GetTeam(ctx context.Context, params GetTeamParams) (*GetTeamResult, error): Retrieve team details.
+//     - UpdateTeam(ctx context.Context, params UpdateTeamParams) (*UpdateTeamResult, error): Modify team name or metadata.
+//     - DeleteTeam(ctx context.Context, params DeleteTeamParams) (*DeleteTeamResult, error): Delete a team.
+//     - ListTeams(ctx context.Context, params ListTeamsParams) (*ListTeamsResult, error): List all teams in an organization.
+//     - AddTeamMember(ctx context.Context, params AddTeamMemberParams) (*AddTeamMemberResult, error): Assign an organization member to a team.
+//     - RemoveTeamMember(ctx context.Context, params RemoveTeamMemberParams) (*RemoveTeamMemberResult, error): Remove a member from a team.
+//     - ListTeamMembers(ctx context.Context, params ListTeamMembersParams) (*ListTeamMembersResult, error): List all members assigned to a team.
+//     - SetActiveTeam(ctx context.Context, params SetActiveTeamParams) (*SetActiveTeamResult, error): Set active team on session.
+//     - GetActiveTeam(ctx context.Context, params GetActiveTeamParams) (*GetActiveTeamResult, error): Get active team from session.
+//
+//   - Dynamic Roles & RBAC:
+//     - CreateRole(ctx context.Context, params CreateRoleParams) (*CreateRoleResult, error): Provision a dynamic database-persisted custom role.
+//     - GetRole(ctx context.Context, params GetRoleParams) (*GetRoleResult, error): Retrieve dynamic role permissions.
+//     - UpdateRole(ctx context.Context, params UpdateRoleParams) (*UpdateRoleResult, error): Modify dynamic role permissions.
+//     - DeleteRole(ctx context.Context, params DeleteRoleParams) (*DeleteRoleResult, error): Delete a dynamic role.
+//     - ListRoles(ctx context.Context, params ListRolesParams) (*ListRolesResult, error): List all dynamic and static roles for an organization.
+//     - HasPermission(ctx context.Context, params HasPermissionParams) (*HasPermissionResult, error): Check if a role satisfies specific permissions.
+//     - CheckPermission(ctx context.Context, orgID, userRole string, required Permissions) (bool, error): Evaluate RBAC permissions.
 //
 // # Configuration Options
 //
@@ -157,12 +318,28 @@ func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
 //
 // Example:
 //
-//	orgPlugin := plugins.Organization(
-//		myOrgRepository,
-//		organization.WithTeams(true, true, false),
-//		organization.WithDynamicAccessControl(true),
-//		organization.WithInvitationExpiresIn(72 * time.Hour),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Organization(
+//				storage,
+//				organization.WithCreatorRole("owner"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	orgRes, err := auth.Plugin[organization.Plugin](app).CreateOrganization(ctx, organization.CreateOrganizationParams{
+//		Name:   "Acme Corp",
+//		Slug:   "acme",
+//		UserID: "usr_123",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func Organization(repo organization.Repository, opts ...organization.Option) *organization.Plugin {
 	return organization.New(repo, opts...)
 }
@@ -171,6 +348,34 @@ func Organization(repo organization.Repository, opts ...organization.Option) *or
 //
 // The Admin plugin provides role-based access control (RBAC), user moderation (ban/unban with automatic expiry),
 // CRUD operations on users, password administration, active session management and revocation, and user impersonation.
+//
+// # Available Methods
+//
+//   - User Administration:
+//     - CreateUser(ctx context.Context, params CreateUserParams) (*entity.User, error): Provision a new user account with assigned role and credentials.
+//     - GetUser(ctx context.Context, params GetUserParams) (*entity.User, error): Retrieve comprehensive user profile details.
+//     - ListUsers(ctx context.Context, params ListUsersParams) (*ListUsersResult, error): Paginated search and filtering of users by role, ban status, email, or creation date.
+//     - UpdateUser(ctx context.Context, params UpdateUserParams) (*entity.User, error): Update user profile, email, name, image, or metadata.
+//     - RemoveUser(ctx context.Context, params RemoveUserParams) error: Permanently delete a user account and associated credentials.
+//     - SetRole(ctx context.Context, params SetRoleParams) (*entity.User, error): Update administrative RBAC role assigned to a user.
+//     - SetUserPassword(ctx context.Context, params SetUserPasswordParams) error: Directly set/override a user's password.
+//
+//   - Moderation & Ban:
+//     - BanUser(ctx context.Context, params BanUserParams) (*entity.User, error): Suspend a user account with optional reason and expiry duration.
+//     - UnbanUser(ctx context.Context, params UnbanUserParams) (*entity.User, error): Reinstate a suspended user account.
+//     - CheckUserBanStatus(ctx context.Context, user *entity.User) error: Validate if user account is currently banned or expired.
+//
+//   - Impersonation:
+//     - ImpersonateUser(ctx context.Context, params ImpersonateUserParams) (*ImpersonateResult, error): Issue a masquerade session to act on behalf of another user.
+//     - StopImpersonating(ctx context.Context, params StopImpersonatingParams) (*StopImpersonatingResult, error): Terminate masquerade session and restore original admin session.
+//
+//   - Session Governance:
+//     - ListUserSessions(ctx context.Context, params ListUserSessionsParams) ([]*entity.Session, error): Retrieve all active sessions for a user.
+//     - RevokeUserSession(ctx context.Context, params RevokeUserSessionParams) error: Terminate a specific user session.
+//     - RevokeUserSessions(ctx context.Context, params RevokeUserSessionsParams) error: Invalidate all active sessions for a user.
+//
+//   - RBAC Evaluation:
+//     - CheckPermission(ctx context.Context, params CheckPermissionParams) (bool, error): Evaluate whether caller role possesses required administrative permissions.
 //
 // # Configuration Options
 //
@@ -190,12 +395,30 @@ func Organization(repo organization.Repository, opts ...organization.Option) *or
 //
 // Example:
 //
-//	adminPlugin := plugins.Admin(
-//		myAdminRepository,
-//		admin.WithAdminRoles("admin", "superadmin"),
-//		admin.WithImpersonationSessionDuration(2 * time.Hour),
-//		admin.WithPasswordLength(8, 64),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Admin(
+//				storage,
+//				admin.WithAdminRoles("admin", "superadmin"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	userRes, err := auth.Plugin[admin.Plugin](app).CreateUser(ctx, admin.CreateUserParams{
+//		Caller:   admin.CallerContext{Role: "admin"},
+//		Name:     "Jane Doe",
+//		Email:    "jane@example.com",
+//		Password: "SecurePassword123!",
+//		Role:     "user",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func Admin(repo admin.Repository, opts ...admin.Option) *admin.Plugin {
 	return admin.New(repo, opts...)
 }
@@ -204,6 +427,17 @@ func Admin(repo admin.Repository, opts ...admin.Option) *admin.Plugin {
 //
 // The Passkey plugin provides biometric and security key passwordless authentication, resident keys (discoverable credentials / conditional UI),
 // AAGUID authenticator metadata lookup, replay and cloning protection via monotonic signature counters, and full lifecycle event dispatching.
+//
+// # Available Methods
+//
+//   - GenerateRegistrationOptions(ctx context.Context, params *GenerateRegistrationOptionsParams) (*RegistrationOptionsResult, error): Generate WebAuthn creation ceremony options and challenge.
+//   - VerifyRegistration(ctx context.Context, params *VerifyRegistrationParams) (*entity.Passkey, error): Verify navigator.credentials.create() response and persist public key credential.
+//   - GenerateAuthenticationOptions(ctx context.Context, params *GenerateAuthenticationOptionsParams) (*AuthenticationOptionsResult, error): Generate WebAuthn assertion ceremony options (supports discoverable keys/autofill).
+//   - VerifyAuthentication(ctx context.Context, params *VerifyAuthenticationParams) (*VerifyAuthenticationResult, error): Verify navigator.credentials.get() assertion response and establish authenticated session.
+//   - ListPasskeys(ctx context.Context, params *ListPasskeysParams) ([]*entity.Passkey, error): List all registered passkeys for an authenticated user.
+//   - GetPasskey(ctx context.Context, id string) (*entity.Passkey, error): Retrieve specific passkey credential details by ID.
+//   - UpdatePasskey(ctx context.Context, params *UpdatePasskeyParams) (*entity.Passkey, error): Rename or update friendly label of a registered passkey.
+//   - DeletePasskey(ctx context.Context, params *DeletePasskeyParams) error: Remove a passkey credential from user account.
 //
 // # Configuration Options
 //
@@ -225,12 +459,30 @@ func Admin(repo admin.Repository, opts ...admin.Option) *admin.Plugin {
 //
 // Example:
 //
-//	passkeyPlugin := plugins.Passkey(
-//		myPasskeyRepository,
-//		passkey.WithRPDisplayName("Acme Corp"),
-//		passkey.WithRPID("auth.acme.com"),
-//		passkey.WithRPOrigins("https://auth.acme.com", "https://app.acme.com"),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Passkey(
+//				storage,
+//				passkey.WithRPDisplayName("Acme Corp"),
+//				passkey.WithRPID("auth.acme.com"),
+//				passkey.WithRPOrigins("https://auth.acme.com"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	regOpts, err := auth.Plugin[passkey.Plugin](app).GenerateRegistrationOptions(ctx, passkey.GenerateRegistrationOptionsParams{
+//		UserID:          "usr_123",
+//		UserName:        "gopher@golang.org",
+//		UserDisplayName: "Gopher Go",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
 	return passkey.New(repo, opts...)
 }
@@ -239,6 +491,19 @@ func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
 //
 // The EmailOTP plugin handles passwordless authentication (sign-in and automatic sign-up), email address verification,
 // secure password reset flows, and verified email change requests via cryptographically secure one-time numeric passwords.
+//
+// # Available Methods
+//
+//   - SendVerificationOTP(ctx context.Context, params *SendVerificationOTPParams) (*SendVerificationOTPResult, error): Generate and dispatch an OTP code via transactional email.
+//   - CreateVerificationOTP(ctx context.Context, params *CreateVerificationOTPParams) (string, error): Server-side generation of an OTP code without sending email.
+//   - GetVerificationOTP(ctx context.Context, params *GetVerificationOTPParams) (*GetVerificationOTPResult, error): Retrieve active OTP details for testing or inspection.
+//   - CheckVerificationOTP(ctx context.Context, params *CheckVerificationOTPParams) (*CheckVerificationOTPResult, error): Non-destructive validation check of an OTP code without consuming it.
+//   - VerifyEmailOTP(ctx context.Context, params *VerifyEmailOTPParams) (*VerifyEmailOTPResult, error): Verify OTP for email address confirmation.
+//   - SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParams) (*SignInEmailOTPResult, error): Passwordless authentication (sign-in/sign-up) using verified OTP code.
+//   - RequestPasswordResetEmailOTP(ctx context.Context, params *RequestPasswordResetParams) (*RequestPasswordResetResult, error): Initiate password reset workflow via email OTP.
+//   - ResetPasswordEmailOTP(ctx context.Context, params *ResetPasswordParams) (*ResetPasswordResult, error): Reset user password upon submitting valid OTP code.
+//   - RequestEmailChangeEmailOTP(ctx context.Context, params *RequestEmailChangeParams) (*RequestEmailChangeResult, error): Initiate email address change workflow with OTP validation.
+//   - ChangeEmailEmailOTP(ctx context.Context, params *ChangeEmailParams) (*ChangeEmailResult, error): Finalize email address update using verified OTP code.
 //
 // # Configuration Options
 //
@@ -257,14 +522,29 @@ func Passkey(repo passkey.Repository, opts ...passkey.Option) *passkey.Plugin {
 //
 // Example:
 //
-//	otpPlugin := plugins.EmailOTP(
-//		myRepository,
-//		emailotp.WithSendVerificationOTP(func(ctx context.Context, data emailotp.SendEmailData) error {
-//			return mailer.Send(data.Email, "Your OTP Code", data.OTP)
-//		}),
-//		emailotp.WithStoreOTP(emailotp.StoreOTPHashed),
-//		emailotp.WithAllowedAttempts(3),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.EmailOTP(
+//				storage,
+//				emailotp.WithSendVerificationOTP(func(ctx context.Context, data emailotp.SendEmailData) error {
+//					return mailer.Send(data.Email, "Your OTP Code", data.OTP)
+//				}),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	otpRes, err := auth.Plugin[emailotp.Plugin](app).SendVerificationOTP(ctx, emailotp.SendVerificationOTPParams{
+//		Email: "gopher@golang.org",
+//		Type:  emailotp.OTPTypeSignIn,
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugin {
 	return emailotp.New(repo, opts...)
 }
@@ -273,6 +553,18 @@ func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugi
 //
 // The PhoneNumber plugin handles passwordless SMS OTP authentication, phone number verification and updates,
 // credentialed phone + password sign-in, secure password resets via SMS, attempt budgeting, and anti-replay protection.
+//
+// # Available Methods
+//
+//   - SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPResult, error): Generate and dispatch a numeric OTP code via SMS callback.
+//   - Verify(ctx context.Context, params VerifyParams) (*VerifyResult, error): Verify an SMS OTP code for passwordless sign-in, registration, or phone update.
+//   - SignIn(ctx context.Context, params SignInParams) (*SignInResult, error): Authenticate an existing user using verified phone number and password credentials.
+//   - RequestPasswordReset(ctx context.Context, params RequestPasswordResetParams) (*RequestPasswordResetResult, error): Initiate password reset flow via SMS OTP code.
+//   - ResetPassword(ctx context.Context, params ResetPasswordParams) (*ResetPasswordResult, error): Finalize password reset using verified SMS OTP code.
+//   - UnlinkPhoneNumber(ctx context.Context, userID string) (*entity.User, error): Remove associated phone number from user account.
+//   - CreateVerificationOTP(ctx context.Context, params CreateVerificationOTPParams) (*CreateVerificationOTPResult, error): Server-side generation of phone OTP code.
+//   - GetVerificationOTP(ctx context.Context, params GetVerificationOTPParams) (*GetVerificationOTPResult, error): Inspect active phone OTP code record.
+//   - CheckVerificationOTP(ctx context.Context, params CheckVerificationOTPParams) (*CheckVerificationOTPResult, error): Non-destructive validation check of phone OTP code.
 //
 // # Configuration Options
 //
@@ -296,14 +588,28 @@ func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugi
 //
 // Example:
 //
-//	phonePlugin := plugins.PhoneNumber(
-//		myRepository,
-//		phonenumber.WithSendOTP(func(ctx context.Context, data phonenumber.SendOTPData) error {
-//			return smsClient.SendSMS(data.PhoneNumber, "Your code is: " + data.Code)
-//		}),
-//		phonenumber.WithStoreOTP(phonenumber.StoreOTPHashed),
-//		phonenumber.WithAllowedAttempts(3),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.PhoneNumber(
+//				storage,
+//				phonenumber.WithSendOTP(func(ctx context.Context, data phonenumber.SendOTPData) error {
+//					return smsClient.SendSMS(data.PhoneNumber, "Your code is: " + data.Code)
+//				}),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	otpRes, err := auth.Plugin[phonenumber.Plugin](app).SendOTP(ctx, phonenumber.SendOTPParams{
+//		PhoneNumber: "+15551234567",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phonenumber.Plugin {
 	return phonenumber.New(repo, opts...)
 }
@@ -314,6 +620,37 @@ func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phone
 // RFC 9207 issuer identification, refresh token rotation with family revocation) and OpenID Connect Core 1.0
 // (ID Token issuance with at_hash/c_hash, UserInfo endpoint, RP-Initiated Logout, Dynamic Client Registration,
 // and Discovery Metadata).
+//
+// # Available Methods
+//
+//   - Authorization Flow:
+//     - Authorize(ctx context.Context, params AuthorizeParams) (*AuthorizeResult, error): Initiate OAuth 2.1 authorization request with PKCE and scope negotiation.
+//     - ContinueAuthorize(ctx context.Context, params ContinueAuthorizeParams) (*AuthorizeResult, error): Resume authorization after user login and scope consent approval.
+//
+//   - Token Exchange & Management:
+//     - Token(ctx context.Context, params TokenParams) (*TokenResult, error): Exchange authorization code or refresh token for Access Token and OIDC ID Token.
+//     - Introspect(ctx context.Context, params IntrospectParams) (*IntrospectResult, error): RFC 7662 token introspection to query token status and claims.
+//     - Revoke(ctx context.Context, params RevokeParams) (*RevokeResult, error): RFC 7009 token revocation for access and refresh tokens.
+//
+//   - OIDC UserInfo & Session Termination:
+//     - UserInfo(ctx context.Context, params UserInfoParams) (*UserInfoResult, error): Serve OIDC UserInfo endpoint returning verified subject claims.
+//     - EndSession(ctx context.Context, params EndSessionParams) (*EndSessionResult, error): RP-Initiated Logout to terminate user sessions.
+//
+//   - Client Registration (RFC 7591):
+//     - RegisterClient(ctx context.Context, params RegisterClientParams) (*RegisterClientResult, error): Dynamically register an OAuth 2.1 client application.
+//     - GetClient(ctx context.Context, params GetClientParams) (*GetClientResult, error): Retrieve registered client details.
+//     - UpdateClient(ctx context.Context, params UpdateClientParams) (*UpdateClientResult, error): Modify client configuration (redirect URIs, scopes, grant types).
+//     - DeleteClient(ctx context.Context, params DeleteClientParams) (*DeleteClientResult, error): Delete a registered client application.
+//     - RotateClientSecret(ctx context.Context, params RotateClientSecretParams) (*RotateClientSecretResult, error): Rotate client secret credentials.
+//
+//   - User Consent Management:
+//     - Consent(ctx context.Context, params ConsentParams) (*ConsentResult, error): Record user consent for authorized client scopes.
+//     - RevokeConsent(ctx context.Context, params RevokeConsentParams) (*RevokeConsentResult, error): Revoke client access to user data.
+//     - ListConsents(ctx context.Context, params ListConsentsParams) (*ListConsentsResult, error): List all active third-party application authorizations for a user.
+//
+//   - Discovery & Metadata:
+//     - GetOpenIDConfiguration(ctx context.Context, params OpenIDConfigurationParams) (*OpenIDConfigurationResult, error): Serve .well-known/openid-configuration metadata.
+//     - GetOAuthAuthorizationServerMetadata(ctx context.Context, params OAuthMetadataParams) (*OAuthMetadataResult, error): Serve RFC 8414 OAuth 2.0 authorization server metadata.
 //
 // # Configuration Options
 //
@@ -335,12 +672,33 @@ func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phone
 //
 // Example:
 //
-//	oauthPlugin := plugins.OAuth2(
-//		myOAuthRepository,
-//		oauth2.WithIssuer("https://auth.example.com"),
-//		oauth2.WithAccessTokenType(oauth2.AccessTokenTypeJWT),
-//		oauth2.WithPages("/sign-in", "/consent"),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.OAuth2(
+//				storage,
+//				oauth2.WithIssuer("https://auth.example.com"),
+//				oauth2.WithAccessTokenType(oauth2.AccessTokenTypeJWT),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	authRes, err := auth.Plugin[oauth2.Plugin](app).Authorize(ctx, oauth2.AuthorizeParams{
+//		ClientID:            "client_123",
+//		RedirectURI:         "https://app.example.com/callback",
+//		ResponseType:        "code",
+//		CodeChallenge:       "E9Melhoa2OwvFrGMTJguCH5rtx64EH_vu9-D64PJstU",
+//		CodeChallengeMethod: "S256",
+//		Scope:               "openid profile email",
+//		State:               "state_xyz",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
 func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 	return oauth2.New(repo, opts...)
 }
@@ -350,6 +708,35 @@ func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 // The Access plugin provides sub-microsecond in-memory permission evaluation, boolean logic combinators (AND/OR),
 // wildcard matching ('*'), multi-role subject aggregation, dynamic role inheritance (Extend/Merge), thread-safe runtime
 // role registration, JSON persistence serialization, and execution guards for HTTP/gRPC middlewares.
+//
+// # Available Methods
+//
+//   - Plugin Methods:
+//     - AccessControl() *AccessControl: Returns the underlying central AccessControl manager instance.
+//     - PublishAuthorized(roles []string, req AuthorizeRequest, extra map[string]any): Dispatch access:authorized security event.
+//     - PublishDenied(roles []string, req AuthorizeRequest, reason string, extra map[string]any): Dispatch access:denied security event.
+//     - PublishRoleCreated(role *Role): Dispatch access:role:created lifecycle event.
+//     - PublishRoleDeleted(roleName string): Dispatch access:role:deleted lifecycle event.
+//
+//   - AccessControl Manager Methods (via plugin.AccessControl()):
+//     - NewRole(name string, roleStatements Statements) (*Role, error): Create and register a named role in the registry.
+//     - MustNewRole(name string, roleStatements Statements) *Role: Create a role, panicking on validation error.
+//     - NewAnonymousRole(roleStatements Statements) (*Role, error): Instantiate an unregistered ephemeral role.
+//     - GetRole(name string) (*Role, bool): Retrieve a registered role by identifier.
+//     - GetAllRoles() map[string]*Role: Return snapshot of all registered roles.
+//     - DeleteRole(name string) bool: Remove a role from the registry.
+//     - AuthorizeRoles(roleNames []string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Atomic multi-role evaluation combining statements with union semantics.
+//     - AuthorizeRoleString(roleString string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate comma-separated role string ("admin,editor").
+//     - MergeRoles(roleNames ...string) (*Role, error): Consolidate multiple registered roles into a combined Role instance.
+//     - MasterStatements() Statements: Retrieve schema master statements.
+//
+//   - Role Instance Methods (via role):
+//     - Authorize(request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate granular permission request with short-circuit evaluation.
+//     - HasPermission(resource string, action string) bool: Check single resource and action permission in sub-microsecond time.
+//     - Extend(newName string, additionalStatements Statements) *Role: Derive a new role inheriting base statements without mutating parent.
+//     - Clone(newName ...string) *Role: Create a deep copy of the role.
+//     - Statements() Statements: Return copy of role permission statements.
+//     - Name() string: Return role name.
 //
 // # Configuration Options
 //
@@ -362,20 +749,32 @@ func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 //
 // Example:
 //
-//	statement := access.Statements{
+//	ctx := context.Background()
+//	statements := access.Statements{
 //		"project": {"create", "read", "update", "delete"},
 //		"user":    {"create", "read", "update", "delete"},
 //	}
 //
-//	accessPlugin := plugins.Access(
-//		statement,
-//		access.WithInitialRoles(map[string]access.Statements{
-//			"admin": {"*": {"*"}},
-//			"user":  {"project": {"read"}, "user": {"read"}},
-//		}),
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Access(
+//				statements,
+//				access.WithInitialRoles(map[string]access.Statements{
+//					"admin": {"*": {"*"}},
+//					"user":  {"project": {"read"}, "user": {"read"}},
+//				}),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	ac := auth.Plugin[access.Plugin](app).AccessControl()
+//	res := ac.AuthorizeRoles([]string{"user"}, access.Req("project", "read"))
+//	if !res.Success {
+//		panic(res.Error)
+//	}
 func Access(masterStatements access.Statements, opts ...access.Option) *access.Plugin {
 	return access.New(masterStatements, opts...)
 }
-
-
