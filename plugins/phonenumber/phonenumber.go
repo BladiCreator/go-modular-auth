@@ -18,272 +18,6 @@ import (
 // PluginID is the unique string identifier for the Phone Number plugin ("phone-number").
 const PluginID = "phone-number"
 
-// Parameter and Result Structs
-type (
-	// SendOTPParams defines parameters required to dispatch an OTP to a user's phone number.
-	SendOTPParams struct {
-		// PhoneNumber is the destination recipient phone number (required).
-		PhoneNumber string `json:"phone_number"`
-
-		// Extra holds dynamic metadata passed through event interceptors (optional).
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// SendOTPResult contains the delivery status and expiry of the dispatched OTP.
-	SendOTPResult struct {
-		// Success indicates if the OTP was successfully generated and dispatched.
-		Success bool `json:"success"`
-
-		// ExpiresAt indicates when the dispatched OTP code will expire.
-		ExpiresAt time.Time `json:"expires_at"`
-	}
-
-	// VerifyParams defines parameters to verify a phone number OTP for login, registration, or profile update.
-	VerifyParams struct {
-		// PhoneNumber is the phone number being verified (required).
-		PhoneNumber string `json:"phone_number"`
-
-		// Code is the verification code submitted by the user (required).
-		Code string `json:"code"`
-
-		// UserID is the ID of the authenticated user (required if UpdatePhoneNumber is true).
-		UserID string `json:"user_id,omitempty"`
-
-		// UpdatePhoneNumber indicates whether to attach the verified phone number to an existing user session.
-		UpdatePhoneNumber bool `json:"update_phone_number,omitempty"`
-
-		// DisableSession prevents creating an active authentication session upon successful verification.
-		DisableSession bool `json:"disable_session,omitempty"`
-
-		// Extra holds optional dynamic metadata.
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// VerifyResult contains the updated user profile and optional created session.
-	VerifyResult struct {
-		// Success indicates successful phone verification.
-		Success bool `json:"success"`
-
-		// User is the authenticated, newly provisioned, or updated user entity.
-		User *entity.User `json:"user"`
-
-		// SessionToken is the raw session token if a session was created.
-		SessionToken string `json:"session_token,omitempty"`
-
-		// Session is the active session entity if created.
-		Session *entity.Session `json:"session,omitempty"`
-	}
-
-	// SignInParams defines parameters for credential-based phone number + password login.
-	SignInParams struct {
-		// PhoneNumber is the registered user's phone number.
-		PhoneNumber string `json:"phone_number"`
-
-		// Password is the plain text password.
-		Password string `json:"password"`
-
-		// RememberMe extends session lifespan if set to true.
-		RememberMe *bool `json:"remember_me,omitempty"`
-
-		// Extra holds optional dynamic metadata.
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// SignInResult contains the authenticated user and active session.
-	SignInResult struct {
-		// User is the authenticated user entity.
-		User *entity.User `json:"user"`
-
-		// SessionToken is the raw session token.
-		SessionToken string `json:"session_token"`
-
-		// Session is the persisted active session entity.
-		Session *entity.Session `json:"session"`
-	}
-
-	// RequestPasswordResetParams defines parameters to request a password reset OTP via SMS.
-	RequestPasswordResetParams struct {
-		// PhoneNumber is the account phone number requesting a password reset.
-		PhoneNumber string `json:"phone_number"`
-
-		// Extra holds optional dynamic metadata.
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// RequestPasswordResetResult reports the result of the password reset dispatch request.
-	RequestPasswordResetResult struct {
-		// Success indicates if the reset OTP was successfully dispatched.
-		Success bool `json:"success"`
-	}
-
-	// ResetPasswordParams defines parameters for setting a new password using a verified SMS OTP.
-	ResetPasswordParams struct {
-		// PhoneNumber is the account phone number.
-		PhoneNumber string `json:"phone_number"`
-
-		// OTP is the reset code submitted by the user.
-		OTP string `json:"otp"`
-
-		// NewPassword is the new password string to set.
-		NewPassword string `json:"new_password"`
-
-		// Extra holds optional dynamic metadata.
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// ResetPasswordResult reports whether the password was successfully reset.
-	ResetPasswordResult struct {
-		// Success indicates if the password was successfully reset.
-		Success bool `json:"success"`
-	}
-
-	// CreateVerificationOTPParams defines parameters for server-side OTP generation without SMS dispatch.
-	CreateVerificationOTPParams struct {
-		// PhoneNumber is the target phone number.
-		PhoneNumber string `json:"phone_number"`
-
-		// Type specifies the OTP workflow type.
-		Type OTPType `json:"type"`
-
-		// Extra holds optional dynamic metadata.
-		Extra map[string]any `json:"extra,omitempty"`
-	}
-
-	// CreateVerificationOTPResult contains the status and expiry of the created OTP.
-	CreateVerificationOTPResult struct {
-		// Success indicates if the OTP record was created.
-		Success bool `json:"success"`
-
-		// ExpiresAt indicates when the created OTP will expire.
-		ExpiresAt time.Time `json:"expires_at"`
-	}
-
-	// GetVerificationOTPParams defines parameters for server-side inspection of an active OTP code.
-	GetVerificationOTPParams struct {
-		// PhoneNumber is the target phone number.
-		PhoneNumber string `json:"phone_number"`
-
-		// Type specifies the OTP workflow type.
-		Type OTPType `json:"type"`
-	}
-
-	// GetVerificationOTPResult contains the plain text OTP code retrieved from storage.
-	GetVerificationOTPResult struct {
-		// OTP is the retrieved plain text code.
-		OTP string `json:"otp"`
-	}
-
-	// CheckVerificationOTPParams defines parameters for validating an OTP without consuming it.
-	CheckVerificationOTPParams struct {
-		// PhoneNumber is the target phone number.
-		PhoneNumber string `json:"phone_number"`
-
-		// Type specifies the OTP workflow type.
-		Type OTPType `json:"type"`
-
-		// OTP is the code to check.
-		OTP string `json:"otp"`
-	}
-
-	// CheckVerificationOTPResult reports whether the tested OTP code is currently valid.
-	CheckVerificationOTPResult struct {
-		// Success indicates whether the OTP is currently valid.
-		Success bool `json:"success"`
-	}
-)
-
-// Helper methods for attaching/retrieving metadata on parameter structs.
-
-func (p *SendOTPParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *SendOTPParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
-func (p *VerifyParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *VerifyParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
-func (p *SignInParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *SignInParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
-func (p *RequestPasswordResetParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *RequestPasswordResetParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
-func (p *ResetPasswordParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *ResetPasswordParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
-func (p *CreateVerificationOTPParams) Set(key string, val any) {
-	if p.Extra == nil {
-		p.Extra = make(map[string]any)
-	}
-	p.Extra[key] = val
-}
-
-func (p *CreateVerificationOTPParams) Get(key string) (any, bool) {
-	if p.Extra == nil {
-		return nil, false
-	}
-	v, ok := p.Extra[key]
-	return v, ok
-}
-
 // Plugin implements the Phone Number (SMS OTP) authentication plugin.
 type Plugin struct {
 	repo   Repository
@@ -390,7 +124,7 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPRes
 	p.publishEvent(EventPhoneNumberOTPSendBefore, &OTPSentPayload{
 		PhoneNumber: params.PhoneNumber,
 		Type:        OTPTypeVerification,
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	rawCode, expiresAt, err := p.resolveOTP(ctx, identifier, params.PhoneNumber, OTPTypeVerification)
@@ -411,7 +145,7 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPRes
 		PhoneNumber: params.PhoneNumber,
 		Type:        OTPTypeVerification,
 		ExpiresAt:   expiresAt,
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &SendOTPResult{Success: true, ExpiresAt: expiresAt}, nil
@@ -431,7 +165,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	p.publishEvent(EventPhoneNumberOTPVerifyBefore, &OTPSentPayload{
 		PhoneNumber: params.PhoneNumber,
 		Type:        OTPTypeVerification,
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if p.config.VerifyOTP != nil {
@@ -445,7 +179,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 				PhoneNumber: params.PhoneNumber,
 				Type:        OTPTypeVerification,
 				Reason:      "custom_verify_failed",
-				Extra:       params.Extra,
+				ExtraContainer: params.ExtraContainer,
 			})
 			return nil, ErrInvalidOTP
 		}
@@ -493,7 +227,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 			PhoneNumber: params.PhoneNumber,
 			Type:        OTPTypeVerification,
 			Timestamp:   time.Now(),
-			Extra:       params.Extra,
+			ExtraContainer: params.ExtraContainer,
 		})
 		p.publishEvent(EventPhoneNumberUpdated, user)
 
@@ -521,9 +255,11 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 		createUserParams := &dto.CreateUserParams{
 			Email: tempEmail,
 			Name:  tempName,
-			Extra: map[string]any{
-				ExtraKeyPhoneNumber:         params.PhoneNumber,
-				ExtraKeyPhoneNumberVerified: true,
+			ExtraContainer: plugin.ExtraContainer{
+				Extra: map[string]any{
+					ExtraKeyPhoneNumber:         params.PhoneNumber,
+					ExtraKeyPhoneNumberVerified: true,
+				},
 			},
 		}
 
@@ -562,7 +298,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 			Token:     token,
 			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 			CreatedAt: time.Now(),
-			Extra:     params.Extra,
+			ExtraContainer: params.ExtraContainer,
 		})
 		if sessErr != nil {
 			return nil, fmt.Errorf("phonenumber: failed to create session: %w", sessErr)
@@ -576,7 +312,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 		PhoneNumber: params.PhoneNumber,
 		Type:        OTPTypeVerification,
 		Timestamp:   time.Now(),
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if isNewUser {
@@ -584,14 +320,14 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 			User:      user,
 			Session:   session,
 			IsNewUser: true,
-			Extra:     params.Extra,
+			ExtraContainer: params.ExtraContainer,
 		})
 	} else {
 		p.publishEvent(EventPhoneNumberSignInSuccess, &SignInSuccessPayload{
 			User:      user,
 			Session:   session,
 			IsNewUser: false,
-			Extra:     params.Extra,
+			ExtraContainer: params.ExtraContainer,
 		})
 	}
 
@@ -624,7 +360,7 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult
 	if p.config.RequireVerification && !user.PhoneNumberVerified {
 		_, _ = p.SendOTP(ctx, SendOTPParams{
 			PhoneNumber: params.PhoneNumber,
-			Extra:       params.Extra,
+			ExtraContainer: params.ExtraContainer,
 		})
 		return nil, ErrPhoneNumberNotVerified
 	}
@@ -653,7 +389,7 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult
 		Token:     token,
 		ExpiresAt: time.Now().Add(sessionExpiry),
 		CreatedAt: time.Now(),
-		Extra:     params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("phonenumber: failed to create session: %w", err)
@@ -663,7 +399,7 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult
 		User:      user,
 		Session:   sess,
 		IsNewUser: false,
-		Extra:     params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &SignInResult{
@@ -709,7 +445,7 @@ func (p *Plugin) RequestPasswordReset(ctx context.Context, params RequestPasswor
 		PhoneNumber: params.PhoneNumber,
 		Type:        OTPTypePasswordReset,
 		ExpiresAt:   expiresAt,
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &RequestPasswordResetResult{Success: true}, nil
@@ -777,7 +513,7 @@ func (p *Plugin) ResetPassword(ctx context.Context, params ResetPasswordParams) 
 		UserID:      user.ID,
 		PhoneNumber: params.PhoneNumber,
 		Timestamp:   time.Now(),
-		Extra:       params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &ResetPasswordResult{Success: true}, nil

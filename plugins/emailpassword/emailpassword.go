@@ -115,10 +115,10 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 	}
 
 	params := &dto.CreateUserParams{
-		Email:        email,
-		Name:         input.Name,
-		PasswordHash: hashedPassword,
-		Extra:        input.Extra,
+		Email:          email,
+		Name:           input.Name,
+		PasswordHash:   hashedPassword,
+		ExtraContainer: input.ExtraContainer,
 	}
 
 	if p.ctx != nil && p.ctx.Events() != nil {
@@ -145,8 +145,8 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 
 	if p.config.SendVerificationOnSignUp {
 		_, _ = p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{
-			Email: newUser.Email,
-			Extra: input.Extra,
+			Email:          newUser.Email,
+			ExtraContainer: input.ExtraContainer,
 		})
 	}
 

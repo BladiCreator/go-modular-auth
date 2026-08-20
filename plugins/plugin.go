@@ -15,6 +15,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
+	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
 // EmailPassword instantiates a new EmailPassword authentication plugin configured with the given repository and options.
@@ -839,5 +840,56 @@ func Access(masterStatements access.Statements, opts ...access.Option) *access.P
 //	}
 func MagicLink(repo magiclink.Repository, opts ...magiclink.Option) *magiclink.Plugin {
 	return magiclink.New(repo, opts...)
+}
+
+// Username instantiates a new Username authentication plugin configured with the given repository and options.
+//
+// The Username plugin enables username-based sign-in, username availability validation,
+// character normalization (lowercasing by default), display username support, and timing attack mitigation.
+//
+// # Available Methods
+//
+//   - SignIn(ctx context.Context, params SignInUsernameParams) (*SignInUsernameResult, error): Authenticate a user with username and password credentials.
+//   - IsAvailable(ctx context.Context, username string) (*IsUsernameAvailableResult, error): Check if a username is available for registration.
+//   - UpdateUsername(ctx context.Context, params UpdateUsernameParams) (*UpdateUsernameResult, error): Update a user's username and display name.
+//   - ProcessSignUpUsername(ctx context.Context, username, displayUsername string) (normalized, finalDisplay string, err error): Validate and normalize credentials for user registration.
+//   - ValidateUsername(ctx context.Context, username string) error: Validate username length, format, and custom constraints.
+//
+// # Configuration Options
+//
+//   - username.WithMinLength(minLen int): Minimum allowed username length (default: 3).
+//   - username.WithMaxLength(maxLen int): Maximum allowed username length (default: 30).
+//   - username.WithUsernameValidator(pattern string): Custom regular expression format pattern.
+//   - username.WithCustomValidator(fn username.CustomValidatorFunc): Asynchronous custom validator callback.
+//   - username.WithNormalization(enable bool): Enable or disable username normalization (default: true).
+//   - username.WithNormalizationFunc(fn username.NormalizationFunc): Custom normalization routine (default: strings.ToLower).
+//   - username.WithRequireEmailVerification(require bool): Require verified email before sign-in (default: false).
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Username(
+//				storage,
+//				username.WithMinLength(4),
+//				username.WithRequireEmailVerification(true),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	res, err := auth.Plugin[username.Plugin](app).SignIn(ctx, username.SignInUsernameParams{
+//		Username: "gopher_coder",
+//		Password: "SecurePassword123!",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func Username(repo username.Repository, opts ...username.Option) *username.Plugin {
+	return username.New(repo, opts...)
 }
 

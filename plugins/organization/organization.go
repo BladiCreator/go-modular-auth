@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -138,7 +139,7 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 		Slug:     slug,
 		Logo:     params.Logo,
 		Metadata: params.Metadata,
-		Extra:    params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Create Organization Entity
@@ -200,7 +201,7 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 	p.publishEvent(EventOrgCreateAfter, &OrgCreateAfterEventPayload{
 		Organization: org,
 		Member:       member,
-		Extra:        params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &CreateOrganizationResult{
@@ -329,7 +330,7 @@ func (p *Plugin) UpdateOrganization(ctx context.Context, params UpdateOrganizati
 		Slug:           params.Slug,
 		Logo:           params.Logo,
 		Metadata:       params.Metadata,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Persist Update
@@ -339,8 +340,8 @@ func (p *Plugin) UpdateOrganization(ctx context.Context, params UpdateOrganizati
 
 	// 6. Emit After Event
 	p.publishEvent(EventOrgUpdateAfter, &OrgUpdateAfterEventPayload{
-		Organization: org,
-		Extra:        params.Extra,
+		Organization:   org,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &UpdateOrganizationResult{Organization: org}, nil
@@ -369,18 +370,18 @@ func (p *Plugin) DeleteOrganization(ctx context.Context, params DeleteOrganizati
 	// 2. Emit Before Event
 	p.publishEvent(EventOrgDeleteBefore, &OrgDeleteBeforeEventPayload{
 		OrganizationID: params.OrganizationID,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 3. Persist Deletion
 	if err := p.repo.DeleteOrganization(ctx, params.OrganizationID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("organization: failed to delete organization: %w", err)
 	}
 
 	// 4. Emit After Event
 	p.publishEvent(EventOrgDeleteAfter, &OrgDeleteAfterEventPayload{
 		OrganizationID: params.OrganizationID,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &DeleteOrganizationResult{Success: true}, nil
@@ -434,7 +435,7 @@ func (p *Plugin) SetActiveOrganization(ctx context.Context, params SetActiveOrga
 	p.publishEvent(EventOrgSetActiveBefore, &OrgSetActiveBeforeEventPayload{
 		UserID:         params.UserID,
 		OrganizationID: params.OrganizationID,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if p.ctx != nil {
@@ -446,7 +447,7 @@ func (p *Plugin) SetActiveOrganization(ctx context.Context, params SetActiveOrga
 		OrganizationID: params.OrganizationID,
 		Organization:   org,
 		Member:         member,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &SetActiveOrganizationResult{

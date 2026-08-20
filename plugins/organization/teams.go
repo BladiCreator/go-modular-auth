@@ -52,7 +52,7 @@ func (p *Plugin) CreateTeam(ctx context.Context, params CreateTeamParams) (*Crea
 	p.publishEvent(EventTeamCreateBefore, &TeamCreateBeforeEventPayload{
 		OrganizationID: params.OrganizationID,
 		Name:           params.Name,
-		Extra:          params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 4. Create Team Entity
@@ -80,7 +80,7 @@ func (p *Plugin) CreateTeam(ctx context.Context, params CreateTeamParams) (*Crea
 	// 6. Emit After Event
 	p.publishEvent(EventTeamCreateAfter, &TeamCreateAfterEventPayload{
 		Team:  team,
-		Extra: params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &CreateTeamResult{Team: team}, nil
@@ -134,7 +134,7 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 	p.publishEvent(EventTeamUpdateBefore, &TeamUpdateBeforeEventPayload{
 		TeamID: team.ID,
 		Name:   params.Name,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	team.Name = strings.TrimSpace(params.Name)
@@ -147,7 +147,7 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 
 	p.publishEvent(EventTeamUpdateAfter, &TeamUpdateAfterEventPayload{
 		Team:  team,
-		Extra: params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &UpdateTeamResult{Team: team}, nil
@@ -194,7 +194,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 
 	p.publishEvent(EventTeamDeleteBefore, &TeamDeleteBeforeEventPayload{
 		TeamID: team.ID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if err := p.repo.DeleteTeam(ctx, params.TeamID); err != nil {
@@ -203,7 +203,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 
 	p.publishEvent(EventTeamDeleteAfter, &TeamDeleteAfterEventPayload{
 		TeamID: team.ID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &DeleteTeamResult{Success: true}, nil
@@ -294,7 +294,7 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 	p.publishEvent(EventTeamMemberAddBefore, &TeamMemberAddBeforeEventPayload{
 		TeamID: params.TeamID,
 		UserID: params.UserID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	teamMember := &TeamMember{
@@ -310,7 +310,7 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 
 	p.publishEvent(EventTeamMemberAddAfter, &TeamMemberAddAfterEventPayload{
 		TeamMember: teamMember,
-		Extra:      params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &AddTeamMemberResult{TeamMember: teamMember}, nil
@@ -353,7 +353,7 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	p.publishEvent(EventTeamMemberRemoveBefore, &TeamMemberRemoveBeforeEventPayload{
 		TeamID: params.TeamID,
 		UserID: params.UserID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if err := p.repo.RemoveTeamMember(ctx, params.TeamID, params.UserID); err != nil {
@@ -363,7 +363,7 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	p.publishEvent(EventTeamMemberRemoveAfter, &TeamMemberRemoveAfterEventPayload{
 		TeamID: params.TeamID,
 		UserID: params.UserID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &RemoveTeamMemberResult{Success: true}, nil
@@ -408,7 +408,7 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 	p.publishEvent(EventTeamSetActiveBefore, &TeamSetActiveBeforeEventPayload{
 		UserID: params.UserID,
 		TeamID: params.TeamID,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	if p.ctx != nil {
@@ -419,7 +419,7 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 		UserID: params.UserID,
 		TeamID: params.TeamID,
 		Team:   team,
-		Extra:  params.Extra,
+		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &SetActiveTeamResult{Team: team}, nil

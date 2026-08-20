@@ -19,83 +19,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-// Request & Response DTOs
-type (
-	// GenerateRegistrationOptionsParams holds inputs for creating a WebAuthn credential registration ceremony challenge.
-	GenerateRegistrationOptionsParams struct {
-		UserID                  string                             `json:"userId,omitempty"`
-		UserName                string                             `json:"userName,omitempty"`
-		UserDisplayName         string                             `json:"userDisplayName,omitempty"`
-		AuthenticatorAttachment *protocol.AuthenticatorAttachment `json:"authenticatorAttachment,omitempty"`
-		Context                 *string                            `json:"context,omitempty"`
-		CustomName              *string                            `json:"customName,omitempty"`
-		Extra                   map[string]any                     `json:"extra,omitempty"`
-	}
-
-	// RegistrationOptionsResult contains creation options sent to the browser and the associated challenge token.
-	RegistrationOptionsResult struct {
-		Options        *protocol.CredentialCreation `json:"options"`
-		ChallengeToken string                       `json:"challengeToken"`
-		ExpiresAt      time.Time                    `json:"expiresAt"`
-	}
-
-	// VerifyRegistrationParams holds data returned from navigator.credentials.create() for verification.
-	VerifyRegistrationParams struct {
-		ChallengeToken string                               `json:"challengeToken"`
-		Origin         string                               `json:"origin,omitempty"`
-		Response       *protocol.CredentialCreationResponse `json:"response"`
-		Name           *string                              `json:"name,omitempty"`
-		CallerUserID   *string                              `json:"callerUserId,omitempty"`
-		Extra          map[string]any                       `json:"extra,omitempty"`
-	}
-
-	// GenerateAuthenticationOptionsParams holds inputs for creating a WebAuthn assertion ceremony challenge.
-	GenerateAuthenticationOptionsParams struct {
-		UserID *string        `json:"userId,omitempty"` // Optional. Omit for discoverable/resident key/autofill login.
-		Extra  map[string]any `json:"extra,omitempty"`
-	}
-
-	// AuthenticationOptionsResult contains assertion request options and the tracking challenge token.
-	AuthenticationOptionsResult struct {
-		Options        *protocol.CredentialAssertion `json:"options"`
-		ChallengeToken string                        `json:"challengeToken"`
-		ExpiresAt      time.Time                     `json:"expiresAt"`
-	}
-
-	// VerifyAuthenticationParams holds data returned from navigator.credentials.get() for verification.
-	VerifyAuthenticationParams struct {
-		ChallengeToken string                                `json:"challengeToken"`
-		Origin         string                                `json:"origin,omitempty"`
-		Response       *protocol.CredentialAssertionResponse `json:"response"`
-		Extra          map[string]any                        `json:"extra,omitempty"`
-	}
-
-	// VerifyAuthenticationResult contains authenticated identity, issued session, and the verified passkey.
-	VerifyAuthenticationResult struct {
-		User    *entity.User    `json:"user"`
-		Session *entity.Session `json:"session"`
-		Passkey *entity.Passkey `json:"passkey"`
-	}
-
-	// ListPasskeysParams filters passkeys for a specific user.
-	ListPasskeysParams struct {
-		UserID string `json:"userId"`
-	}
-
-	// UpdatePasskeyParams contains update parameters for an existing passkey.
-	UpdatePasskeyParams struct {
-		ID           string `json:"id"`
-		CallerUserID string `json:"callerUserId"`
-		Name         string `json:"name"`
-	}
-
-	// DeletePasskeyParams contains deletion parameters for an existing passkey.
-	DeletePasskeyParams struct {
-		ID           string `json:"id"`
-		CallerUserID string `json:"callerUserId"`
-	}
-)
-
 // Plugin implements the plugin.Plugin interface for FIDO2/WebAuthn Passkey authentication.
 type Plugin struct {
 	repo     Repository
@@ -694,8 +617,8 @@ func (p *Plugin) VerifyAuthentication(ctx context.Context, params *VerifyAuthent
 		IPAddress: ipAddress,
 		UserAgent: userAgent,
 		ExpiresAt: now.Add(p.config.SessionDuration),
-		CreatedAt: now,
-		Extra:     params.Extra,
+		CreatedAt:      now,
+		ExtraContainer: params.ExtraContainer,
 	}
 
 	session, err := p.repo.CreateSession(ctx, sessionParams)

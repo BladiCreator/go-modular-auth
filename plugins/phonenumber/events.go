@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Event bus topic string constants emitted during Phone Number lifecycle operations.
@@ -69,29 +70,29 @@ const (
 type (
 	// OTPSentPayload contains recipient and expiration details for dispatched OTPs.
 	OTPSentPayload struct {
-		PhoneNumber string         `json:"phone_number"`
-		Type        OTPType        `json:"type"`
-		ExpiresAt   time.Time      `json:"expires_at"`
-		Extra       map[string]any `json:"extra,omitempty"`
+		PhoneNumber string    `json:"phone_number"`
+		Type        OTPType   `json:"type"`
+		ExpiresAt   time.Time `json:"expires_at"`
+		plugin.ExtraContainer
 	}
 
 	// OTPFailedPayload contains details when OTP verification fails or reaches limits.
 	OTPFailedPayload struct {
-		PhoneNumber       string         `json:"phone_number"`
-		Type              OTPType        `json:"type"`
-		AttemptsUsed      int            `json:"attempts_used"`
-		AttemptsRemaining int            `json:"attempts_remaining"`
-		Reason            string         `json:"reason"`
-		Extra             map[string]any `json:"extra,omitempty"`
+		PhoneNumber       string  `json:"phone_number"`
+		Type              OTPType `json:"type"`
+		AttemptsUsed      int     `json:"attempts_used"`
+		AttemptsRemaining int     `json:"attempts_remaining"`
+		Reason            string  `json:"reason"`
+		plugin.ExtraContainer
 	}
 
 	// OTPVerifiedPayload reports details of a successful OTP code verification.
 	OTPVerifiedPayload struct {
-		UserID      string         `json:"user_id"`
-		PhoneNumber string         `json:"phone_number"`
-		Type        OTPType        `json:"type"`
-		Timestamp   time.Time      `json:"timestamp"`
-		Extra       map[string]any `json:"extra,omitempty"`
+		UserID      string    `json:"user_id"`
+		PhoneNumber string    `json:"phone_number"`
+		Type        OTPType   `json:"type"`
+		Timestamp   time.Time `json:"timestamp"`
+		plugin.ExtraContainer
 	}
 
 	// SignInSuccessPayload reports authentication or auto-registration details upon phone login.
@@ -99,14 +100,14 @@ type (
 		User      *entity.User    `json:"user"`
 		Session   *entity.Session `json:"session,omitempty"`
 		IsNewUser bool            `json:"is_new_user"`
-		Extra     map[string]any  `json:"extra,omitempty"`
+		plugin.ExtraContainer
 	}
 
 	// PasswordResetPayload reports details when a password is reset via SMS OTP.
 	PasswordResetPayload struct {
-		UserID      string         `json:"user_id"`
-		PhoneNumber string         `json:"phone_number"`
-		Timestamp   time.Time      `json:"timestamp"`
-		Extra       map[string]any `json:"extra,omitempty"`
+		UserID      string    `json:"user_id"`
+		PhoneNumber string    `json:"phone_number"`
+		Timestamp   time.Time `json:"timestamp"`
+		plugin.ExtraContainer
 	}
 )

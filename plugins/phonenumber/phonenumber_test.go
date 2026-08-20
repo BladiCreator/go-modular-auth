@@ -507,9 +507,11 @@ func TestSignIn_PhonePassword_And_RequireVerification(t *testing.T) {
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
 		Email: "phoneuser@example.com",
 		Name:  "Phone User",
-		Extra: map[string]any{
-			phonenumber.ExtraKeyPhoneNumber:         phone,
-			phonenumber.ExtraKeyPhoneNumberVerified: false,
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{
+				phonenumber.ExtraKeyPhoneNumber:         phone,
+				phonenumber.ExtraKeyPhoneNumberVerified: false,
+			},
 		},
 	})
 	_ = repo.CreateAccount(context.Background(), &entity.Account{
@@ -572,9 +574,11 @@ func TestPasswordReset_Flow(t *testing.T) {
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
 		Email: "resetuser@example.com",
 		Name:  "Reset User",
-		Extra: map[string]any{
-			phonenumber.ExtraKeyPhoneNumber:         phone,
-			phonenumber.ExtraKeyPhoneNumberVerified: true,
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{
+				phonenumber.ExtraKeyPhoneNumber:         phone,
+				phonenumber.ExtraKeyPhoneNumberVerified: true,
+			},
 		},
 	})
 	// Create active session
@@ -628,9 +632,11 @@ func TestUnlinkPhoneNumber(t *testing.T) {
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
 		Email: "unlink@example.com",
 		Name:  "Unlink User",
-		Extra: map[string]any{
-			phonenumber.ExtraKeyPhoneNumber:         phone,
-			phonenumber.ExtraKeyPhoneNumberVerified: true,
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{
+				phonenumber.ExtraKeyPhoneNumber:         phone,
+				phonenumber.ExtraKeyPhoneNumberVerified: true,
+			},
 		},
 	})
 

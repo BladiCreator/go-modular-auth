@@ -1,6 +1,10 @@
 // Package organization defines event names and typed event payloads published by the Organization plugin on the global EventBus.
 package organization
 
+import (
+	"github.com/BladiCreator/go-modular-auth/plugin"
+)
+
 // Event Name Constants
 const (
 	// Organization Events
@@ -60,262 +64,264 @@ const (
 
 // Organization Payloads
 
-type OrgCreateBeforeEventPayload struct {
-	UserID   string
-	Name     string
-	Slug     string
-	Logo     string
-	Metadata map[string]any
-	Extra    map[string]any
-}
+type (
+	OrgCreateBeforeEventPayload struct {
+		UserID   string
+		Name     string
+		Slug     string
+		Logo     string
+		Metadata map[string]any
+		plugin.ExtraContainer
+	}
 
-type OrgCreateAfterEventPayload struct {
-	Organization *Organization
-	Member       *Member
-	Extra        map[string]any
-}
+	OrgCreateAfterEventPayload struct {
+		Organization *Organization
+		Member       *Member
+		plugin.ExtraContainer
+	}
 
-type OrgUpdateBeforeEventPayload struct {
-	OrganizationID string
-	Name           *string
-	Slug           *string
-	Logo           *string
-	Metadata       map[string]any
-	Extra          map[string]any
-}
+	OrgUpdateBeforeEventPayload struct {
+		OrganizationID string
+		Name           *string
+		Slug           *string
+		Logo           *string
+		Metadata       map[string]any
+		plugin.ExtraContainer
+	}
 
-type OrgUpdateAfterEventPayload struct {
-	Organization *Organization
-	Extra        map[string]any
-}
+	OrgUpdateAfterEventPayload struct {
+		Organization *Organization
+		plugin.ExtraContainer
+	}
 
-type OrgDeleteBeforeEventPayload struct {
-	OrganizationID string
-	Extra          map[string]any
-}
+	OrgDeleteBeforeEventPayload struct {
+		OrganizationID string
+		plugin.ExtraContainer
+	}
 
-type OrgDeleteAfterEventPayload struct {
-	OrganizationID string
-	Extra          map[string]any
-}
+	OrgDeleteAfterEventPayload struct {
+		OrganizationID string
+		plugin.ExtraContainer
+	}
 
-type OrgSetActiveBeforeEventPayload struct {
-	UserID         string
-	OrganizationID string
-	Extra          map[string]any
-}
+	OrgSetActiveBeforeEventPayload struct {
+		UserID         string
+		OrganizationID string
+		plugin.ExtraContainer
+	}
 
-type OrgSetActiveAfterEventPayload struct {
-	UserID         string
-	OrganizationID string
-	Organization   *Organization
-	Member         *Member
-	Extra          map[string]any
-}
+	OrgSetActiveAfterEventPayload struct {
+		UserID         string
+		OrganizationID string
+		Organization   *Organization
+		Member         *Member
+		plugin.ExtraContainer
+	}
 
-// Member Payloads
+	// Member Payloads
 
-type MemberAddBeforeEventPayload struct {
-	OrganizationID string
-	UserID         string
-	Role           string
-	Extra          map[string]any
-}
+	MemberAddBeforeEventPayload struct {
+		OrganizationID string
+		UserID         string
+		Role           string
+		plugin.ExtraContainer
+	}
 
-type MemberAddAfterEventPayload struct {
-	Member *Member
-	Extra  map[string]any
-}
+	MemberAddAfterEventPayload struct {
+		Member *Member
+		plugin.ExtraContainer
+	}
 
-type MemberRemoveBeforeEventPayload struct {
-	OrganizationID string
-	UserID         string
-	Extra          map[string]any
-}
+	MemberRemoveBeforeEventPayload struct {
+		OrganizationID string
+		UserID         string
+		plugin.ExtraContainer
+	}
 
-type MemberRemoveAfterEventPayload struct {
-	OrganizationID string
-	UserID         string
-	Extra          map[string]any
-}
+	MemberRemoveAfterEventPayload struct {
+		OrganizationID string
+		UserID         string
+		plugin.ExtraContainer
+	}
 
-type MemberRoleUpdateBeforeEventPayload struct {
-	OrganizationID string
-	UserID         string
-	NewRole        string
-	Extra          map[string]any
-}
+	MemberRoleUpdateBeforeEventPayload struct {
+		OrganizationID string
+		UserID         string
+		NewRole        string
+		plugin.ExtraContainer
+	}
 
-type MemberRoleUpdateAfterEventPayload struct {
-	Member *Member
-	Extra  map[string]any
-}
+	MemberRoleUpdateAfterEventPayload struct {
+		Member *Member
+		plugin.ExtraContainer
+	}
 
-type MemberLeaveBeforeEventPayload struct {
-	OrganizationID string
-	UserID         string
-	Extra          map[string]any
-}
+	MemberLeaveBeforeEventPayload struct {
+		OrganizationID string
+		UserID         string
+		plugin.ExtraContainer
+	}
 
-type MemberLeaveAfterEventPayload struct {
-	OrganizationID string
-	UserID         string
-	Extra          map[string]any
-}
+	MemberLeaveAfterEventPayload struct {
+		OrganizationID string
+		UserID         string
+		plugin.ExtraContainer
+	}
 
-// Invitation Payloads
+	// Invitation Payloads
 
-type InvitationCreateBeforeEventPayload struct {
-	OrganizationID string
-	InviterID      string
-	Email          string
-	Role           string
-	TeamID         *string
-	Extra          map[string]any
-}
+	InvitationCreateBeforeEventPayload struct {
+		OrganizationID string
+		InviterID      string
+		Email          string
+		Role           string
+		TeamID         *string
+		plugin.ExtraContainer
+	}
 
-type InvitationCreateAfterEventPayload struct {
-	Invitation *Invitation
-	Extra      map[string]any
-}
+	InvitationCreateAfterEventPayload struct {
+		Invitation *Invitation
+		plugin.ExtraContainer
+	}
 
-type InvitationAcceptBeforeEventPayload struct {
-	InvitationID string
-	UserID       string
-	Extra        map[string]any
-}
+	InvitationAcceptBeforeEventPayload struct {
+		InvitationID string
+		UserID       string
+		plugin.ExtraContainer
+	}
 
-type InvitationAcceptAfterEventPayload struct {
-	Invitation   *Invitation
-	Member       *Member
-	Organization *Organization
-	Extra        map[string]any
-}
+	InvitationAcceptAfterEventPayload struct {
+		Invitation   *Invitation
+		Member       *Member
+		Organization *Organization
+		plugin.ExtraContainer
+	}
 
-type InvitationRejectBeforeEventPayload struct {
-	InvitationID string
-	UserID       string
-	Extra        map[string]any
-}
+	InvitationRejectBeforeEventPayload struct {
+		InvitationID string
+		UserID       string
+		plugin.ExtraContainer
+	}
 
-type InvitationRejectAfterEventPayload struct {
-	Invitation *Invitation
-	Extra      map[string]any
-}
+	InvitationRejectAfterEventPayload struct {
+		Invitation *Invitation
+		plugin.ExtraContainer
+	}
 
-type InvitationCancelBeforeEventPayload struct {
-	InvitationID string
-	UserID       string
-	Extra        map[string]any
-}
+	InvitationCancelBeforeEventPayload struct {
+		InvitationID string
+		UserID       string
+		plugin.ExtraContainer
+	}
 
-type InvitationCancelAfterEventPayload struct {
-	Invitation *Invitation
-	Extra      map[string]any
-}
+	InvitationCancelAfterEventPayload struct {
+		Invitation *Invitation
+		plugin.ExtraContainer
+	}
 
-// Team Payloads
+	// Team Payloads
 
-type TeamCreateBeforeEventPayload struct {
-	OrganizationID string
-	Name           string
-	Extra          map[string]any
-}
+	TeamCreateBeforeEventPayload struct {
+		OrganizationID string
+		Name           string
+		plugin.ExtraContainer
+	}
 
-type TeamCreateAfterEventPayload struct {
-	Team  *Team
-	Extra map[string]any
-}
+	TeamCreateAfterEventPayload struct {
+		Team *Team
+		plugin.ExtraContainer
+	}
 
-type TeamUpdateBeforeEventPayload struct {
-	TeamID string
-	Name   string
-	Extra  map[string]any
-}
+	TeamUpdateBeforeEventPayload struct {
+		TeamID string
+		Name   string
+		plugin.ExtraContainer
+	}
 
-type TeamUpdateAfterEventPayload struct {
-	Team  *Team
-	Extra map[string]any
-}
+	TeamUpdateAfterEventPayload struct {
+		Team *Team
+		plugin.ExtraContainer
+	}
 
-type TeamDeleteBeforeEventPayload struct {
-	TeamID string
-	Extra  map[string]any
-}
+	TeamDeleteBeforeEventPayload struct {
+		TeamID string
+		plugin.ExtraContainer
+	}
 
-type TeamDeleteAfterEventPayload struct {
-	TeamID string
-	Extra  map[string]any
-}
+	TeamDeleteAfterEventPayload struct {
+		TeamID string
+		plugin.ExtraContainer
+	}
 
-type TeamMemberAddBeforeEventPayload struct {
-	TeamID string
-	UserID string
-	Extra  map[string]any
-}
+	TeamMemberAddBeforeEventPayload struct {
+		TeamID string
+		UserID string
+		plugin.ExtraContainer
+	}
 
-type TeamMemberAddAfterEventPayload struct {
-	TeamMember *TeamMember
-	Extra      map[string]any
-}
+	TeamMemberAddAfterEventPayload struct {
+		TeamMember *TeamMember
+		plugin.ExtraContainer
+	}
 
-type TeamMemberRemoveBeforeEventPayload struct {
-	TeamID string
-	UserID string
-	Extra  map[string]any
-}
+	TeamMemberRemoveBeforeEventPayload struct {
+		TeamID string
+		UserID string
+		plugin.ExtraContainer
+	}
 
-type TeamMemberRemoveAfterEventPayload struct {
-	TeamID string
-	UserID string
-	Extra  map[string]any
-}
+	TeamMemberRemoveAfterEventPayload struct {
+		TeamID string
+		UserID string
+		plugin.ExtraContainer
+	}
 
-type TeamSetActiveBeforeEventPayload struct {
-	UserID string
-	TeamID string
-	Extra  map[string]any
-}
+	TeamSetActiveBeforeEventPayload struct {
+		UserID string
+		TeamID string
+		plugin.ExtraContainer
+	}
 
-type TeamSetActiveAfterEventPayload struct {
-	UserID string
-	TeamID string
-	Team   *Team
-	Extra  map[string]any
-}
+	TeamSetActiveAfterEventPayload struct {
+		UserID string
+		TeamID string
+		Team   *Team
+		plugin.ExtraContainer
+	}
 
-// Dynamic Role Payloads
+	// Dynamic Role Payloads
 
-type RoleCreateBeforeEventPayload struct {
-	OrganizationID string
-	Role           string
-	Permissions    map[string][]string
-	Extra          map[string]any
-}
+	RoleCreateBeforeEventPayload struct {
+		OrganizationID string
+		Role           string
+		Permissions    map[string][]string
+		plugin.ExtraContainer
+	}
 
-type RoleCreateAfterEventPayload struct {
-	Role  *OrganizationRole
-	Extra map[string]any
-}
+	RoleCreateAfterEventPayload struct {
+		Role *OrganizationRole
+		plugin.ExtraContainer
+	}
 
-type RoleUpdateBeforeEventPayload struct {
-	RoleID      string
-	Role        *string
-	Permissions map[string][]string
-	Extra       map[string]any
-}
+	RoleUpdateBeforeEventPayload struct {
+		RoleID      string
+		Role        *string
+		Permissions map[string][]string
+		plugin.ExtraContainer
+	}
 
-type RoleUpdateAfterEventPayload struct {
-	Role  *OrganizationRole
-	Extra map[string]any
-}
+	RoleUpdateAfterEventPayload struct {
+		Role *OrganizationRole
+		plugin.ExtraContainer
+	}
 
-type RoleDeleteBeforeEventPayload struct {
-	RoleID string
-	Extra  map[string]any
-}
+	RoleDeleteBeforeEventPayload struct {
+		RoleID string
+		plugin.ExtraContainer
+	}
 
-type RoleDeleteAfterEventPayload struct {
-	RoleID string
-	Extra  map[string]any
-}
+	RoleDeleteAfterEventPayload struct {
+		RoleID string
+		plugin.ExtraContainer
+	}
+)
