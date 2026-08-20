@@ -9,6 +9,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
@@ -778,3 +779,65 @@ func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 func Access(masterStatements access.Statements, opts ...access.Option) *access.Plugin {
 	return access.New(masterStatements, opts...)
 }
+
+// MagicLink instantiates a new MagicLink authentication plugin configured with the given repository and options.
+//
+// The MagicLink plugin provides passwordless user authentication and auto-registration via transactional email verification links.
+// It features atomic single-use token consumption (protecting against race conditions and replay attacks), flexible token
+// storage modes (plain text, SHA-256 constant-time hashing, and AES-256-GCM symmetric encryption), customizable redirect URLs
+// for new vs existing users, HTTP handlers for direct router integration, and lifecycle event bus hooks.
+//
+// # Available Methods
+//
+//   - SignInMagicLink(ctx context.Context, params magiclink.SignInMagicLinkParams) (*magiclink.SignInMagicLinkResult, error): Issue a secure verification token and dispatch the magic link email.
+//   - VerifyMagicLink(ctx context.Context, params magiclink.VerifyMagicLinkParams) (*magiclink.VerifyMagicLinkResult, error): Atomically consume token, authenticate/register user, and issue active session.
+//   - HandleSignInMagicLink(w http.ResponseWriter, r *http.Request): HTTP POST endpoint handler for /sign-in/magic-link.
+//   - HandleVerifyMagicLink(w http.ResponseWriter, r *http.Request): HTTP GET/POST endpoint handler for /magic-link/verify with JSON or browser redirect output.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - magiclink.WithSendMagicLink(fn magiclink.SendMagicLinkFunc): Transactional email delivery callback for dispatching magic links (Required).
+//   - magiclink.WithExpiresIn(duration time.Duration): Expiry duration for verification tokens (default: 5 minutes).
+//   - magiclink.WithDisableSignUp(disable bool): Prevent auto-registration of unknown email addresses (default: false).
+//   - magiclink.WithDefaultCallbackURL(url string): Default fallback redirect URL after successful login (default: "/").
+//   - magiclink.WithStoreTokenMode(mode magiclink.StoreTokenMode): Security storage mode ("plain", "hashed", "encrypted", default: "plain").
+//   - magiclink.WithSecretKey(key string): Secret key used for AES-256-GCM encrypted token storage.
+//   - magiclink.WithCustomHasher(h magiclink.Hasher): Custom token hasher implementation for hashed mode.
+//   - magiclink.WithCustomCipher(c magiclink.Cipher): Custom token cipher implementation for encrypted mode.
+//   - magiclink.WithGenerateToken(fn magiclink.TokenGeneratorFunc): Custom token generator function.
+//   - magiclink.WithRateLimit(window time.Duration, max int): Request throttling configuration (default: 5 requests per 60 seconds).
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.MagicLink(
+//				storage,
+//				magiclink.WithSendMagicLink(func(ctx context.Context, data magiclink.SendMagicLinkData) error {
+//					fmt.Printf("Send magic link to %s: %s\n", data.Email, data.URL)
+//					return nil
+//				}),
+//				magiclink.WithExpiresIn(10 * time.Minute),
+//				magiclink.WithDefaultCallbackURL("/dashboard"),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	res, err := auth.Plugin[magiclink.Plugin](app).SignInMagicLink(ctx, magiclink.SignInMagicLinkParams{
+//		Email: "gopher@golang.org",
+//		Name:  "Gopher Go",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func MagicLink(repo magiclink.Repository, opts ...magiclink.Option) *magiclink.Plugin {
+	return magiclink.New(repo, opts...)
+}
+
