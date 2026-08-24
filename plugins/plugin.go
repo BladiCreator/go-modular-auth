@@ -6,6 +6,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/access"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
+	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
@@ -892,4 +893,61 @@ func MagicLink(repo magiclink.Repository, opts ...magiclink.Option) *magiclink.P
 func Username(repo username.Repository, opts ...username.Option) *username.Plugin {
 	return username.New(repo, opts...)
 }
+
+// DeviceAuth instantiates a new Device Authorization Flow (RFC 8628) plugin configured with the given repository and options.
+//
+// The DeviceAuth plugin enables OAuth 2.0 Device Authorization Grant workflow for input-constrained
+// or browserless devices (Smart TVs, CLI tools, IoT hardware), issuing short verification codes for end-user approval
+// on a secondary browser and exchanging approved grants for active user sessions.
+//
+// # Available Methods
+//
+//   - RequestDeviceCode(ctx context.Context, params RequestDeviceCodeParams) (*DeviceCodeResponse, error): Initiate a new device authorization grant request.
+//   - ExchangeDeviceToken(ctx context.Context, params ExchangeDeviceTokenParams) (*TokenResponse, error): Poll for authorization and exchange an approved device code for a session token.
+//   - GetVerificationState(ctx context.Context, rawUserCode string) (*DeviceCode, error): Retrieve device authorization status by user verification code.
+//   - ApproveDeviceCode(ctx context.Context, params ApproveDeviceCodeParams) error: Authorize a pending device code request for an authenticated user.
+//   - DenyDeviceCode(ctx context.Context, params DenyDeviceCodeParams) error: Reject a pending device code authorization request.
+//
+// # Configuration Options
+//
+//   - deviceauth.WithExpiresIn(d time.Duration): Expiration lifetime duration of issued device code grants (default: 30 minutes).
+//   - deviceauth.WithInterval(d time.Duration): Minimum polling interval requirement between token requests (default: 5 seconds).
+//   - deviceauth.WithDeviceCodeLength(length int): Character length of generated device codes (default: 40).
+//   - deviceauth.WithUserCodeLength(length int): Character length of generated user codes (default: 8).
+//   - deviceauth.WithVerificationURI(uri string): Base verification path returned in responses (default: "/device").
+//   - deviceauth.WithCustomURI(uri string): Custom domain base URI for complete verification URLs.
+//   - deviceauth.WithSessionExpiry(d time.Duration): Duration of sessions generated upon token exchange (default: 24 hours).
+//   - deviceauth.WithGenerateDeviceCode(fn func(int) (string, error)): Custom device code generator callback.
+//   - deviceauth.WithGenerateUserCode(fn func(int) (string, error)): Custom user code generator callback.
+//   - deviceauth.WithValidateClient(fn func(context.Context, string) (bool, error)): Callback to validate client_id during requests.
+//   - deviceauth.WithOnDeviceAuthRequest(fn func(context.Context, string, *string) error): Callback hook executed on device code requests.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := repo // custom deviceauth.Repository implementation
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.DeviceAuth(
+//				storage,
+//				deviceauth.WithExpiresIn(15*time.Minute),
+//				deviceauth.WithInterval(5*time.Second),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	devPlugin := auth.Plugin[deviceauth.Plugin](app)
+//	resp, err := devPlugin.RequestDeviceCode(ctx, deviceauth.RequestDeviceCodeParams{
+//		ClientID: "cli_app",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func DeviceAuth(repo deviceauth.Repository, opts ...deviceauth.Option) *deviceauth.Plugin {
+	return deviceauth.New(repo, opts...)
+}
+
 
