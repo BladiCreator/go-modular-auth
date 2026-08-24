@@ -15,6 +15,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/oidcprovider"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
+	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -1071,6 +1072,31 @@ func OIDCProvider(repo oidcprovider.Repository, opts ...oidcprovider.Option) *oi
 func ApiKey(repo apikey.Repository, opts ...apikey.Option) *apikey.Plugin {
 	return apikey.New(repo, opts...)
 }
+
+// OTT instantiates a new One-Time Token (OTT) authentication plugin configured with the given repository and options.
+//
+// The OTT plugin allows issuing single-use, time-bound tokens bound to active user sessions for cross-domain SSO,
+// secure credential exchange, or automatic session header generation.
+//
+// # Available Methods
+//
+//   - GenerateToken(ctx context.Context, params GenerateTokenParams) (*GenerateTokenResponse, error): Issue a new single-use token bound to a session.
+//   - VerifyToken(ctx context.Context, params VerifyTokenParams) (*VerifyTokenResponse, error): Validate and atomically consume an OTT token.
+//   - AttachOttHeader(w http.ResponseWriter, sessionToken string) error: Generate an OTT and set the set-ott HTTP header.
+//
+// # Configuration Options
+//
+//   - ott.WithExpiresIn(d time.Duration): Lifetime duration for issued OTT tokens (default: 3 minutes).
+//   - ott.WithDisableClientRequest(disable bool): Disable token generation requests originating directly from HTTP clients.
+//   - ott.WithDisableSetSessionCookie(disable bool): Prevent setting session HTTP cookies on verification.
+//   - ott.WithSetOttHeaderOnNewSession(enable bool): Automatically attach set-ott header on new session creation.
+//   - ott.WithStoreTokenMode(mode ott.StoreTokenMode): Set token storage mode ("plain" or "hashed", default: "plain").
+//   - ott.WithCustomHasher(fn ott.HasherFunc): Override default SHA-256 base64url token hasher.
+//   - ott.WithCustomGenerator(fn ott.TokenGeneratorFunc): Override default crypto/rand random token generator.
+func OTT(repo ott.Repository, opts ...ott.Option) *ott.Plugin {
+	return ott.New(repo, opts...)
+}
+
 
 
 
