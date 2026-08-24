@@ -5,6 +5,7 @@ package plugins
 import (
 	"github.com/BladiCreator/go-modular-auth/plugins/access"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/apikey"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
@@ -1011,6 +1012,64 @@ func DeviceAuth(repo deviceauth.Repository, opts ...deviceauth.Option) *deviceau
 //	}
 func OIDCProvider(repo oidcprovider.Repository, opts ...oidcprovider.Option) *oidcprovider.Plugin {
 	return oidcprovider.New(repo, opts...)
+}
+
+// ApiKey instantiates a new ApiKey authentication and rate-limiting plugin configured with the given repository and options.
+//
+// The ApiKey plugin allows applications to create, verify, list, update, and revoke API keys with SHA-256 base64url hashing,
+// sliding window rate limiting, quota auto-refill, scope permission verification, custom JSON metadata, expiration,
+// asynchronous background updates (DeferUpdates), and HTTP header middleware authentication.
+//
+// # Available Methods
+//
+//   - CreateKey(ctx context.Context, params CreateApiKeyParams) (*CreateApiKeyResult, error): Issue a new API key.
+//   - VerifyKey(ctx context.Context, params VerifyApiKeyParams) (*VerifyApiKeyResult, error): Authenticate an incoming API key.
+//   - GetKey(ctx context.Context, params GetApiKeyParams) (*ApiKey, error): Retrieve key details by ID.
+//   - UpdateKey(ctx context.Context, params UpdateApiKeyParams) (*ApiKey, error): Update metadata, status, or quota parameters.
+//   - DeleteKey(ctx context.Context, params DeleteApiKeyParams) error: Revoke and delete an API key.
+//   - ListKeys(ctx context.Context, params ListApiKeysParams) (*ListApiKeysResult, error): List keys for a owner reference ID.
+//   - DeleteAllExpiredKeys(ctx context.Context) (int64, error): Purge all expired keys from storage.
+//   - HTTPMiddleware() func(next http.Handler) http.Handler: Net/HTTP middleware for authenticating API Key request headers.
+//
+// # Configuration Options
+//
+//   - apikey.WithHeaderNames(headers ...string): Request headers checked for API keys (default: "X-API-Key").
+//   - apikey.WithDefaultKeyLength(length int): Key character length (default: 32).
+//   - apikey.WithDefaultPrefix(prefix string): Key prefix attached to issued keys (e.g. "sk_live_").
+//   - apikey.WithRateLimit(enabled bool, window time.Duration, maxReq int64): Configure sliding window rate limiting.
+//   - apikey.WithExpiration(defaultExpiresIn *time.Duration): Configure default expiration duration.
+//   - apikey.WithDisableKeyHashing(disable bool): Toggle storing raw plaintext keys instead of SHA-256 hashes.
+//   - apikey.WithEnableSessionForAPIKeys(enable bool): Populate mock user identity during HTTP middleware verification.
+//   - apikey.WithDeferUpdates(deferUpdates bool): Execute request counter and timestamp updates asynchronously.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := repo // custom apikey.Repository implementation
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.ApiKey(
+//				storage,
+//				apikey.WithDefaultPrefix("sk_live_"),
+//				apikey.WithDeferUpdates(true),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	ak := auth.Plugin[apikey.Plugin](app)
+//	res, err := ak.CreateKey(ctx, apikey.CreateApiKeyParams{
+//		ReferenceID: "user_123",
+//		Name:        stringPtr("Production Access"),
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+//	fmt.Println("Raw API Key (shown once):", res.RawKey)
+func ApiKey(repo apikey.Repository, opts ...apikey.Option) *apikey.Plugin {
+	return apikey.New(repo, opts...)
 }
 
 
