@@ -12,6 +12,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
+	"github.com/BladiCreator/go-modular-auth/plugins/oidcprovider"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
@@ -949,5 +950,68 @@ func Username(repo username.Repository, opts ...username.Option) *username.Plugi
 func DeviceAuth(repo deviceauth.Repository, opts ...deviceauth.Option) *deviceauth.Plugin {
 	return deviceauth.New(repo, opts...)
 }
+
+// OIDCProvider instantiates a new OIDC Provider (OpenID Connect 1.0 / OAuth 2.0) plugin configured with the given repository and options.
+//
+// The OIDCProvider plugin converts your application into an OAuth 2.0 Authorization Server and OpenID Connect Provider (OP),
+// handling client registration, Authorization Code Flow with PKCE (RFC 7636), user consent management, Access/Refresh/ID Token issuance,
+// UserInfo claims endpoint, RP-Initiated Logout, OpenID Connect Discovery metadata (/.well-known/openid-configuration), and public JWKS export.
+//
+// # Available Methods
+//
+//   - RegisterClient(ctx context.Context, params RegisterClientParams) (*OAuthClient, error): Register a new OAuth 2.0 / OIDC client application.
+//   - GetClient(ctx context.Context, clientID string) (*OAuthClient, error): Retrieve a registered client application by client_id.
+//   - Authorize(ctx context.Context, params AuthorizeParams) (*AuthorizeResponse, error): Process an authorization request and issue an authorization code.
+//   - GrantConsent(ctx context.Context, params GrantConsentParams) (*AuthorizeResponse, error): Record explicit user scope consent for a client.
+//   - ExchangeToken(ctx context.Context, params ExchangeTokenParams) (*TokenResponse, error): Exchange an authorization code or refresh token for token pairs.
+//   - GetUserInfo(ctx context.Context, accessToken string) (UserInfoClaims, error): Retrieve standard OpenID Connect claims for a valid access_token.
+//   - EndSession(ctx context.Context, idTokenHint string, postLogoutRedirectURI *string) (string, error): Perform RP-Initiated Logout.
+//   - GetDiscoveryMetadata(ctx context.Context) (*DiscoveryMetadata, error): Generate OpenID Connect Discovery 1.0 JSON configuration.
+//   - GetJWKS(ctx context.Context) (map[string]any, error): Export public keys in JWKS format.
+//
+// # Configuration Options
+//
+//   - oidcprovider.WithIssuer(issuer string): OIDC issuer identifier URL (default: "http://localhost:8080").
+//   - oidcprovider.WithBaseURL(url string): Base URL for endpoint path construction.
+//   - oidcprovider.WithTokenExpirations(access, refresh, code time.Duration): Expiration durations for tokens and codes.
+//   - oidcprovider.WithSupportedScopes(scopes []string): List of supported OIDC scopes (default: openid, profile, email, offline_access).
+//   - oidcprovider.WithRequirePKCE(require bool): Enforce PKCE for authorization code grant requests (default: true).
+//   - oidcprovider.WithRSAKeys(privateKey *rsa.PrivateKey): RSA private key for RS256 ID Token signing and JWKS export.
+//   - oidcprovider.WithSecretKey(secret []byte): Shared secret key for HS256 ID Token signing.
+//   - oidcprovider.WithStoreClientSecretMode(mode SecretStoreMode): How client_secret values are stored and verified.
+//   - oidcprovider.WithConsentPageURL(url string): Interactive consent UI page URL.
+//   - oidcprovider.WithLoginPageURL(url string): Login redirect URL.
+//   - oidcprovider.WithAdditionalClaims(fn AdditionalClaimsFunc): Custom callback to inject custom claims into UserInfo and ID Tokens.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := repo // custom oidcprovider.Repository implementation
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.OIDCProvider(
+//				storage,
+//				oidcprovider.WithIssuer("https://auth.example.com"),
+//				oidcprovider.WithSecretKey([]byte("my-super-secret-key-32-bytes")),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	op := auth.Plugin[oidcprovider.Plugin](app)
+//	client, err := op.RegisterClient(ctx, oidcprovider.RegisterClientParams{
+//		Name:         "My Web App",
+//		Type:         oidcprovider.ClientTypeWeb,
+//		RedirectURIs: []string{"https://app.example.com/callback"},
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func OIDCProvider(repo oidcprovider.Repository, opts ...oidcprovider.Option) *oidcprovider.Plugin {
+	return oidcprovider.New(repo, opts...)
+}
+
 
 
