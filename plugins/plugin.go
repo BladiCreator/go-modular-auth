@@ -7,6 +7,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/apikey"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
+	"github.com/BladiCreator/go-modular-auth/plugins/captcha"
 	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
@@ -1093,9 +1094,83 @@ func ApiKey(repo apikey.Repository, opts ...apikey.Option) *apikey.Plugin {
 //   - ott.WithStoreTokenMode(mode ott.StoreTokenMode): Set token storage mode ("plain" or "hashed", default: "plain").
 //   - ott.WithCustomHasher(fn ott.HasherFunc): Override default SHA-256 base64url token hasher.
 //   - ott.WithCustomGenerator(fn ott.TokenGeneratorFunc): Override default crypto/rand random token generator.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := repo // custom ott.Repository implementation
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.OTT(
+//				storage,
+//				ott.WithExpiresIn(5*time.Minute),
+//				ott.WithStoreTokenMode(ott.StoreTokenHashed),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	ottPlugin := auth.Plugin[ott.Plugin](app)
+//	resp, err := ottPlugin.GenerateToken(ctx, ott.GenerateTokenParams{
+//		SessionToken: "sess_123456",
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = resp.Token
 func OTT(repo ott.Repository, opts ...ott.Option) *ott.Plugin {
 	return ott.New(repo, opts...)
 }
+
+// Captcha instantiates a new Captcha verification plugin configured with functional options.
+//
+// The Captcha plugin provides middleware and verifiers for intercepting authentication endpoints (such as /sign-up/email, /sign-in/email)
+// and validating client tokens against Cloudflare Turnstile, Google reCAPTCHA v2/v3, hCaptcha, or CaptchaFox.
+//
+// # Available Methods
+//
+//   - VerifyToken(ctx context.Context, token string, remoteIP string) error: Manually validate a captcha response token against the configured provider.
+//   - IsProtectedPath(path string) bool: Check if a given URI path is configured for captcha protection.
+//   - HTTPMiddleware() func(next http.Handler) http.Handler: Return a net/http middleware handler to intercept and validate requests on protected endpoints.
+//
+// # Configuration Options
+//
+//   - captcha.WithProvider(p captcha.Provider): Set captcha provider (Turnstile, reCAPTCHA, hCaptcha, CaptchaFox).
+//   - captcha.WithSecretKey(key string): Configure private secret key for provider verification API.
+//   - captcha.WithSiteKey(key string): Configure public site key for providers requiring it.
+//   - captcha.WithEndpoints(endpoints []string): Set protected request URI paths.
+//   - captcha.WithExemptEndpoints(exempt []string): Set exempted request URI paths.
+//   - captcha.WithSiteVerifyURLOverride(url string): Override default siteverify endpoint URL.
+//   - captcha.WithMinScore(score float64): Minimum score for reCAPTCHA v3 verification (default: 0.5).
+//   - captcha.WithExpectedAction(action string): Validate expected action string for Turnstile / reCAPTCHA.
+//   - captcha.WithAllowedHostnames(hostnames []string): Restrict valid tokens to allowed hostnames.
+//   - captcha.WithTimeout(d time.Duration): Maximum verification HTTP request timeout (default: 10s).
+//   - captcha.WithIPExtractor(fn captcha.IPExtractorFunc): Configure custom client remote IP extractor function.
+//
+// Example:
+//
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Captcha(
+//				captcha.WithProvider(captcha.ProviderCloudflareTurnstile),
+//				captcha.WithSecretKey("0x4AAAAAAAxXxxxxXXxxXxx"),
+//				captcha.WithEndpoints([]string{"/sign-up/email", "/sign-in/email"}),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	captchaPlugin := auth.Plugin[captcha.Plugin](app)
+//	_ = captchaPlugin.HTTPMiddleware()
+func Captcha(opts ...captcha.Option) *captcha.Plugin {
+	return captcha.New(opts...)
+}
+
+
 
 
 
