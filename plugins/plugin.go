@@ -13,6 +13,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
+	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauthproxy"
 	"github.com/BladiCreator/go-modular-auth/plugins/oidcprovider"
@@ -1197,6 +1198,26 @@ func Captcha(opts ...captcha.Option) *captcha.Plugin {
 func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
 	return oauthproxy.New(opts...)
 }
+
+// MultiSession instantiates a new MultiSession authentication plugin configured with the given repository and options.
+//
+// The MultiSession plugin enables users/devices to maintain multiple active sessions for different user accounts
+// within the same browser, managing HMAC SHA-256 signed multi-session cookies, active session switching,
+// session limit enforcement, and mass session revocation on sign-out.
+//
+// Example:
+//
+//	repo := memory.New()
+//	multiSessionPlugin := plugins.MultiSession(
+//		repo,
+//		multisession.WithMaximumSessions(5),
+//		multisession.WithCookiePrefix("better-auth"),
+//		multisession.WithSecret("my-hmac-secret-key"),
+//	)
+func MultiSession(repo multisession.Repository, opts ...multisession.Option) *multisession.Plugin {
+	return multisession.New(repo, opts...)
+}
+
 
 
 

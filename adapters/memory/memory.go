@@ -18,6 +18,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
@@ -33,6 +34,7 @@ var (
 	_ admin.Repository         = (*Store)(nil)
 	_ passkey.Repository       = (*Store)(nil)
 	_ oauth2.Repository        = (*Store)(nil)
+	_ multisession.Repository  = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -430,6 +432,42 @@ func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) error
 		}
 	}
 	return nil
+}
+
+func (s *Store) DeleteSessions(ctx context.Context, tokens []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, token := range tokens {
+		delete(s.sessions, token)
+	}
+	return nil
+}
+
+func (s *Store) FindSessionsByTokens(ctx context.Context, tokens []string) ([]*entity.Session, []*entity.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	matchedSessions := make([]*entity.Session, 0)
+	userIDsMap := make(map[string]bool)
+
+	for _, token := range tokens {
+		if sess, ok := s.sessions[token]; ok {
+			cloned := *sess
+			matchedSessions = append(matchedSessions, &cloned)
+			userIDsMap[sess.UserID] = true
+		}
+	}
+
+	matchedUsers := make([]*entity.User, 0)
+	for userID := range userIDsMap {
+		if u, ok := s.users[userID]; ok {
+			cloned := *u
+			matchedUsers = append(matchedUsers, &cloned)
+		}
+	}
+
+	return matchedSessions, matchedUsers, nil
 }
 
 // 2FA TOTP Methods
