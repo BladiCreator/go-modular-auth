@@ -83,8 +83,57 @@ type VerificationRecord struct {
 
 // Repository defines the persistent storage contract required by the Email OTP plugin.
 // Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, SQLite, MongoDB, GORM).
+//
+// # Implementation Example (GORM / database/sql):
+//
+//	type GormEmailOTPRepository struct {
+//		db *gorm.DB
+//	}
+//
+//	func (r *GormEmailOTPRepository) FindVerificationValue(ctx context.Context, identifier string) (*emailotp.VerificationRecord, error) {
+//		var rec emailotp.VerificationRecord
+//		if err := r.db.WithContext(ctx).Where("identifier = ?", identifier).First(&rec).Error; err != nil {
+//			if errors.Is(err, gorm.ErrRecordNotFound) {
+//				return nil, nil
+//			}
+//			return nil, err
+//		}
+//		return &rec, nil
+//	}
+//
+// # Storage and Caching Recommendation (Redis TTL Storage):
+//
+// OTP codes (`VerificationRecord`) are short-lived, ephemeral credentials. Storing them in Redis
+// with automatic key expiration (TTL) guarantees auto-cleanup without periodic DB purges:
+//
+//	type RedisEmailOTPRepository struct {
+//		redis *redis.Client
+//	}
+//
+//	func (r *RedisEmailOTPRepository) CreateVerificationValue(ctx context.Context, record *emailotp.VerificationRecord) error {
+//		bytes, _ := json.Marshal(record)
+//		ttl := time.Until(record.ExpiresAt)
+//		return r.redis.Set(ctx, "emailotp:"+record.Identifier, bytes, ttl).Err()
+//	}
+//
+//	func (r *RedisEmailOTPRepository) ConsumeVerificationValue(ctx context.Context, identifier string) (*emailotp.VerificationRecord, error) {
+//		key := "emailotp:" + identifier
+//		val, err := r.redis.GetDel(ctx, key).Bytes() // Atomic single-use retrieval & deletion
+//		if err != nil {
+//			return nil, emailotp.ErrInvalidOTP
+//		}
+//		var rec emailotp.VerificationRecord
+//		_ = json.Unmarshal(val, &rec)
+//		return &rec, nil
+//	}
 type Repository interface {
 	// FindVerificationValue retrieves an active verification record matching the given identifier.
+	//
+	// Function:
+	//   Queries storage for an active OTP verification code record during verification.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Ephemeral short-lived OTP token data.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -96,9 +145,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   SELECT id, identifier, value, expires_at, created_at, updated_at FROM verification_tokens WHERE identifier = $1 LIMIT 1;
+	//
+	// Example Cache (Redis):
+	//   val, err := rdb.Get(ctx, "emailotp:" + identifier).Bytes()
 	FindVerificationValue(ctx context.Context, identifier string) (*VerificationRecord, error)
 
 	// CreateVerificationValue creates or replaces a verification record in storage.
+	//
+	// Function:
+	//   Persists a newly generated OTP code record with expiration timestamp.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Short-lived key-value with TTL equal to token validity.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -110,9 +168,18 @@ type Repository interface {
 	// Example SQL:
 	//   INSERT INTO verification_tokens (id, identifier, value, expires_at, created_at, updated_at)
 	//   VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (identifier) DO UPDATE SET value = $3, expires_at = $4, updated_at = $6;
+	//
+	// Example Cache (Redis):
+	//   err := rdb.Set(ctx, "emailotp:" + record.Identifier, bytes, ttl).Err()
 	CreateVerificationValue(ctx context.Context, record *VerificationRecord) error
 
 	// UpdateVerificationValue updates the value and expiry of an existing verification record.
+	//
+	// Function:
+	//   Updates attempts counter or regenerates OTP value payload.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Key update with adjusted TTL.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -125,9 +192,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   UPDATE verification_tokens SET value = $1, expires_at = $2, updated_at = $3 WHERE identifier = $4;
+	//
+	// Example Cache (Redis):
+	//   err := rdb.Set(ctx, "emailotp:" + identifier, bytes, ttl).Err()
 	UpdateVerificationValue(ctx context.Context, identifier, value string, expiresAt time.Time) error
 
 	// DeleteVerificationValue removes a verification record from storage by identifier.
+	//
+	// Function:
+	//   Explicit removal of an OTP record upon invalidation.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Key eviction from memory/Redis.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -138,10 +214,19 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   DELETE FROM verification_tokens WHERE identifier = $1;
+	//
+	// Example Cache (Redis):
+	//   err := rdb.Del(ctx, "emailotp:" + identifier).Err()
 	DeleteVerificationValue(ctx context.Context, identifier string) error
 
 	// ConsumeVerificationValue atomically retrieves and deletes a verification record in a single operation.
 	// This ensures strictly single-use anti-replay protection under high concurrency.
+	//
+	// Function:
+	//   Single-use OTP verification and atomic consumption.
+	//
+	// Storage:
+	//   Cache (Redis GETDEL / Memory) - Atomic read-and-delete operation.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -154,9 +239,18 @@ type Repository interface {
 	// Example SQL:
 	//   DELETE FROM verification_tokens WHERE identifier = $1 AND expires_at > $2
 	//   RETURNING id, identifier, value, expires_at, created_at, updated_at;
+	//
+	// Example Cache (Redis):
+	//   val, err := rdb.GetDel(ctx, "emailotp:" + identifier).Bytes()
 	ConsumeVerificationValue(ctx context.Context, identifier string) (*VerificationRecord, error)
 
 	// GetUserByEmail retrieves a user entity matching the provided email address.
+	//
+	// Function:
+	//   Used during sign-in or signup to check existing user accounts.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user entity query.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -172,6 +266,12 @@ type Repository interface {
 
 	// GetUserByID retrieves a user entity matching the provided unique identifier.
 	//
+	// Function:
+	//   Used to load user details by primary key ID.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - User primary key lookup.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - id: The user's primary key ID.
@@ -185,6 +285,12 @@ type Repository interface {
 	GetUserByID(ctx context.Context, id string) (*entity.User, error)
 
 	// CreateUser persists a newly registered user in storage.
+	//
+	// Function:
+	//   Called when a new user completes email OTP registration.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational insert of new User domain entity.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -201,6 +307,12 @@ type Repository interface {
 
 	// UpdateUser updates modified fields of an existing user profile (e.g. Email, EmailVerified).
 	//
+	// Function:
+	//   Called when updating user attributes or setting EmailVerified to true.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational update.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - user: The modified user entity.
@@ -213,6 +325,12 @@ type Repository interface {
 	UpdateUser(ctx context.Context, user *entity.User) error
 
 	// GetAccountByUserIDAndProvider retrieves an account matching a given user and authentication provider.
+	//
+	// Function:
+	//   Used to locate provider credentials for a user.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Account credentials record lookup.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -229,6 +347,12 @@ type Repository interface {
 
 	// CreateAccount associates a new provider authentication account with a user.
 	//
+	// Function:
+	//   Persists account credential linking record.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Account entity creation.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - account: The Account entity to persist.
@@ -241,6 +365,12 @@ type Repository interface {
 	CreateAccount(ctx context.Context, account *entity.Account) error
 
 	// UpdateAccountPassword updates the password hash on a user's credential account.
+	//
+	// Function:
+	//   Called during password reset or credential update.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Account password hash update.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -256,6 +386,12 @@ type Repository interface {
 
 	// DeleteCredentialAccount removes the credential account for a user adopted via passwordless OTP.
 	//
+	// Function:
+	//   Unlinks password credential account.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Record deletion.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - userID: The target user's ID.
@@ -268,6 +404,12 @@ type Repository interface {
 	DeleteCredentialAccount(ctx context.Context, userID string) error
 
 	// CreateSession persists a new active user session in storage.
+	//
+	// Function:
+	//   Creates a new active session upon successful OTP verification.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Active session creation.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -283,6 +425,12 @@ type Repository interface {
 	CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error)
 
 	// DeleteSessionsByUserID invalidates all active sessions for a user (used upon password reset).
+	//
+	// Function:
+	//   Bulk invalidation of user sessions.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Bulk session removal.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.

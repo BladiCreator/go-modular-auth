@@ -150,11 +150,44 @@ type JWKS struct {
 //	func (r *GormJWKRepository) DeleteKey(ctx context.Context, id string) error {
 //		return r.db.WithContext(ctx).Where("id = ?", id).Delete(&jwt.JWKRecord{}).Error
 //	}
+//
+// # Storage and Caching Recommendation (In-Memory Key Caching):
+//
+// Cryptographic signing keys (JWKs) change infrequently. Caching the active signing key and
+// public key set in local application memory avoids redundant database queries on token issuance.
+//
+// Recommended In-Memory Decorator Example:
+//
+//	type CachedJWKRepository struct {
+//		dbRepo jwt.Repository
+//		mu     sync.RWMutex
+//		latest *jwt.JWKRecord
+//		byID   map[string]*jwt.JWKRecord
+//	}
+//
+//	func (r *CachedJWKRepository) GetLatestKey(ctx context.Context) (*jwt.JWKRecord, error) {
+//		r.mu.RLock()
+//		if r.latest != nil {
+//			defer r.mu.RUnlock()
+//			return r.latest, nil
+//		}
+//		r.mu.RUnlock()
+//		rec, err := r.dbRepo.GetLatestKey(ctx)
+//		if err == nil {
+//			r.mu.Lock()
+//			r.latest = rec
+//			r.mu.Unlock()
+//		}
+//		return rec, err
+//	}
 type Repository interface {
 	// GetLatestKey retrieves the most recently created signing key record.
 	//
 	// Function:
 	//   Used during initialization and token signing to acquire the active private key.
+	//
+	// Storage:
+	//   Both (Cache-Aside Strategy) - Cached in memory/Redis to eliminate DB lookups per token signing.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -165,12 +198,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   SELECT id, public_key, private_key, alg, crv, created_at, expires_at FROM jwks ORDER BY created_at DESC LIMIT 1;
+	//
+	// Example Cache (In-Memory/Redis):
+	//   val, err := rdb.Get(ctx, "jwks:latest").Bytes()
 	GetLatestKey(ctx context.Context) (*JWKRecord, error)
 
 	// GetKeyByID retrieves a specific key-pair record by its unique Key ID ("kid").
 	//
 	// Function:
 	//   Used during token verification to locate the public/private key matching the token's header 'kid'.
+	//
+	// Storage:
+	//   Both (Cache-Aside Strategy) - Cached in memory/Redis by kid.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -182,12 +221,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   SELECT id, public_key, private_key, alg, crv, created_at, expires_at FROM jwks WHERE id = $1 LIMIT 1;
+	//
+	// Example Cache (In-Memory/Redis):
+	//   val, err := rdb.Get(ctx, "jwks:kid:" + id).Bytes()
 	GetKeyByID(ctx context.Context, id string) (*JWKRecord, error)
 
 	// GetAllKeys retrieves all persisted key records.
 	//
 	// Function:
 	//   Used to assemble the public JWKS exposed to clients and microservices.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational key set persistence.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -205,6 +250,9 @@ type Repository interface {
 	// Function:
 	//   Invoked during initial bootstrap or key rotation to persist the new key pair.
 	//
+	// Storage:
+	//   Database (GORM / SQL) - Persistent storage for cryptographic key pairs.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - record: Key pair record containing public JWK JSON and (optionally encrypted) private key.
@@ -220,6 +268,9 @@ type Repository interface {
 	//
 	// Function:
 	//   Optional maintenance operation for purging revoked or expired keys.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Persistent record removal.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.

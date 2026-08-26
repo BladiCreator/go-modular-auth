@@ -77,52 +77,261 @@ type ListUsersFilter struct {
 
 // Repository defines the persistent storage contract required by the Admin plugin.
 // Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, SQLite, MongoDB, GORM).
+//
+// # Implementation Example (GORM / database/sql):
+//
+//	type GormAdminRepository struct {
+//		db *gorm.DB
+//	}
+//
+//	func (r *GormAdminRepository) GetUserByID(ctx context.Context, id string) (*entity.User, error) {
+//		var u entity.User
+//		if err := r.db.WithContext(ctx).Where("id = ?", id).First(&u).Error; err != nil {
+//			if errors.Is(err, gorm.ErrRecordNotFound) {
+//				return nil, admin.ErrUserNotFound
+//			}
+//			return nil, err
+//		}
+//		return &u, nil
+//	}
 type Repository interface {
 	// GetUserByID retrieves a user entity matching the provided unique identifier.
-	// Example SQL: SELECT id, name, email, email_verified, two_factor_enabled, role, banned, ban_reason, ban_expires, created_at, updated_at FROM users WHERE id = $1 LIMIT 1;
+	//
+	// Function:
+	//   Used during admin user detail lookup, role updates, and account ban/unban checks.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user entity query by primary key.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - id: Unique primary key identifier of the user.
+	//
+	// Returns:
+	//   - *entity.User: Matching user profile.
+	//   - error: ErrUserNotFound if missing.
+	//
+	// Example SQL:
+	//   SELECT id, name, email, email_verified, two_factor_enabled, role, banned, ban_reason, ban_expires, created_at, updated_at FROM users WHERE id = $1 LIMIT 1;
 	GetUserByID(ctx context.Context, id string) (*entity.User, error)
 
 	// GetUserByEmail retrieves a user entity matching the provided normalized email address.
-	// Example SQL: SELECT id, name, email, email_verified, two_factor_enabled, role, banned, ban_reason, ban_expires, created_at, updated_at FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;
+	//
+	// Function:
+	//   Used in user search or when checking duplicate email existence during admin user creation.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Query user by normalized email.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - email: Normalized email address string.
+	//
+	// Returns:
+	//   - *entity.User: Matching user profile.
+	//   - error: ErrUserNotFound if missing.
+	//
+	// Example SQL:
+	//   SELECT id, name, email, email_verified, two_factor_enabled, role, banned, ban_reason, ban_expires, created_at, updated_at FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 
 	// CreateUser persists a newly created user entity in storage.
-	// Example SQL: INSERT INTO users (id, name, email, role, banned, ban_reason, ban_expires, email_verified, two_factor_enabled, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+	//
+	// Function:
+	//   Called by administrators creating accounts directly via the administrative portal.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - User domain entity creation.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - params: Parameters for creating a user.
+	//
+	// Returns:
+	//   - *entity.User: Newly created user record.
+	//   - error: ErrUserAlreadyExists on email conflict.
+	//
+	// Example SQL:
+	//   INSERT INTO users (id, name, email, role, banned, ban_reason, ban_expires, email_verified, two_factor_enabled, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
 	CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error)
 
 	// UpdateUser updates modified fields of an existing user profile in storage.
-	// Example SQL: UPDATE users SET name = $1, email = $2, role = $3, banned = $4, ban_reason = $5, ban_expires = $6, email_verified = $7, updated_at = $8 WHERE id = $9;
+	//
+	// Function:
+	//   Used when setting roles, banning/unbanning users, or updating profile attributes.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user table update.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - user: Modified User domain entity.
+	//
+	// Returns:
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   UPDATE users SET name = $1, email = $2, role = $3, banned = $4, ban_reason = $5, ban_expires = $6, email_verified = $7, updated_at = $8 WHERE id = $9;
 	UpdateUser(ctx context.Context, user *entity.User) error
 
 	// DeleteUser removes a user record and their related accounts and credentials from storage.
-	// Example SQL: DELETE FROM users WHERE id = $1;
+	//
+	// Function:
+	//   Called when an administrator permanently deletes a user account.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user record deletion.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - id: Target user primary key ID.
+	//
+	// Returns:
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   DELETE FROM users WHERE id = $1;
 	DeleteUser(ctx context.Context, id string) error
 
-	// ListUsers returns a paginated and filtered list of user records matching the filter criteria.
-	// Example SQL: SELECT id, name, email, role, banned, ban_reason, ban_expires, email_verified, created_at, updated_at FROM users WHERE email ILIKE '%' || $1 || '%' ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+	// ListUsers returns a paginated and filtered list of user records matching search filter criteria.
+	//
+	// Function:
+	//   Used by admin dashboard user management tables.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Paginated relational query with search and filters.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - filter: ListUsersFilter defining search terms, filters, sorting, and pagination parameters.
+	//
+	// Returns:
+	//   - []*entity.User: Slice of matching user entities.
+	//   - int64: Total total matching record count.
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   SELECT id, name, email, role, banned, ban_reason, ban_expires, email_verified, created_at, updated_at FROM users WHERE email ILIKE '%' || $1 || '%' ORDER BY created_at DESC LIMIT $2 OFFSET $3;
 	ListUsers(ctx context.Context, filter ListUsersFilter) ([]*entity.User, int64, error)
 
 	// LinkCredentialAccount links or updates provider credential password hashes for a user.
-	// Example SQL: INSERT INTO accounts (id, user_id, provider_id, password_hash, created_at, updated_at) VALUES ($1, $2, 'credential', $3, $4, $5) ON CONFLICT (user_id, provider_id) DO UPDATE SET password_hash = $3, updated_at = $5;
+	//
+	// Function:
+	//   Called when an admin resets or assigns a new password to a user account.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Credential account update or insert.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Target user ID.
+	//   - passwordHash: New hashed password.
+	//
+	// Returns:
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   INSERT INTO accounts (id, user_id, provider_id, password_hash, created_at, updated_at) VALUES ($1, $2, 'credential', $3, $4, $5) ON CONFLICT (user_id, provider_id) DO UPDATE SET password_hash = $3, updated_at = $5;
 	LinkCredentialAccount(ctx context.Context, userID, passwordHash string) error
 
 	// CreateSession persists a new session entity (supporting impersonation tracking).
-	// Example SQL: INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+	//
+	// Function:
+	//   Called during impersonation flows when an administrator impersonates a target user.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Active session creation.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - session: DTO for session creation.
+	//
+	// Returns:
+	//   - *entity.Session: Active session entity.
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 	CreateSession(ctx context.Context, session *dto.CreateSessionParams) (*entity.Session, error)
 
 	// GetSessionByToken retrieves an active session by its raw token string.
-	// Example SQL: SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE token = $1 LIMIT 1;
+	//
+	// Function:
+	//   Used during impersonation verification and stop-impersonation flows.
+	//
+	// Storage:
+	//   Both (Cache-Aside Strategy) - Cached in Redis (`session:<token>`) for fast session validation.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - token: Session token string.
+	//
+	// Returns:
+	//   - *entity.Session: Session entity.
+	//   - error: ErrAdminSessionNotFound if missing.
+	//
+	// Example SQL:
+	//   SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE token = $1 LIMIT 1;
+	//
+	// Example Cache (Redis):
+	//   val, err := rdb.Get(ctx, "session:" + token).Bytes()
 	GetSessionByToken(ctx context.Context, token string) (*entity.Session, error)
 
 	// ListSessionsByUserID lists all active sessions belonging to the specified user.
-	// Example SQL: SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE user_id = $1;
+	//
+	// Function:
+	//   Used in admin user session management panels.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user session list query.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Target user ID.
+	//
+	// Returns:
+	//   - []*entity.Session: List of active sessions.
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE user_id = $1;
 	ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error)
 
 	// DeleteSession deletes a specific session by token.
-	// Example SQL: DELETE FROM sessions WHERE token = $1;
+	//
+	// Function:
+	//   Called when an admin revokes a single session.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Session record deletion.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - token: Target session token string.
+	//
+	// Returns:
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   DELETE FROM sessions WHERE token = $1;
 	DeleteSession(ctx context.Context, token string) error
 
-	// DeleteSessionsByUserID deletes all active sessions belonging to a user (used during bans and global revocation).
-	// Example SQL: DELETE FROM sessions WHERE user_id = $1;
+	// DeleteSessionsByUserID deletes all active sessions belonging to a user.
+	//
+	// Function:
+	//   Used during account bans, security locks, and global session revocation.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Bulk user session deletion.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation context.
+	//   - userID: Target user ID.
+	//
+	// Returns:
+	//   - error: Nil on success.
+	//
+	// Example SQL:
+	//   DELETE FROM sessions WHERE user_id = $1;
 	DeleteSessionsByUserID(ctx context.Context, userID string) error
 }

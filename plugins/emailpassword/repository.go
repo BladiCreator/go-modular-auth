@@ -86,6 +86,9 @@ type Repository interface {
 	// Function:
 	//   Used during SignUp, SignIn, ForgotPassword, and SendVerificationEmail to check user existence and fetch profile details.
 	//
+	// Storage:
+	//   Database (GORM / SQL) - Relational user entity query by email.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
 	//   - email: The normalized email address to query.
@@ -102,6 +105,9 @@ type Repository interface {
 	//
 	// Function:
 	//   Used during ChangePassword, ResetPassword, VerifyPassword, and VerifyEmail flows.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Primary key user lookup.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
@@ -121,6 +127,9 @@ type Repository interface {
 	//   Called during SignUp to persist the primary user entity. Plugins may inspect or modify
 	//   params.Extra before this method is called via EventSignUpBefore.
 	//
+	// Storage:
+	//   Database (GORM / SQL) - User domain entity creation.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
 	//   - params: Pointer to CreateUserParams containing Email, Name, PasswordHash, and Extra metadata.
@@ -138,6 +147,9 @@ type Repository interface {
 	// Function:
 	//   Used when updating user metadata, email verification state (email_verified = true), or profile attributes.
 	//
+	// Storage:
+	//   Database (GORM / SQL) - User record update.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
 	//   - user: The updated user entity to persist.
@@ -153,6 +165,9 @@ type Repository interface {
 	//
 	// Function:
 	//   Used during SignIn, ChangePassword, and VerifyPassword to retrieve stored hashed passwords (provider: "credential").
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Account credentials query.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
@@ -172,6 +187,9 @@ type Repository interface {
 	// Function:
 	//   Called immediately after CreateUser during SignUp to link credential passwords to the user.
 	//
+	// Storage:
+	//   Database (GORM / SQL) - Account record creation.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
 	//   - account: The credentials account entity to insert.
@@ -187,6 +205,9 @@ type Repository interface {
 	//
 	// Function:
 	//   Called during ChangePassword and ResetPassword to overwrite the stored password hash.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Password hash update.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
@@ -205,6 +226,9 @@ type Repository interface {
 	// Function:
 	//   Called during ForgotPassword and SendVerificationEmail to save the generated token and expiration timestamp.
 	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Short-lived verification token.
+	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
 	//   - token: The VerificationToken entity (Identifier/Email, Token, ExpiresAt).
@@ -214,12 +238,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   INSERT INTO verification_tokens (identifier, token, expires_at) VALUES ($1, $2, $3);
+	//
+	// Example Cache (Redis):
+	//   err := rdb.Set(ctx, "reset_token:" + token.Token, token.Identifier, ttl).Err()
 	CreateVerificationToken(ctx context.Context, token *entity.VerificationToken) error
 
 	// GetVerificationToken retrieves an active token record by its token string.
 	//
 	// Function:
 	//   Called during ResetPassword and VerifyEmail to validate token existence and verify whether it has expired.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Verification token lookup.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
@@ -231,12 +261,18 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   SELECT identifier, token, expires_at FROM verification_tokens WHERE token = $1 LIMIT 1;
+	//
+	// Example Cache (Redis):
+	//   val, err := rdb.Get(ctx, "reset_token:" + token).Bytes()
 	GetVerificationToken(ctx context.Context, token string) (*entity.VerificationToken, error)
 
 	// DeleteVerificationToken removes a consumed or invalidated token from storage.
 	//
 	// Function:
 	//   Called immediately upon successful password reset or email verification to guarantee single-use token consumption.
+	//
+	// Storage:
+	//   Cache (Redis / In-Memory TTL) - Verification token key eviction.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
@@ -247,5 +283,8 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   DELETE FROM verification_tokens WHERE token = $1;
+	//
+	// Example Cache (Redis):
+	//   err := rdb.Del(ctx, "reset_token:" + token).Err()
 	DeleteVerificationToken(ctx context.Context, token string) error
 }

@@ -49,11 +49,45 @@ var (
 //		}
 //		return &s, nil
 //	}
+//
+// # Storage and Caching Recommendation (Redis / Cache-Aside Strategy):
+//
+// Because `GetSessionByToken` is invoked on **every Bearer-authenticated API request**, querying
+// the relational database on every HTTP call can become a performance bottleneck.
+//
+// Decorating your database repository with Redis or an in-memory Cache-Aside wrapper is strongly recommended:
+//
+//	type CachedBearerRepository struct {
+//		dbRepo bearer.Repository
+//		redis  *redis.Client
+//		ttl    time.Duration
+//	}
+//
+//	func (r *CachedBearerRepository) GetSessionByToken(ctx context.Context, token string) (*entity.Session, error) {
+//		cacheKey := "session:" + token
+//		val, err := r.redis.Get(ctx, cacheKey).Bytes()
+//		if err == nil {
+//			var sess entity.Session
+//			if json.Unmarshal(val, &sess) == nil {
+//				return &sess, nil // Fast Cache Hit ($O(1)$ response)
+//			}
+//		}
+//		sess, err := r.dbRepo.GetSessionByToken(ctx, token)
+//		if err != nil {
+//			return nil, err
+//		}
+//		bytes, _ := json.Marshal(sess)
+//		r.redis.Set(ctx, cacheKey, bytes, r.ttl)
+//		return sess, nil
+//	}
 type Repository interface {
 	// GetSessionByToken retrieves an active session by its raw token identifier.
 	//
 	// Function:
-	//   Queries the persistent storage for the session entity associated with the verified raw token string.
+	//   Queries storage for the session entity associated with the verified raw token string.
+	//
+	// Storage:
+	//   Both (Cache-Aside Strategy) - High-frequency lookup per HTTP request.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -65,5 +99,8 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   SELECT id, user_id, token, expires_at, created_at, ip_address, user_agent FROM sessions WHERE token = $1 LIMIT 1;
+	//
+	// Example Cache (Redis):
+	//   val, err := rdb.Get(ctx, "session:" + token).Bytes()
 	GetSessionByToken(ctx context.Context, token string) (*entity.Session, error)
 }
