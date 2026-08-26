@@ -14,6 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauthproxy"
 	"github.com/BladiCreator/go-modular-auth/plugins/oidcprovider"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
@@ -1171,6 +1172,32 @@ func OTT(repo ott.Repository, opts ...ott.Option) *ott.Plugin {
 func Captcha(opts ...captcha.Option) *captcha.Plugin {
 	return captcha.New(opts...)
 }
+
+// OAuthProxy instantiates a new OAuth Proxy authentication plugin configured with functional options.
+//
+// The OAuth Proxy plugin resolves OAuth 2.0 / OIDC authentication in preview or dynamic deployment environments
+// (e.g. Vercel Preview Deployments, Netlify Previews, local dev) by securely proxying authentication through a Production server.
+//
+// Example:
+//
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.OAuthProxy(
+//				oauthproxy.WithProductionURL("https://myapp.com"),
+//				oauthproxy.WithSecret("shared-secret-key-123"),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	proxyPlugin := auth.Plugin[oauthproxy.Plugin](app)
+//	_ = proxyPlugin.ServeOAuthProxyCallback
+func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
+	return oauthproxy.New(opts...)
+}
+
 
 
 
