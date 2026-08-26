@@ -2,8 +2,6 @@ package ott
 
 import (
 	"context"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/plugin"
@@ -187,31 +185,4 @@ func (p *Plugin) VerifyToken(ctx context.Context, params VerifyTokenParams) (*Ve
 		Session: session,
 		User:    user,
 	}, nil
-}
-
-// AttachOttHeader generates an OTT for the given session and sets the set-ott HTTP header on the response writer.
-func (p *Plugin) AttachOttHeader(w http.ResponseWriter, sessionToken string) error {
-	if w == nil || sessionToken == "" {
-		return ErrInvalidParameter
-	}
-
-	res, err := p.GenerateToken(context.Background(), GenerateTokenParams{
-		SessionToken: sessionToken,
-		IsClientReq:  false,
-	})
-	if err != nil {
-		return err
-	}
-
-	w.Header().Set("set-ott", res.Token)
-
-	// Expose header for CORS requests if not present
-	existingExpose := w.Header().Get("Access-Control-Expose-Headers")
-	if existingExpose == "" {
-		w.Header().Set("Access-Control-Expose-Headers", "set-ott")
-	} else if !strings.Contains(strings.ToLower(existingExpose), "set-ott") {
-		w.Header().Set("Access-Control-Expose-Headers", existingExpose+", set-ott")
-	}
-
-	return nil
 }

@@ -59,5 +59,7 @@ func (p *Plugin) Config() Config {
 
 // Repository returns the underlying storage repository.
 func (p *Plugin) Repository() Repository {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return p.repo
 }

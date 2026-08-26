@@ -51,7 +51,7 @@ func TestCaptchaPlugin_UnprotectedAndExemptPath(t *testing.T) {
 		WithExemptEndpoints([]string{"/sign-in/email-otp"}),
 	)
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	}))
@@ -76,7 +76,7 @@ func TestCaptchaPlugin_UnprotectedAndExemptPath(t *testing.T) {
 func TestCaptchaPlugin_MissingSecretKey(t *testing.T) {
 	p := New(WithEndpoints([]string{"/sign-up/email"}))
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -95,7 +95,7 @@ func TestCaptchaPlugin_MissingHeader(t *testing.T) {
 		WithEndpoints([]string{"/sign-up/email"}),
 	)
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -147,7 +147,7 @@ func TestCaptchaPlugin_Turnstile_SuccessAndFailures(t *testing.T) {
 		WithAllowedHostnames([]string{"example.com"}),
 	)
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("Authorized"))
 	}))
@@ -168,7 +168,7 @@ func TestCaptchaPlugin_Turnstile_SuccessAndFailures(t *testing.T) {
 		WithSiteVerifyURLOverride(ts.URL),
 		WithExpectedAction("signup"),
 	)
-	handlerAction := pAction.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	handlerAction := pAction.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	reqAction := httptest.NewRequest(http.MethodPost, "/sign-in/email", nil)
 	reqAction.Header.Set(HeaderCaptchaResponse, "valid-token")
 	recAction := httptest.NewRecorder()
@@ -185,7 +185,7 @@ func TestCaptchaPlugin_Turnstile_SuccessAndFailures(t *testing.T) {
 		WithSiteVerifyURLOverride(ts.URL),
 		WithAllowedHostnames([]string{"otherdomain.com"}),
 	)
-	handlerHost := pHost.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	handlerHost := pHost.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	reqHost := httptest.NewRequest(http.MethodPost, "/sign-in/email", nil)
 	reqHost.Header.Set(HeaderCaptchaResponse, "valid-token")
 	recHost := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestCaptchaPlugin_GoogleRecaptcha_Score(t *testing.T) {
 		WithMinScore(0.5),
 	)
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -255,7 +255,7 @@ func TestCaptchaPlugin_HCaptcha_And_CaptchaFox(t *testing.T) {
 		WithSiteKey("site-123"),
 		WithSiteVerifyURLOverride(ts.URL),
 	)
-	handlerH := pH.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handlerH := pH.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -275,7 +275,7 @@ func TestCaptchaPlugin_HCaptcha_And_CaptchaFox(t *testing.T) {
 		WithSiteKey("site-123"),
 		WithSiteVerifyURLOverride(ts.URL),
 	)
-	handlerFox := pFox.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handlerFox := pFox.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -302,7 +302,7 @@ func TestCaptchaPlugin_Timeout(t *testing.T) {
 		WithTimeout(30*time.Millisecond),
 	)
 
-	handler := p.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	handler := p.Protect()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	req := httptest.NewRequest(http.MethodPost, "/sign-up/email", nil)
 	req.Header.Set(HeaderCaptchaResponse, "token")

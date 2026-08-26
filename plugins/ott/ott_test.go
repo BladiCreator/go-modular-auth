@@ -303,14 +303,14 @@ func TestOTT_DisableClientRequest(t *testing.T) {
 	}
 }
 
-func TestOTT_AttachOttHeader(t *testing.T) {
+func TestOTT_AttachHeader(t *testing.T) {
 	repo, _, session := setupTest(t)
 	p := ott.New(repo, ott.WithSetOttHeaderOnNewSession(true))
 
 	rec := httptest.NewRecorder()
-	err := p.AttachOttHeader(rec, session.Token)
+	err := p.AttachHeader(rec, session.Token)
 	if err != nil {
-		t.Fatalf("AttachOttHeader failed: %v", err)
+		t.Fatalf("AttachHeader failed: %v", err)
 	}
 
 	ottHeader := rec.Header().Get("set-ott")

@@ -293,7 +293,7 @@ func TestHTTPMiddleware(t *testing.T) {
 		t.Fatalf("CreateKey failed: %v", err)
 	}
 
-	handler := plugin.HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := plugin.Authenticate()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqUser, ok := r.Context().Value(apikey.UserContextKey).(*entity.User)
 		if !ok || reqUser == nil {
 			t.Fatal("User not found in request context")

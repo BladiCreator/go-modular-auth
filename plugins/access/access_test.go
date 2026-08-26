@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 
@@ -574,4 +576,44 @@ func TestPlugin_LifecycleAndEvents(t *testing.T) {
 	if !authorizedEventReceived {
 		t.Errorf("expected EventAccessAuthorized to be dispatched and received")
 	}
+}
+
+func TestAccessHTTPMiddleware(t *testing.T) {
+	p := plugins.Access(testMasterStatements, access.WithInitialRoles(map[string]access.Statements{
+		"admin":  {"project": {"create", "read"}},
+		"viewer": {"project": {"read"}},
+	}))
+
+	handler := p.RequirePermission("project", "create")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Run("missing subject roles returns 403", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/projects", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected status 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("unauthorized role returns 403", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/projects", nil)
+		req = req.WithContext(access.WithSubjectRoles(req.Context(), "viewer"))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected status 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("authorized role returns 200", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/projects", nil)
+		req = req.WithContext(access.WithSubjectRoles(req.Context(), "admin"))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", rec.Code)
+		}
+	})
 }

@@ -158,6 +158,7 @@ func TwoFactor(repo twofactor.Repository, opts ...twofactor.Option) *twofactor.P
 //   - FormatHeader(token string) string: Format a token into standard "Bearer <token>" header value.
 //   - FormatAuthTokenHeader(token string) (headerName, headerValue string): Generate "set-auth-token" response header.
 //   - ExposedHeaders() string: Return CORS headers to expose to browsers ("set-auth-token").
+//   - Authenticate() func(next http.Handler) http.Handler: Net/HTTP middleware for authenticating Bearer token request headers.
 //
 // # Configuration Options
 //
@@ -209,6 +210,7 @@ func Bearer(repo bearer.Repository, opts ...bearer.Option) *bearer.Plugin {
 //   - GetJWKS(ctx context.Context, params GetJWKSParams) (*GetJWKSResult, error): Serve RFC 7517 JSON Web Key Set containing active and valid grace-period public keys.
 //   - GetToken(ctx context.Context, params GetTokenParams) (*GetTokenResult, error): Issue a signed JWT for an authenticated user session.
 //   - RotateKeys(ctx context.Context, params RotateKeysParams) (*RotateKeysResult, error): Perform on-demand cryptographic key rotation, generating new active key pair.
+//   - Authenticate() func(next http.Handler) http.Handler: Net/HTTP middleware for authenticating JWT tokens from incoming Authorization headers.
 //
 // # Configuration Options
 //

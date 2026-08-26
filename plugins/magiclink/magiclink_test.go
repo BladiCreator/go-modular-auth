@@ -321,7 +321,7 @@ func TestMagicLink_HTTPHandlers(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	p.HandleSignInMagicLink(w, req)
+	p.ServeSignIn(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected HTTP 200, got %d", w.Code)
@@ -332,7 +332,7 @@ func TestMagicLink_HTTPHandlers(t *testing.T) {
 	reqVerify := httptest.NewRequest(http.MethodGet, verifyURL, nil)
 	wVerify := httptest.NewRecorder()
 
-	p.HandleVerifyMagicLink(wVerify, reqVerify)
+	p.ServeVerify(wVerify, reqVerify)
 
 	if wVerify.Code != http.StatusFound {
 		t.Fatalf("expected HTTP 302 Found redirect, got %d", wVerify.Code)
