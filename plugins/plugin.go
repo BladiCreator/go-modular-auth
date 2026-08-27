@@ -11,6 +11,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
+	"github.com/BladiCreator/go-modular-auth/plugins/genericoauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/lastloginmethod"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
@@ -715,6 +716,63 @@ func OAuth2(repo oauth2.Repository, opts ...oauth2.Option) *oauth2.Plugin {
 	return oauth2.New(repo, opts...)
 }
 
+// GenericOAuth instantiates a new Generic OAuth & OIDC social authentication plugin configured with an optional repository and options.
+//
+// The GenericOAuth plugin enables dynamic integration with any OAuth 2.0 or OpenID Connect (OIDC) identity provider,
+// supporting automatic OIDC discovery (/.well-known/openid-configuration), PKCE (S256) code challenge security,
+// state token verification, user lookup/auto-creation, account linking to existing user profiles, session issuance,
+// and preset provider builders (Auth0, Okta, Keycloak, Microsoft Entra ID, Slack, HubSpot, Line, Patreon, etc.).
+//
+// # Available Methods
+//
+//   - SignIn(ctx context.Context, providerID string, callbackURL string) (*SignInData, error): Initiate an OAuth authorization flow for the specified provider.
+//   - Callback(ctx context.Context, providerID string, code string, state string, codeVerifier string) (*entity.User, *entity.Session, *Tokens, error): Process authorization code exchange, user lookup/registration, account linking, and session creation.
+//   - LinkAccount(ctx context.Context, userID string, providerID string, code string, codeVerifier string) (*entity.Account, error): Explicitly bind a social provider profile to an existing authenticated user account.
+//   - GetProvider(providerID string) (*ProviderConfig, error): Retrieve registered configuration for a specific provider.
+//   - Config() Config: Retrieve the active configuration of the Generic OAuth plugin.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - genericoauth.WithProvider(cfg *genericoauth.ProviderConfig): Register an OAuth/OIDC provider configuration.
+//   - genericoauth.WithHTTPClient(client *http.Client): Override the HTTP client used for discovery, token exchange, and UserInfo calls.
+//   - genericoauth.WithCookieConfig(cfg genericoauth.CookieConfig): Customize cookie settings for state and PKCE tracking.
+//   - genericoauth.WithStateTTL(ttl time.Duration): Set maximum expiration duration for OAuth state and PKCE verifier tokens (default: 10 minutes).
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.GenericOAuth(
+//				storage,
+//				genericoauth.WithProvider(&genericoauth.ProviderConfig{
+//					ProviderID:   "github",
+//					ClientID:     "my-client-id",
+//					ClientSecret: "my-client-secret",
+//					AuthURL:      "https://github.com/login/oauth/authorize",
+//					TokenURL:     "https://github.com/login/oauth/access_token",
+//					UserInfoURL:  "https://api.github.com/user",
+//					Scopes:       []string{"read:user", "user:email"},
+//				}),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	signInData, err := auth.Plugin[genericoauth.Plugin](app).SignIn(ctx, "github", "https://myapp.com/callback/github")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = signInData.URL
+func GenericOAuth(repo genericoauth.Repository, opts ...genericoauth.Option) *genericoauth.Plugin {
+	return genericoauth.New(repo, opts...)
+}
+
 // Access instantiates a new Access Control (Granular Permissions & RBAC/ABAC) plugin configured with master statements and options.
 //
 // The Access plugin provides sub-microsecond in-memory permission evaluation, boolean logic combinators (AND/OR),
@@ -1180,6 +1238,20 @@ func Captcha(opts ...captcha.Option) *captcha.Plugin {
 // The OAuth Proxy plugin resolves OAuth 2.0 / OIDC authentication in preview or dynamic deployment environments
 // (e.g. Vercel Preview Deployments, Netlify Previews, local dev) by securely proxying authentication through a Production server.
 //
+// # Available Methods
+//
+//   - ServeOAuthProxyCallback(w http.ResponseWriter, r *http.Request): HTTP handler to verify and proxy incoming OAuth callback payloads from preview environments to production.
+//   - RedirectToProduction(w http.ResponseWriter, r *http.Request, targetURL string): Redirect authentication requests from preview instances back to the main production server.
+//   - VerifyProxyPayload(r *http.Request) (*ProxyPayload, error): Cryptographically verify signed payload parameters from proxy requests using HMAC SHA-256.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - oauthproxy.WithProductionURL(url string): Set base URL of the primary production server (e.g. "https://myapp.com").
+//   - oauthproxy.WithSecret(secret string): Set shared HMAC SHA-256 secret key for signing preview/production proxy state.
+//   - oauthproxy.WithAllowedRedirectURLs(urls ...string): Restrict valid preview environment callback URLs.
+//
 // Example:
 //
 //	app, err := auth.New(
@@ -1206,45 +1278,142 @@ func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
 // within the same browser, managing HMAC SHA-256 signed multi-session cookies, active session switching,
 // session limit enforcement, and mass session revocation on sign-out.
 //
+// # Available Methods
+//
+//   - ListDeviceSessions(ctx context.Context, r *http.Request) (*ListDeviceSessionsResult, error): List all active sessions registered on the current client device.
+//   - SetActiveSession(ctx context.Context, params SetActiveSessionParams) (*SetActiveSessionResult, error): Switch the active account/session on the current client device.
+//   - RevokeDeviceSession(ctx context.Context, params RevokeDeviceSessionParams) (*RevokeDeviceSessionResult, error): Revoke a specific multi-session from the client device.
+//   - AfterSessionCreated(ctx context.Context, w http.ResponseWriter, r *http.Request, newSession *entity.Session) error: Lifecycle hook to enforce session limits and emit multi-session cookies.
+//   - AfterSignOut(ctx context.Context, w http.ResponseWriter, r *http.Request) error: Perform mass revocation of all multi-sessions registered on the client device.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - multisession.WithMaximumSessions(max int): Set maximum allowed concurrent active sessions per device (default: 5).
+//   - multisession.WithCookiePrefix(prefix string): Set prefix for multi-session cookies (default: "better-auth").
+//   - multisession.WithSecret(secret string): Set HMAC SHA-256 secret key for signing multi-session cookies.
+//   - multisession.WithOnSessionActivated(fn SessionActivatedCallback): Callback invoked when a device session is set active.
+//   - multisession.WithOnSessionRevoked(fn SessionRevokedCallback): Callback invoked when a device session is revoked.
+//
 // Example:
 //
-//	repo := memory.New()
-//	multiSessionPlugin := plugins.MultiSession(
-//		repo,
-//		multisession.WithMaximumSessions(5),
-//		multisession.WithCookiePrefix("better-auth"),
-//		multisession.WithSecret("my-hmac-secret-key"),
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.MultiSession(
+//				storage,
+//				multisession.WithMaximumSessions(5),
+//				multisession.WithCookiePrefix("better-auth"),
+//				multisession.WithSecret("my-hmac-secret-key"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	multiSessionPlugin := auth.Plugin[multisession.Plugin](app)
+//	_ = multiSessionPlugin
 func MultiSession(repo multisession.Repository, opts ...multisession.Option) *multisession.Plugin {
 	return multisession.New(repo, opts...)
 }
 
 // LastLoginMethod instantiates a new LastLoginMethod authentication plugin configured with functional options.
 //
-// The LastLoginMethod plugin automatically tracks the authentication method used by a user (e.g. email, google, github, passkey, magic-link, siwe),
+// The LastLoginMethod plugin automatically tracks the authentication method used by a user (e.g., email, google, github, passkey, magic-link, siwe),
 // storing it in a client-readable browser cookie ("better-auth.last_used_login_method" with HttpOnly=false) and optionally persisting it in the User entity in database.
+//
+// # Available Methods
+//
+//   - SetLastLoginMethod(ctx context.Context, w http.ResponseWriter, r *http.Request, userID, method string) (string, error): Explicitly record a user's last login method.
+//   - GetLastLoginMethod(ctx context.Context, r *http.Request, userID string) (string, error): Retrieve last used login method from HTTP request cookies or DB.
+//   - ClearLastLoginMethod(ctx context.Context, w http.ResponseWriter): Expire the last login method cookie and emit event.
+//   - Middleware() func(next http.Handler) http.Handler: Net/HTTP middleware to automatically intercept responses (2xx), resolve login method, and emit cookie/DB update.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "better-auth.last_used_login_method").
+//   - lastloginmethod.WithMaxAge(duration time.Duration): Cookie expiration lifetime (default: 30 days).
+//   - lastloginmethod.WithCookieAttributes(domain, path string, sameSite http.SameSite, secure bool): Configure cookie attributes.
+//   - lastloginmethod.WithStoreInDatabase(store bool): Enable or disable persisting last_login_method in User DB record.
+//   - lastloginmethod.WithRouteMapping(pathPattern, method string): Add or override a path-to-method mapping rule.
+//   - lastloginmethod.WithRouteMappings(routes map[string]string): Bulk configure custom path-to-method mapping rules.
+//   - lastloginmethod.WithDisableDefaultRoutes(disable bool): Disable built-in route heuristics.
+//   - lastloginmethod.WithCustomResolver(fn ResolveMethodFunc): Custom function to resolve login method from HTTP request.
+//   - lastloginmethod.WithBeforeStoreCookie(fn BeforeStoreCookieFunc): GDPR consent check callback before issuing cookie.
 //
 // Example:
 //
-//	repo := memory.New()
-//	lastLoginPlugin := plugins.LastLoginMethod(
-//		lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
-//		lastloginmethod.WithMaxAge(30 * 24 * time.Hour),
+//	ctx := context.Background()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.LastLoginMethod(
+//				lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
+//				lastloginmethod.WithMaxAge(30 * 24 * time.Hour),
+//				lastloginmethod.WithRouteMapping("/custom/login", "custom-sso"),
+//			),
+//		),
 //	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	lastLoginPlugin := auth.Plugin[lastloginmethod.Plugin](app)
+//	_ = lastLoginPlugin
 func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 	return lastloginmethod.New(opts...)
 }
 
-// LastLoginMethodWithRepository instantiates a new LastLoginMethod authentication plugin configured with a Repository implementation for database persistence.
+// LastLoginMethodWithRepository instantiates a new LastLoginMethod authentication plugin configured with a persistence repository and options.
+//
+// The LastLoginMethodWithRepository plugin automatically tracks the authentication method used by a user (e.g., email, google, github, passkey, magic-link, siwe),
+// storing it in a client-readable browser cookie ("better-auth.last_used_login_method" with HttpOnly=false) and persisting it to the User entity in database storage via the provided Repository.
+//
+// # Available Methods
+//
+//   - SetLastLoginMethod(ctx context.Context, w http.ResponseWriter, r *http.Request, userID, method string) (string, error): Explicitly record a user's last login method and persist to database.
+//   - GetLastLoginMethod(ctx context.Context, r *http.Request, userID string) (string, error): Retrieve last used login method from HTTP request cookies or fallback to database lookup.
+//   - ClearLastLoginMethod(ctx context.Context, w http.ResponseWriter): Expire the last login method cookie and emit event.
+//   - Middleware() func(next http.Handler) http.Handler: Net/HTTP middleware to automatically intercept responses (2xx), resolve login method, update cookie, and persist to database.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "better-auth.last_used_login_method").
+//   - lastloginmethod.WithMaxAge(duration time.Duration): Cookie expiration lifetime (default: 30 days).
+//   - lastloginmethod.WithCookieAttributes(domain, path string, sameSite http.SameSite, secure bool): Configure cookie attributes.
+//   - lastloginmethod.WithStoreInDatabase(store bool): Enable or disable persisting last_login_method in User DB record (default: true when repository provided).
+//   - lastloginmethod.WithRouteMapping(pathPattern, method string): Add or override a path-to-method mapping rule.
+//   - lastloginmethod.WithRouteMappings(routes map[string]string): Bulk configure custom path-to-method mapping rules.
+//   - lastloginmethod.WithDisableDefaultRoutes(disable bool): Disable built-in route heuristics.
+//   - lastloginmethod.WithCustomResolver(fn ResolveMethodFunc): Custom function to resolve login method from HTTP request.
+//   - lastloginmethod.WithBeforeStoreCookie(fn BeforeStoreCookieFunc): GDPR consent check callback before issuing cookie.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := memory.New()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.LastLoginMethodWithRepository(
+//				storage,
+//				lastloginmethod.WithStoreInDatabase(true),
+//				lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	lastLoginPlugin := auth.Plugin[lastloginmethod.Plugin](app)
+//	_ = lastLoginPlugin
 func LastLoginMethodWithRepository(repo lastloginmethod.Repository, opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 	return lastloginmethod.NewWithRepository(repo, opts...)
 }
-
-
-
-
-
-
-
-
 
