@@ -7,6 +7,8 @@ require (
 	golang.org/x/crypto v0.54.0
 )
 
+require github.com/stripe/stripe-go/v76 v76.25.0 // indirect
+
 require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-webauthn/webauthn v0.12.2

@@ -23,6 +23,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
+	"github.com/BladiCreator/go-modular-auth/plugins/stripe"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
@@ -1416,4 +1417,71 @@ func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 func LastLoginMethodWithRepository(repo lastloginmethod.Repository, opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 	return lastloginmethod.NewWithRepository(repo, opts...)
 }
+
+// Stripe instantiates a new Stripe billing & subscription authentication plugin configured with a mandatory repository and options.
+//
+// The Stripe plugin manages customer billing, checkout sessions, subscription lifecycles, seat-based billing for organizations,
+// cryptographic webhook event verification (including checkout, subscription, and invoice payment events), and net/http middlewares.
+//
+// # Available Methods
+//
+//   - CreateCheckoutSession(ctx context.Context, params stripe.CreateCheckoutParams) (string, error): Create a Stripe Checkout session URL.
+//   - UpgradeSubscription(ctx context.Context, params stripe.UpgradeSubscriptionParams) (*stripe.Subscription, error): Upgrade or downgrade plan or seat count.
+//   - CancelSubscription(ctx context.Context, params stripe.CancelSubscriptionParams) (*stripe.Subscription, error): Cancel subscription immediately or at period end.
+//   - RestoreSubscription(ctx context.Context, subID string) (*stripe.Subscription, error): Revoke scheduled cancellation.
+//   - CreateBillingPortalSession(ctx context.Context, params stripe.BillingPortalParams) (string, error): Generate customer portal URL.
+//   - GetSubscription(ctx context.Context, subID string) (*stripe.Subscription, error): Fetch local subscription record.
+//   - ListSubscriptions(ctx context.Context, referenceID string) ([]*stripe.Subscription, error): List all subscriptions for a referenceId.
+//   - SyncSeats(ctx context.Context, referenceID string, seats int) error: Update seat quantity in Stripe.
+//   - ProcessWebhook(ctx context.Context, payload []byte, signature string) error: Process & verify raw Stripe webhooks.
+//   - HandleWebhook(w http.ResponseWriter, r *http.Request): Net/HTTP handler for Stripe webhooks.
+//   - WebhookHandler() http.Handler: Net/HTTP Handler instance for webhook routing.
+//   - RequireActiveSubscription(allowedPlans ...string) func(http.Handler) http.Handler: Middleware requiring active subscription.
+//   - AuthorizeReference(action string) func(http.Handler) http.Handler: Middleware authorizing referenceId access.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - stripe.WithStripeAPIKey(key string): Stripe secret API key used for initializing Stripe client.
+//   - stripe.WithWebhookSecret(secret string): Secret key used to verify Stripe-Signature HTTP headers.
+//   - stripe.WithCreateCustomerOnSignUp(enable bool): Automatically create Stripe Customer record during sign-up (default: true).
+//   - stripe.WithPlans(plans ...stripe.StripePlan): Define static subscription plans available in the application.
+//   - stripe.WithPlansFunc(fn stripe.PlansFunc): Set dynamic callback for resolving available subscription plans.
+//   - stripe.WithAuthorizeReference(fn stripe.AuthorizeReferenceFunc): Configure callback to authorize referenceId access.
+//   - stripe.WithOnSubscriptionCreated(fn stripe.SubscriptionCallbackFunc): Callback triggered when a subscription is created.
+//   - stripe.WithOnSubscriptionUpdated(fn stripe.SubscriptionCallbackFunc): Callback triggered when a subscription state updates.
+//   - stripe.WithOnSubscriptionDeleted(fn stripe.SubscriptionCallbackFunc): Callback triggered when a subscription is canceled or deleted.
+//   - stripe.WithOnInvoicePaymentSucceeded(fn stripe.InvoiceCallbackFunc): Callback triggered when an invoice payment succeeds.
+//   - stripe.WithOnInvoicePaymentFailed(fn stripe.InvoiceCallbackFunc): Callback triggered when an invoice payment fails.
+//   - stripe.WithSeatPriceID(seatPriceID string): Configure organization seat-based billing with a specific Stripe Seat Price ID.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := stripe.NewMemoryRepository()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Stripe(
+//				storage,
+//				stripe.WithStripeAPIKey("sk_test_..."),
+//				stripe.WithWebhookSecret("whsec_..."),
+//				stripe.WithPlans(stripe.StripePlan{
+//					ID:      "pro_plan",
+//					Name:    "Pro Plan",
+//					PriceID: "price_12345",
+//				}),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	stripePlugin := auth.Plugin[stripe.Plugin](app)
+//	_ = stripePlugin
+func Stripe(repo stripe.Repository, opts ...stripe.Option) (*stripe.Plugin, error) {
+	return stripe.New(repo, opts...)
+}
+
 
