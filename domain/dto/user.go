@@ -70,10 +70,11 @@ type (
 
 	// CreateUserParams defines the mutable parameter payload passed to repository user creation operations.
 	CreateUserParams struct {
-		Email        string `json:"email"`
-		PasswordHash string `json:"-"`
-		Name         string `json:"name"`
-		Role         string `json:"role,omitempty"`
+		Email           string  `json:"email"`
+		PasswordHash    string  `json:"-"`
+		Name            string  `json:"name"`
+		Role            string  `json:"role,omitempty"`
+		LastLoginMethod *string `json:"lastLoginMethod,omitempty"`
 		plugin.ExtraContainer
 	}
 )

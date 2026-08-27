@@ -18,6 +18,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/lastloginmethod"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
@@ -26,15 +27,16 @@ import (
 )
 
 var (
-	_ emailpassword.Repository = (*Store)(nil)
-	_ twofactor.Repository     = (*Store)(nil)
-	_ bearer.Repository        = (*Store)(nil)
-	_ jwt.Repository           = (*Store)(nil)
-	_ organization.Repository  = (*Store)(nil)
-	_ admin.Repository         = (*Store)(nil)
-	_ passkey.Repository       = (*Store)(nil)
-	_ oauth2.Repository        = (*Store)(nil)
-	_ multisession.Repository  = (*Store)(nil)
+	_ emailpassword.Repository   = (*Store)(nil)
+	_ twofactor.Repository       = (*Store)(nil)
+	_ bearer.Repository          = (*Store)(nil)
+	_ jwt.Repository             = (*Store)(nil)
+	_ organization.Repository    = (*Store)(nil)
+	_ admin.Repository           = (*Store)(nil)
+	_ passkey.Repository         = (*Store)(nil)
+	_ oauth2.Repository          = (*Store)(nil)
+	_ multisession.Repository    = (*Store)(nil)
+	_ lastloginmethod.Repository = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -157,6 +159,33 @@ func (s *Store) UpdateUser(ctx context.Context, user *entity.User) error {
 	user.UpdatedAt = time.Now()
 	s.users[user.ID] = user
 	return nil
+}
+
+func (s *Store) UpdateLastLoginMethod(ctx context.Context, userID string, method string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	u, ok := s.users[userID]
+	if !ok {
+		return domain.ErrUserNotFound
+	}
+	u.LastLoginMethod = &method
+	u.UpdatedAt = time.Now()
+	return nil
+}
+
+func (s *Store) GetLastLoginMethod(ctx context.Context, userID string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	u, ok := s.users[userID]
+	if !ok {
+		return "", domain.ErrUserNotFound
+	}
+	if u.LastLoginMethod == nil {
+		return "", nil
+	}
+	return *u.LastLoginMethod, nil
 }
 
 func (s *Store) DeleteUser(ctx context.Context, id string) error {

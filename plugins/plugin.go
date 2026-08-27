@@ -12,6 +12,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/lastloginmethod"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
@@ -1217,6 +1218,28 @@ func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
 func MultiSession(repo multisession.Repository, opts ...multisession.Option) *multisession.Plugin {
 	return multisession.New(repo, opts...)
 }
+
+// LastLoginMethod instantiates a new LastLoginMethod authentication plugin configured with functional options.
+//
+// The LastLoginMethod plugin automatically tracks the authentication method used by a user (e.g. email, google, github, passkey, magic-link, siwe),
+// storing it in a client-readable browser cookie ("better-auth.last_used_login_method" with HttpOnly=false) and optionally persisting it in the User entity in database.
+//
+// Example:
+//
+//	repo := memory.New()
+//	lastLoginPlugin := plugins.LastLoginMethod(
+//		lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
+//		lastloginmethod.WithMaxAge(30 * 24 * time.Hour),
+//	)
+func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
+	return lastloginmethod.New(opts...)
+}
+
+// LastLoginMethodWithRepository instantiates a new LastLoginMethod authentication plugin configured with a Repository implementation for database persistence.
+func LastLoginMethodWithRepository(repo lastloginmethod.Repository, opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
+	return lastloginmethod.NewWithRepository(repo, opts...)
+}
+
 
 
 

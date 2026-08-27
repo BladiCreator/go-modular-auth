@@ -19,6 +19,7 @@ type User struct {
 	Banned              bool       `json:"banned"`
 	BanReason           *string    `json:"banReason,omitempty"`
 	BanExpires          *time.Time `json:"banExpires,omitempty"`
+	LastLoginMethod     *string    `json:"lastLoginMethod,omitempty"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	UpdatedAt           time.Time  `json:"updatedAt"`
 }
