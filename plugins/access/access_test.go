@@ -15,7 +15,7 @@ import (
 	"github.com/asaskevich/EventBus"
 )
 
-// Master statement schema matching standard Better Auth test fixture
+// Master statement schema matching standard access control test fixture
 var testMasterStatements = access.Statements{
 	"project": {"create", "read", "update", "delete"},
 	"user":    {"create", "read", "update", "delete"},
@@ -23,10 +23,10 @@ var testMasterStatements = access.Statements{
 }
 
 // -----------------------------------------------------------------------------
-// 1. Better Auth TypeScript 100% Parity Tests
+// 1. Access Control Parity Tests
 // -----------------------------------------------------------------------------
 
-func TestBetterAuthParity_RoleCreationAndStatements(t *testing.T) {
+func TestAccessControlParity_RoleCreationAndStatements(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 
 	userRole, err := ac.NewRole("user", access.Statements{
@@ -46,7 +46,7 @@ func TestBetterAuthParity_RoleCreationAndStatements(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_SingleAndMultipleActions(t *testing.T) {
+func TestAccessControlParity_SingleAndMultipleActions(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("editor", access.Statements{
 		"project": {"create", "read", "update"},
@@ -81,7 +81,7 @@ func TestBetterAuthParity_SingleAndMultipleActions(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_ResourceLevelOR(t *testing.T) {
+func TestAccessControlParity_ResourceLevelOR(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("reader_or_creator", access.Statements{
 		"project": {"read"},
@@ -104,7 +104,7 @@ func TestBetterAuthParity_ResourceLevelOR(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_MultiResource_AND(t *testing.T) {
+func TestAccessControlParity_MultiResource_AND(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("manager", access.Statements{
 		"project": {"create", "read"},
@@ -138,7 +138,7 @@ func TestBetterAuthParity_MultiResource_AND(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_MultiResource_OR(t *testing.T) {
+func TestAccessControlParity_MultiResource_OR(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("auditor", access.Statements{
 		"user": {"read"},
@@ -170,7 +170,7 @@ func TestBetterAuthParity_MultiResource_OR(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_EmptyActionsRejected(t *testing.T) {
+func TestAccessControlParity_EmptyActionsRejected(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("admin", access.Statements{
 		"project": {"create", "read"},
@@ -209,7 +209,7 @@ func TestBetterAuthParity_EmptyActionsRejected(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_UnknownResourceError(t *testing.T) {
+func TestAccessControlParity_UnknownResourceError(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("limited", access.Statements{
 		"user": {"read"},
@@ -226,7 +226,7 @@ func TestBetterAuthParity_UnknownResourceError(t *testing.T) {
 	}
 }
 
-func TestBetterAuthParity_EmptyRequest(t *testing.T) {
+func TestAccessControlParity_EmptyRequest(t *testing.T) {
 	ac := access.CreateAccessControl(testMasterStatements)
 	role := ac.MustNewRole("admin", access.Statements{
 		"project": {"*"},

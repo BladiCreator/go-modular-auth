@@ -25,7 +25,7 @@ func setupTestPlugin(t *testing.T, opts ...multisession.Option) (*multisession.P
 
 	defaultOpts := []multisession.Option{
 		multisession.WithSecret("test-hmac-secret-12345"),
-		multisession.WithCookiePrefix("better-auth"),
+		multisession.WithCookiePrefix("modular-auth"),
 		multisession.WithMaximumSessions(5),
 	}
 	defaultOpts = append(defaultOpts, opts...)
@@ -73,7 +73,7 @@ func TestMultiSession(t *testing.T) {
 	t.Run("GetConfigInfo", func(t *testing.T) {
 		p, _, _ := setupTestPlugin(t)
 		info := p.GetConfigInfo()
-		if info.MaximumSessions != 5 || info.CookiePrefix != "better-auth" {
+		if info.MaximumSessions != 5 || info.CookiePrefix != "modular-auth" {
 			t.Fatalf("unexpected config info: %+v", info)
 		}
 	})
@@ -204,7 +204,7 @@ func TestMultiSession(t *testing.T) {
 		cookies := w.Result().Cookies()
 		var mainCookie *http.Cookie
 		for _, c := range cookies {
-			if c.Name == "better-auth.session_token" {
+			if c.Name == "modular-auth.session_token" {
 				mainCookie = c
 				break
 			}
@@ -238,7 +238,7 @@ func TestMultiSession(t *testing.T) {
 		mainVal := multisession.SignCookieValue(s1.Token, p.Config().Secret)
 
 		r := httptest.NewRequest("POST", "/multi-session/revoke", nil)
-		r.AddCookie(&http.Cookie{Name: "better-auth.session_token", Value: mainVal})
+		r.AddCookie(&http.Cookie{Name: "modular-auth.session_token", Value: mainVal})
 		r.AddCookie(&http.Cookie{Name: p.GetMultiCookieName(s1.Token), Value: c1Val})
 		r.AddCookie(&http.Cookie{Name: p.GetMultiCookieName(s2.Token), Value: c2Val})
 

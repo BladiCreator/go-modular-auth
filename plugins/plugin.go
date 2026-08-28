@@ -1294,7 +1294,7 @@ func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
 // You can pass functional options to customize the plugin:
 //
 //   - multisession.WithMaximumSessions(max int): Set maximum allowed concurrent active sessions per device (default: 5).
-//   - multisession.WithCookiePrefix(prefix string): Set prefix for multi-session cookies (default: "better-auth").
+//   - multisession.WithCookiePrefix(prefix string): Set prefix for multi-session cookies (default: "modular-auth").
 //   - multisession.WithSecret(secret string): Set HMAC SHA-256 secret key for signing multi-session cookies.
 //   - multisession.WithOnSessionActivated(fn SessionActivatedCallback): Callback invoked when a device session is set active.
 //   - multisession.WithOnSessionRevoked(fn SessionRevokedCallback): Callback invoked when a device session is revoked.
@@ -1308,7 +1308,7 @@ func OAuthProxy(opts ...oauthproxy.Option) *oauthproxy.Plugin {
 //			plugins.MultiSession(
 //				storage,
 //				multisession.WithMaximumSessions(5),
-//				multisession.WithCookiePrefix("better-auth"),
+//				multisession.WithCookiePrefix("modular-auth"),
 //				multisession.WithSecret("my-hmac-secret-key"),
 //			),
 //		),
@@ -1326,7 +1326,7 @@ func MultiSession(repo multisession.Repository, opts ...multisession.Option) *mu
 // LastLoginMethod instantiates a new LastLoginMethod authentication plugin configured with functional options.
 //
 // The LastLoginMethod plugin automatically tracks the authentication method used by a user (e.g., email, google, github, passkey, magic-link, siwe),
-// storing it in a client-readable browser cookie ("better-auth.last_used_login_method" with HttpOnly=false) and optionally persisting it in the User entity in database.
+// storing it in a client-readable browser cookie ("modular-auth.last_used_login_method" with HttpOnly=false) and optionally persisting it in the User entity in database.
 //
 // # Available Methods
 //
@@ -1339,7 +1339,7 @@ func MultiSession(repo multisession.Repository, opts ...multisession.Option) *mu
 //
 // You can pass functional options to customize the plugin:
 //
-//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "better-auth.last_used_login_method").
+//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "modular-auth.last_used_login_method").
 //   - lastloginmethod.WithMaxAge(duration time.Duration): Cookie expiration lifetime (default: 30 days).
 //   - lastloginmethod.WithCookieAttributes(domain, path string, sameSite http.SameSite, secure bool): Configure cookie attributes.
 //   - lastloginmethod.WithStoreInDatabase(store bool): Enable or disable persisting last_login_method in User DB record.
@@ -1355,7 +1355,7 @@ func MultiSession(repo multisession.Repository, opts ...multisession.Option) *mu
 //	app, err := auth.New(
 //		config.WithPlugins(
 //			plugins.LastLoginMethod(
-//				lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
+//				lastloginmethod.WithCookieName("modular-auth.last_used_login_method"),
 //				lastloginmethod.WithMaxAge(30 * 24 * time.Hour),
 //				lastloginmethod.WithRouteMapping("/custom/login", "custom-sso"),
 //			),
@@ -1374,7 +1374,7 @@ func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 // LastLoginMethodWithRepository instantiates a new LastLoginMethod authentication plugin configured with a persistence repository and options.
 //
 // The LastLoginMethodWithRepository plugin automatically tracks the authentication method used by a user (e.g., email, google, github, passkey, magic-link, siwe),
-// storing it in a client-readable browser cookie ("better-auth.last_used_login_method" with HttpOnly=false) and persisting it to the User entity in database storage via the provided Repository.
+// storing it in a client-readable browser cookie ("modular-auth.last_used_login_method" with HttpOnly=false) and persisting it to the User entity in database storage via the provided Repository.
 //
 // # Available Methods
 //
@@ -1387,7 +1387,7 @@ func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 //
 // You can pass functional options to customize the plugin:
 //
-//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "better-auth.last_used_login_method").
+//   - lastloginmethod.WithCookieName(name string): Customize cookie name (default: "modular-auth.last_used_login_method").
 //   - lastloginmethod.WithMaxAge(duration time.Duration): Cookie expiration lifetime (default: 30 days).
 //   - lastloginmethod.WithCookieAttributes(domain, path string, sameSite http.SameSite, secure bool): Configure cookie attributes.
 //   - lastloginmethod.WithStoreInDatabase(store bool): Enable or disable persisting last_login_method in User DB record (default: true when repository provided).
@@ -1406,7 +1406,7 @@ func LastLoginMethod(opts ...lastloginmethod.Option) *lastloginmethod.Plugin {
 //			plugins.LastLoginMethodWithRepository(
 //				storage,
 //				lastloginmethod.WithStoreInDatabase(true),
-//				lastloginmethod.WithCookieName("better-auth.last_used_login_method"),
+//				lastloginmethod.WithCookieName("modular-auth.last_used_login_method"),
 //			),
 //		),
 //	)

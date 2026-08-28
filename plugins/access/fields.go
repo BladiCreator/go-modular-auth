@@ -17,7 +17,7 @@ const (
 	WildcardAll = "*"
 )
 
-// Standard error messages matching Better Auth TypeScript specifications.
+// Standard error messages matching access control specifications.
 const (
 	// ErrPrefixUnknownResource is the error prefix when a requested resource is not recognized under ConnectorAND.
 	// Matches: "You are not allowed to access resource: <resource>"

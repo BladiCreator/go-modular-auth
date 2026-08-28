@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// DefaultCookieName is the standard cookie key used by better-auth to track the last login method.
-const DefaultCookieName = "better-auth.last_used_login_method"
+// DefaultCookieName is the standard cookie key used by modular-auth to track the last login method.
+const DefaultCookieName = "modular-auth.last_used_login_method"
 
 // DefaultMaxAge defines the default cookie expiration duration (30 days).
 const DefaultMaxAge = 30 * 24 * time.Hour
@@ -14,7 +14,7 @@ const DefaultMaxAge = 30 * 24 * time.Hour
 // Config defines the configuration parameters for the LastLoginMethod plugin.
 type Config struct {
 	// CookieName specifies the key for storing the last used login method cookie.
-	// Default: "better-auth.last_used_login_method"
+	// Default: "modular-auth.last_used_login_method"
 	CookieName string
 
 	// MaxAge specifies the cookie duration.

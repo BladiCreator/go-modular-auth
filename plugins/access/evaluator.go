@@ -16,7 +16,7 @@ func NewEvaluator(allowWildcards bool) *Evaluator {
 }
 
 // Evaluate evaluates an AuthorizeRequest against Statements using the given global Connector.
-// It complies with 100% Better Auth TypeScript parity and short-circuit evaluation.
+// It complies with access control specifications and short-circuit evaluation.
 func (e *Evaluator) Evaluate(statements Statements, request AuthorizeRequest, globalConnector Connector) AuthorizeResult {
 	if len(request) == 0 {
 		return AuthorizeResult{Success: false, Error: ErrMsgNotAuthorized}

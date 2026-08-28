@@ -10,7 +10,7 @@ const (
 	DefaultEmailDomain = "anonymous.local"
 
 	// DefaultCookieName is the standard session cookie key.
-	DefaultCookieName = "better-auth.session_token"
+	DefaultCookieName = "modular-auth.session_token"
 
 	// DefaultCookieMaxAge specifies the default cookie duration (30 days).
 	DefaultCookieMaxAge = 30 * 24 * time.Hour

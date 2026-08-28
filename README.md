@@ -19,7 +19,7 @@
 
 ## 🌟 Overview
 
-**Go Modular Auth** is a decoupled authentication engine designed to provide maximum flexibility and developer ergonomics in Go applications. Inspired by modular architectures such as *Better-Auth*, it allows developers to compose authentication systems from independent plugins (`emailpassword`, `twofactor`, OAuth2, etc.) without locking the project into any specific web framework (compatible with **Gin**, **Fiber**, **Echo**, **Chi**, **net/http**, or **gRPC**).
+**Go Modular Auth** is a decoupled authentication engine designed to provide maximum flexibility and developer ergonomics in Go applications. Inspired by modern modular authentication architectures, it allows developers to compose authentication systems from independent plugins (`emailpassword`, `twofactor`, OAuth2, etc.) without locking the project into any specific web framework (compatible with **Gin**, **Fiber**, **Echo**, **Chi**, **net/http**, or **gRPC**).
 
 ---
 

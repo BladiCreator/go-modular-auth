@@ -22,7 +22,7 @@ func SetLastLoginMethodCookie(w http.ResponseWriter, method string, cfg Config) 
 		Expires:  time.Now().Add(cfg.MaxAge),
 		MaxAge:   int(cfg.MaxAge.Seconds()),
 		Secure:   cfg.Secure,
-		HttpOnly: false, // Explicitly false per user requirements and better-auth spec
+		HttpOnly: false, // Explicitly false per user requirements and modular-auth spec
 		SameSite: cfg.SameSite,
 	}
 

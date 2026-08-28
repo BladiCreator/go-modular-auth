@@ -15,7 +15,7 @@ type Config struct {
 	MaximumSessions int
 
 	// CookiePrefix defines the prefix for multi-session cookies.
-	// Default: "better-auth"
+	// Default: "modular-auth"
 	CookiePrefix string
 
 	// Secret is the HMAC SHA-256 secret key used for signing and verifying multi-session cookies.
@@ -32,7 +32,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		MaximumSessions: 5,
-		CookiePrefix:    "better-auth",
+		CookiePrefix:    "modular-auth",
 		Secret:          "",
 	}
 }
