@@ -9,6 +9,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/apikey"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/captcha"
+	"github.com/BladiCreator/go-modular-auth/plugins/customsession"
 	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
@@ -1597,6 +1598,37 @@ func Polar(repo polar.Repository, opts ...polar.Option) (*polar.Plugin, error) {
 //	_ = res
 func Anonymous(repo anonymous.Repository, opts ...anonymous.Option) *anonymous.Plugin {
 	return anonymous.NewWithRepository(repo, opts...)
+}
+
+// CustomSession instantiates a new CustomSession / Additional Fields plugin configured with optional Repository and functional options.
+//
+// The CustomSession plugin enables dynamic session payload modification for GET /get-session (and optionally GET /multi-session/list-device-sessions),
+// enriching user and session objects with dynamic calculated fields (roles, permissions, organization data) and managing custom additional fields.
+//
+// # Available Methods
+//
+//   - TransformSession(ctx context.Context, sessionData *dto.SessionData, req *http.Request) (any, error): Transform and enrich session payload.
+//   - ServeGetCustomSession(w http.ResponseWriter, r *http.Request, sessionData *dto.SessionData): HTTP handler for customized GET /get-session response.
+//   - SessionInterceptor(next http.Handler) http.Handler: Middleware for intercepting session responses dynamically.
+//
+// # Configuration Options
+//
+//   - customsession.WithTransformFunc(fn TransformSessionFunc): Custom dynamic transformation callback.
+//   - customsession.WithMutateListDeviceSessions(mutate bool): Toggle whether session transformation applies to GET /multi-session/list-device-sessions.
+//   - customsession.WithUserAdditionalFields(fields ...AdditionalFieldDefinition): Register dynamic field definitions for User entities.
+//   - customsession.WithSessionAdditionalFields(fields ...AdditionalFieldDefinition): Register dynamic field definitions for Session entities.
+//   - customsession.WithFilterUnregisteredFields(filter bool): Omit unregistered extra fields from serialized output.
+//
+// Example:
+//
+//	storage := customsession.NewMemoryRepository()
+//	p := plugins.CustomSession(storage, customsession.WithTransformFunc(func(ctx context.Context, s *dto.SessionData, r *http.Request) (any, error) {
+//		s.Set("custom_role", "admin")
+//		return s, nil
+//	}))
+//	_ = p
+func CustomSession(repo customsession.Repository, opts ...customsession.Option) *customsession.Plugin {
+	return customsession.New(repo, opts...)
 }
 
 

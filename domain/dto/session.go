@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
@@ -17,6 +18,12 @@ type (
 		ImpersonatedBy *string   `json:"impersonated_by,omitempty"`
 		ExpiresAt      time.Time `json:"expires_at" binding:"required"`
 		CreatedAt      time.Time `json:"created_at" binding:"required"`
+		plugin.ExtraContainer
+	}
+	// SessionData holds the combined session and user information returned by session endpoints.
+	SessionData struct {
+		Session *entity.Session `json:"session"`
+		User    *entity.User    `json:"user"`
 		plugin.ExtraContainer
 	}
 )
