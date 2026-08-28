@@ -1,4 +1,4 @@
-package stripe
+package polar
 
 import (
 	"context"
@@ -10,47 +10,47 @@ import (
 
 var (
 	// ErrRepositoryRequired is returned when no Repository implementation is provided.
-	ErrRepositoryRequired = errors.New("stripe: repository is required")
+	ErrRepositoryRequired = errors.New("polar: repository is required")
 
-	// ErrStripeAPIKeyRequired is returned when no Stripe secret API key is configured.
-	ErrStripeAPIKeyRequired = errors.New("stripe: stripe API key is required")
+	// ErrAccessTokenRequired is returned when no Polar Bearer access token is configured.
+	ErrAccessTokenRequired = errors.New("polar: access token is required")
 
 	// ErrSubscriptionNotFound is returned when a subscription record cannot be located.
-	ErrSubscriptionNotFound = errors.New("stripe: subscription not found")
+	ErrSubscriptionNotFound = errors.New("polar: subscription not found")
 
-	// ErrCustomerNotFound is returned when no Stripe Customer ID is linked to an entity.
-	ErrCustomerNotFound = errors.New("stripe: customer not found")
+	// ErrCustomerNotFound is returned when no Polar Customer ID is linked to an entity.
+	ErrCustomerNotFound = errors.New("polar: customer not found")
 
-	// ErrInvalidWebhookSignature is returned when a Stripe webhook signature fails verification.
-	ErrInvalidWebhookSignature = errors.New("stripe: invalid webhook signature")
+	// ErrInvalidWebhookSignature is returned when a Polar webhook signature fails verification.
+	ErrInvalidWebhookSignature = errors.New("polar: invalid webhook signature")
 
 	// ErrUnauthorizedReference is returned when a user lacks authorization over a referenceId.
-	ErrUnauthorizedReference = errors.New("stripe: unauthorized reference access")
+	ErrUnauthorizedReference = errors.New("polar: unauthorized reference access")
 
 	// ErrInvalidPlan is returned when an unrecognized or missing plan ID is specified.
-	ErrInvalidPlan = errors.New("stripe: invalid plan specified")
+	ErrInvalidPlan = errors.New("polar: invalid plan specified")
 )
 
-// Repository defines the persistent storage contract required by the Stripe plugin.
+// Repository defines the persistent storage contract required by the Polar plugin.
 // Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, SQLite, MongoDB, GORM).
 //
 // # Implementation Example (GORM / database/sql):
 //
-//	type GormStripeRepository struct {
+//	type GormPolarRepository struct {
 //		db *gorm.DB
 //	}
 //
-//	func (r *GormStripeRepository) CreateSubscription(ctx context.Context, sub *stripe.Subscription) error {
+//	func (r *GormPolarRepository) CreateSubscription(ctx context.Context, sub *polar.Subscription) error {
 //		return r.db.WithContext(ctx).Create(sub).Error
 //	}
 type Repository interface {
-	// CreateSubscription persists a new local subscription record linked to Stripe.
+	// CreateSubscription persists a new local subscription record linked to Polar.
 	//
 	// Function:
 	//   Called when a new subscription is provisioned via Checkout or Webhooks.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Inserts a new row into stripe_subscriptions table.
+	//   Database (GORM / SQL) - Inserts a new row into polar_subscriptions table.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -60,8 +60,8 @@ type Repository interface {
 	//   - error: Nil on success, or database error on failure.
 	//
 	// Example SQL:
-	//   INSERT INTO stripe_subscriptions (id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status, period_start, period_end, cancel_at_period_end, seats, billing_interval, created_at, updated_at)
-	//   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+	//   INSERT INTO polar_subscriptions (id, plan_id, reference_id, polar_customer_id, polar_subscription_id, status, period_start, period_end, cancel_at_period_end, seats, created_at, updated_at)
+	//   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 	CreateSubscription(ctx context.Context, sub *Subscription) error
 
 	// UpdateSubscription updates an existing local subscription record.
@@ -80,7 +80,7 @@ type Repository interface {
 	//   - error: ErrSubscriptionNotFound if missing, or database error on failure.
 	//
 	// Example SQL:
-	//   UPDATE stripe_subscriptions SET status = $1, period_end = $2, seats = $3, updated_at = NOW() WHERE id = $4;
+	//   UPDATE polar_subscriptions SET status = $1, period_end = $2, seats = $3, updated_at = NOW() WHERE id = $4;
 	UpdateSubscription(ctx context.Context, sub *Subscription) error
 
 	// DeleteSubscription removes a subscription record from storage by local ID.
@@ -99,7 +99,7 @@ type Repository interface {
 	//   - error: ErrSubscriptionNotFound if missing, or database error.
 	//
 	// Example SQL:
-	//   DELETE FROM stripe_subscriptions WHERE id = $1;
+	//   DELETE FROM polar_subscriptions WHERE id = $1;
 	DeleteSubscription(ctx context.Context, id string) error
 
 	// FindSubscriptionByID retrieves a subscription by local primary key ID.
@@ -108,7 +108,7 @@ type Repository interface {
 	//   Used in subscription retrieval and cancellation operations.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Primary key lookup on stripe_subscriptions.
+	//   Database (GORM / SQL) - Primary key lookup on polar_subscriptions.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -119,28 +119,28 @@ type Repository interface {
 	//   - error: ErrSubscriptionNotFound if missing, or database error.
 	//
 	// Example SQL:
-	//   SELECT id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status FROM stripe_subscriptions WHERE id = $1 LIMIT 1;
+	//   SELECT id, plan_id, reference_id, polar_customer_id, polar_subscription_id, status FROM polar_subscriptions WHERE id = $1 LIMIT 1;
 	FindSubscriptionByID(ctx context.Context, id string) (*Subscription, error)
 
-	// FindSubscriptionByStripeID retrieves a subscription by its Stripe-assigned subscription ID.
+	// FindSubscriptionByPolarID retrieves a subscription by its Polar-assigned subscription ID.
 	//
 	// Function:
-	//   Used in webhook processing to locate local subscription records matching incoming Stripe events.
+	//   Used in webhook processing to locate local subscription records matching incoming Polar events.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Query by stripe_subscription_id column index.
+	//   Database (GORM / SQL) - Query by polar_subscription_id column index.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
-	//   - stripeSubID: Remote Stripe subscription ID string (e.g. "sub_12345").
+	//   - polarSubID: Remote Polar subscription ID string.
 	//
 	// Returns:
 	//   - *Subscription: Matching subscription record if found.
 	//   - error: ErrSubscriptionNotFound if missing, or database error.
 	//
 	// Example SQL:
-	//   SELECT id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status FROM stripe_subscriptions WHERE stripe_subscription_id = $1 LIMIT 1;
-	FindSubscriptionByStripeID(ctx context.Context, stripeSubID string) (*Subscription, error)
+	//   SELECT id, plan_id, reference_id, polar_customer_id, polar_subscription_id, status FROM polar_subscriptions WHERE polar_subscription_id = $1 LIMIT 1;
+	FindSubscriptionByPolarID(ctx context.Context, polarSubID string) (*Subscription, error)
 
 	// ListSubscriptionsByReferenceID retrieves all subscriptions linked to a referenceId (user or organization).
 	//
@@ -148,7 +148,7 @@ type Repository interface {
 	//   Used by middlewares and service APIs to evaluate active access rights for a user or team.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Query stripe_subscriptions by reference_id column.
+	//   Database (GORM / SQL) - Query polar_subscriptions by reference_id column.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -159,16 +159,16 @@ type Repository interface {
 	//   - error: Nil on success, or database error.
 	//
 	// Example SQL:
-	//   SELECT id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status FROM stripe_subscriptions WHERE reference_id = $1;
+	//   SELECT id, plan_id, reference_id, polar_customer_id, polar_subscription_id, status FROM polar_subscriptions WHERE reference_id = $1;
 	ListSubscriptionsByReferenceID(ctx context.Context, referenceID string) ([]*Subscription, error)
 
-	// GetCustomerStripeID retrieves the Stripe Customer ID linked to an entity.
+	// GetCustomerPolarID retrieves the Polar Customer ID linked to an entity.
 	//
 	// Function:
-	//   Used during customer billing portal session creation or customer lookup.
+	//   Used during customer portal session creation or usage event ingestion.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Query stripe_customers by entity_type and entity_id.
+	//   Database (GORM / SQL) - Query polar_customers by entity_type and entity_id.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
@@ -176,49 +176,49 @@ type Repository interface {
 	//   - entityID: Target user or organization primary key ID.
 	//
 	// Returns:
-	//   - string: Remote Stripe Customer ID (e.g. "cus_12345").
+	//   - string: Remote Polar Customer ID.
 	//   - error: ErrCustomerNotFound if missing, or database error.
 	//
 	// Example SQL:
-	//   SELECT stripe_customer_id FROM stripe_customers WHERE entity_type = $1 AND entity_id = $2 LIMIT 1;
-	GetCustomerStripeID(ctx context.Context, entityType, entityID string) (string, error)
+	//   SELECT polar_customer_id FROM polar_customers WHERE entity_type = $1 AND entity_id = $2 LIMIT 1;
+	GetCustomerPolarID(ctx context.Context, entityType, entityID string) (string, error)
 
-	// SaveCustomerStripeID persists the mapping between a local entity and a Stripe Customer ID.
+	// SaveCustomerPolarID persists the mapping between a local entity and a Polar Customer ID.
 	//
 	// Function:
-	//   Called after creating a new Customer in Stripe during sign-up or onboarding.
+	//   Called after creating a new Customer in Polar during sign-up or onboarding.
 	//
 	// Storage:
-	//   Database (GORM / SQL) - Upsert row into stripe_customers mapping table.
+	//   Database (GORM / SQL) - Upsert row into polar_customers mapping table.
 	//
 	// Arguments:
 	//   - ctx: Request cancellation context.
 	//   - entityType: "user" or "organization".
 	//   - entityID: Local entity ID string.
-	//   - stripeCustomerID: Remote Stripe Customer ID string.
+	//   - polarCustomerID: Remote Polar Customer ID string.
 	//
 	// Returns:
 	//   - error: Nil on success, or database error.
 	//
 	// Example SQL:
-	//   INSERT INTO stripe_customers (entity_type, entity_id, stripe_customer_id, created_at) VALUES ($1, $2, $3, NOW())
-	//   ON CONFLICT (entity_type, entity_id) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id;
-	SaveCustomerStripeID(ctx context.Context, entityType, entityID, stripeCustomerID string) error
+	//   INSERT INTO polar_customers (entity_type, entity_id, polar_customer_id, created_at) VALUES ($1, $2, $3, NOW())
+	//   ON CONFLICT (entity_type, entity_id) DO UPDATE SET polar_customer_id = EXCLUDED.polar_customer_id;
+	SaveCustomerPolarID(ctx context.Context, entityType, entityID, polarCustomerID string) error
 }
 
 // MemoryRepository provides a thread-safe, in-memory implementation of Repository for testing and lightweight usage.
 type MemoryRepository struct {
 	mu            sync.RWMutex
-	subscriptions map[string]*Subscription       // keyed by ID
-	stripeSubMap  map[string]string              // stripeSubID -> subID
-	customers     map[string]string              // "entityType:entityID" -> stripeCustomerID
+	subscriptions map[string]*Subscription // keyed by local ID
+	polarSubMap   map[string]string        // polarSubID -> subID
+	customers     map[string]string        // "entityType:entityID" -> polarCustomerID
 }
 
 // NewMemoryRepository initializes a fresh MemoryRepository instance.
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
 		subscriptions: make(map[string]*Subscription),
-		stripeSubMap:  make(map[string]string),
+		polarSubMap:   make(map[string]string),
 		customers:     make(map[string]string),
 	}
 }
@@ -229,7 +229,7 @@ func (r *MemoryRepository) CreateSubscription(_ context.Context, sub *Subscripti
 	defer r.mu.Unlock()
 
 	if sub.ID == "" {
-		sub.ID = fmt.Sprintf("sub_loc_%d", time.Now().UnixNano())
+		sub.ID = fmt.Sprintf("pol_sub_loc_%d", time.Now().UnixNano())
 	}
 	now := time.Now()
 	if sub.CreatedAt.IsZero() {
@@ -239,8 +239,8 @@ func (r *MemoryRepository) CreateSubscription(_ context.Context, sub *Subscripti
 
 	cp := *sub
 	r.subscriptions[sub.ID] = &cp
-	if sub.StripeSubscriptionID != "" {
-		r.stripeSubMap[sub.StripeSubscriptionID] = sub.ID
+	if sub.PolarSubscriptionID != "" {
+		r.polarSubMap[sub.PolarSubscriptionID] = sub.ID
 	}
 	return nil
 }
@@ -262,8 +262,8 @@ func (r *MemoryRepository) UpdateSubscription(_ context.Context, sub *Subscripti
 
 	cp := *sub
 	r.subscriptions[sub.ID] = &cp
-	if sub.StripeSubscriptionID != "" {
-		r.stripeSubMap[sub.StripeSubscriptionID] = sub.ID
+	if sub.PolarSubscriptionID != "" {
+		r.polarSubMap[sub.PolarSubscriptionID] = sub.ID
 	}
 	return nil
 }
@@ -279,8 +279,8 @@ func (r *MemoryRepository) DeleteSubscription(_ context.Context, id string) erro
 	}
 
 	delete(r.subscriptions, id)
-	if sub.StripeSubscriptionID != "" {
-		delete(r.stripeSubMap, sub.StripeSubscriptionID)
+	if sub.PolarSubscriptionID != "" {
+		delete(r.polarSubMap, sub.PolarSubscriptionID)
 	}
 	return nil
 }
@@ -298,12 +298,12 @@ func (r *MemoryRepository) FindSubscriptionByID(_ context.Context, id string) (*
 	return &cp, nil
 }
 
-// FindSubscriptionByStripeID retrieves an in-memory subscription by remote Stripe ID.
-func (r *MemoryRepository) FindSubscriptionByStripeID(_ context.Context, stripeSubID string) (*Subscription, error) {
+// FindSubscriptionByPolarID retrieves an in-memory subscription by remote Polar ID.
+func (r *MemoryRepository) FindSubscriptionByPolarID(_ context.Context, polarSubID string) (*Subscription, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	id, ok := r.stripeSubMap[stripeSubID]
+	id, ok := r.polarSubMap[polarSubID]
 	if !ok {
 		return nil, ErrSubscriptionNotFound
 	}
@@ -330,8 +330,8 @@ func (r *MemoryRepository) ListSubscriptionsByReferenceID(_ context.Context, ref
 	return result, nil
 }
 
-// GetCustomerStripeID retrieves the Stripe Customer ID linked to an entity in memory.
-func (r *MemoryRepository) GetCustomerStripeID(_ context.Context, entityType, entityID string) (string, error) {
+// GetCustomerPolarID retrieves the Polar Customer ID linked to an entity in memory.
+func (r *MemoryRepository) GetCustomerPolarID(_ context.Context, entityType, entityID string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -343,12 +343,12 @@ func (r *MemoryRepository) GetCustomerStripeID(_ context.Context, entityType, en
 	return custID, nil
 }
 
-// SaveCustomerStripeID persists the entity-to-Stripe Customer ID mapping in memory.
-func (r *MemoryRepository) SaveCustomerStripeID(_ context.Context, entityType, entityID, stripeCustomerID string) error {
+// SaveCustomerPolarID persists the entity-to-Polar Customer ID mapping in memory.
+func (r *MemoryRepository) SaveCustomerPolarID(_ context.Context, entityType, entityID, polarCustomerID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	key := fmt.Sprintf("%s:%s", entityType, entityID)
-	r.customers[key] = stripeCustomerID
+	r.customers[key] = polarCustomerID
 	return nil
 }

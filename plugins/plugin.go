@@ -23,6 +23,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
+	"github.com/BladiCreator/go-modular-auth/plugins/polar"
 	"github.com/BladiCreator/go-modular-auth/plugins/stripe"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
@@ -1483,5 +1484,76 @@ func LastLoginMethodWithRepository(repo lastloginmethod.Repository, opts ...last
 func Stripe(repo stripe.Repository, opts ...stripe.Option) (*stripe.Plugin, error) {
 	return stripe.New(repo, opts...)
 }
+
+// Polar instantiates a new Polar billing, customer portal, usage metering, and webhook plugin configured with a mandatory repository and options.
+//
+// The Polar plugin manages customer billing, checkout sessions, customer portal sessions, subscription lifecycles,
+// usage event ingestion, customer meter balances, benefit entitlements, cryptographic webhook event verification, and net/http middlewares.
+//
+// # Available Methods
+//
+//   - CreateCheckoutSession(ctx context.Context, params polar.CreateCheckoutParams) (string, error): Create a Polar Checkout session URL.
+//   - CreateCustomerPortalSession(ctx context.Context, params polar.CustomerPortalParams) (string, error): Generate Customer Portal URL.
+//   - GetCustomerState(ctx context.Context, referenceID string) (*polar.CustomerState, error): Retrieve customer billing and benefit state.
+//   - ListSubscriptions(ctx context.Context, referenceID string) ([]*polar.Subscription, error): List subscriptions linked to a referenceId.
+//   - GetSubscription(ctx context.Context, subID string) (*polar.Subscription, error): Fetch local subscription record.
+//   - CancelSubscription(ctx context.Context, params polar.CancelSubscriptionParams) (*polar.Subscription, error): Cancel subscription.
+//   - IngestEvent(ctx context.Context, params polar.IngestEventParams) (*polar.IngestEventResult, error): Ingest usage metrics event.
+//   - ListMeters(ctx context.Context, referenceID string) ([]*polar.CustomerMeter, error): Fetch customer meter balances.
+//   - SyncSeats(ctx context.Context, referenceID string, seats int) error: Update seat quantity for an active subscription.
+//   - ProcessWebhook(ctx context.Context, payload []byte, signature string) error: Process & verify raw Polar webhooks.
+//   - HandleWebhook(w http.ResponseWriter, r *http.Request): Net/HTTP handler for Polar webhooks.
+//   - WebhookHandler() http.Handler: Net/HTTP Handler instance for webhook routing.
+//   - RequireActiveSubscription(allowedPlans ...string) func(http.Handler) http.Handler: Middleware requiring active subscription.
+//   - RequireBenefit(benefitID string) func(http.Handler) http.Handler: Middleware requiring granted benefit entitlement.
+//   - AuthorizeReference(action string) func(http.Handler) http.Handler: Middleware authorizing referenceId access.
+//
+// # Configuration Options
+//
+// You can pass functional options to customize the plugin:
+//
+//   - polar.WithAccessToken(token string): Bearer access token for Polar API.
+//   - polar.WithWebhookSecret(secret string): Secret key used to verify incoming webhook signatures.
+//   - polar.WithServer(server string): Server environment ("production" or "sandbox").
+//   - polar.WithCreateCustomerOnSignUp(enable bool): Automatically create Polar Customer record during sign-up (default: true).
+//   - polar.WithPlans(plans ...polar.PolarPlan): Define static subscription plans available in the application.
+//   - polar.WithPlansFunc(fn polar.PlansFunc): Set dynamic callback for resolving available subscription plans.
+//   - polar.WithAuthorizeReference(fn polar.AuthorizeReferenceFunc): Configure callback to authorize referenceId access.
+//   - polar.WithOnSubscriptionCreated(fn polar.SubscriptionCallbackFunc): Callback triggered when a subscription is created.
+//   - polar.WithOnSubscriptionUpdated(fn polar.SubscriptionCallbackFunc): Callback triggered when a subscription state updates.
+//   - polar.WithOnSubscriptionCanceled(fn polar.SubscriptionCallbackFunc): Callback triggered when a subscription is canceled.
+//   - polar.WithOnCustomerStateChanged(fn polar.CustomerStateCallbackFunc): Callback triggered when customer state updates.
+//   - polar.WithOnOrderPaid(fn polar.OrderCallbackFunc): Callback triggered when an order is paid.
+//   - polar.WithOnBenefitGranted(fn polar.BenefitCallbackFunc): Callback triggered when a benefit is granted.
+//   - polar.WithOnBenefitRevoked(fn polar.BenefitCallbackFunc): Callback triggered when a benefit is revoked.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := polar.NewMemoryRepository()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Polar(
+//				storage,
+//				polar.WithAccessToken("polar_at_..."),
+//				polar.WithWebhookSecret("whsec_..."),
+//				polar.WithPlans(polar.PolarPlan{
+//					ID:        "pro_plan",
+//					Name:      "Pro Plan",
+//					PriceID:   "price_12345",
+//				}),
+//			),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	polarPlugin := auth.Plugin[polar.Plugin](app)
+//	_ = polarPlugin
+func Polar(repo polar.Repository, opts ...polar.Option) (*polar.Plugin, error) {
+	return polar.New(repo, opts...)
+}
+
 
 

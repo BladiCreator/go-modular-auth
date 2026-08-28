@@ -444,3 +444,27 @@ func TestCustomCookieOptions(t *testing.T) {
 		t.Fatal("expected Secure=true")
 	}
 }
+
+func TestMemoryRepository(t *testing.T) {
+	ctx := context.Background()
+	repo := lastloginmethod.NewMemoryRepository()
+
+	// Test Get on missing user
+	_, err := repo.GetLastLoginMethod(ctx, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error getting nonexistent user method")
+	}
+
+	// Test Update and Get
+	if err := repo.UpdateLastLoginMethod(ctx, "user_1", "passkey"); err != nil {
+		t.Fatalf("failed to update method: %v", err)
+	}
+
+	method, err := repo.GetLastLoginMethod(ctx, "user_1")
+	if err != nil {
+		t.Fatalf("failed to get method: %v", err)
+	}
+	if method != "passkey" {
+		t.Fatalf("expected method 'passkey', got %q", method)
+	}
+}

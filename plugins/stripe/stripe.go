@@ -49,6 +49,7 @@ func (p *Plugin) ID() string {
 // Init initializes the plugin with the shared execution context.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
+	p.setupHooks()
 	return nil
 }
 

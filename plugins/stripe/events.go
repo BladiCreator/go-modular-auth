@@ -1,26 +1,29 @@
 package stripe
 
 const (
+	// EventUserCreated is published when a new user is created in the application.
+	EventUserCreated = "auth:user:created"
+
 	// EventStripeCustomerCreated is published when a new Stripe customer is created and linked.
-	EventStripeCustomerCreated = "stripe.customer.created"
+	EventStripeCustomerCreated = "stripe:customer:created"
 
 	// EventStripeSubscriptionCreated is published when a subscription is successfully created.
-	EventStripeSubscriptionCreated = "stripe.subscription.created"
+	EventStripeSubscriptionCreated = "stripe:subscription:created"
 
 	// EventStripeSubscriptionUpdated is published when a subscription state, tier, or period updates.
-	EventStripeSubscriptionUpdated = "stripe.subscription.updated"
+	EventStripeSubscriptionUpdated = "stripe:subscription:updated"
 
 	// EventStripeSubscriptionDeleted is published when a subscription is canceled or deleted.
-	EventStripeSubscriptionDeleted = "stripe.subscription.deleted"
+	EventStripeSubscriptionDeleted = "stripe:subscription:deleted"
 
 	// EventStripeInvoicePaymentSucceeded is published when an invoice payment succeeds.
-	EventStripeInvoicePaymentSucceeded = "stripe.invoice.payment_succeeded"
+	EventStripeInvoicePaymentSucceeded = "stripe:invoice:payment_succeeded"
 
 	// EventStripeInvoicePaymentFailed is published when an invoice payment attempt fails.
-	EventStripeInvoicePaymentFailed = "stripe.invoice.payment_failed"
+	EventStripeInvoicePaymentFailed = "stripe:invoice:payment_failed"
 
 	// EventStripeWebhookReceived is published upon successfully receiving and verifying a webhook event.
-	EventStripeWebhookReceived = "stripe.webhook.received"
+	EventStripeWebhookReceived = "stripe:webhook:received"
 )
 
 // CustomerCreatedPayload represents the EventBus payload for EventStripeCustomerCreated.
