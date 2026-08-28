@@ -5,6 +5,7 @@ package plugins
 import (
 	"github.com/BladiCreator/go-modular-auth/plugins/access"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
 	"github.com/BladiCreator/go-modular-auth/plugins/apikey"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/captcha"
@@ -1554,6 +1555,50 @@ func Stripe(repo stripe.Repository, opts ...stripe.Option) (*stripe.Plugin, erro
 func Polar(repo polar.Repository, opts ...polar.Option) (*polar.Plugin, error) {
 	return polar.New(repo, opts...)
 }
+
+// Anonymous instantiates a new Anonymous (Guest Sessions) authentication plugin configured with optional Repository and functional options.
+//
+// The Anonymous plugin enables guest user workflows, allowing non-registered users to interact
+// with the application under a temporary anonymous user profile (IsAnonymous = true). When the guest
+// user eventually registers or signs in with a permanent account, the account linking hook (OnLinkAccount)
+// is executed to transfer data (e.g. shopping carts, settings) before purging the temporary guest account.
+//
+// # Available Methods
+//
+//   - SignInAnonymous(ctx context.Context, currentSession *entity.Session, params SignInAnonymousParams) (*SignInAnonymousResult, error): Issue guest credentials and session.
+//   - DeleteAnonymousUser(ctx context.Context, session *entity.Session) (*DeleteAnonymousUserResult, error): Purge guest user account and session data.
+//   - LinkAccount(ctx context.Context, data *OnLinkAccountData) error: Execute custom linking callback and purge previous guest account if enabled.
+//
+// # Configuration Options
+//
+//   - anonymous.WithEmailDomainName(domain string): Custom domain suffix for temporary guest emails (default: "anonymous.local").
+//   - anonymous.WithDisableDeleteAnonymousUser(disable bool): Toggle whether guest accounts should be retained after account linking.
+//   - anonymous.WithOnLinkAccount(fn LinkAccountCallback): Callback triggered when linking a guest account to a permanent account.
+//   - anonymous.WithGenerateName(fn GenerateNameCallback): Custom display name generator for guest users.
+//   - anonymous.WithGenerateRandomEmail(fn GenerateEmailCallback): Custom email generator for guest users.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	storage := anonymous.NewMemoryRepository()
+//	app, err := auth.New(
+//		config.WithPlugins(
+//			plugins.Anonymous(storage, anonymous.WithEmailDomainName("guest.myapp.com")),
+//		),
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	res, err := auth.Plugin[anonymous.Plugin](app).SignInAnonymous(ctx, nil, anonymous.SignInAnonymousParams{})
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = res
+func Anonymous(repo anonymous.Repository, opts ...anonymous.Option) *anonymous.Plugin {
+	return anonymous.NewWithRepository(repo, opts...)
+}
+
 
 
 

@@ -20,6 +20,7 @@ type User struct {
 	BanReason           *string    `json:"banReason,omitempty"`
 	BanExpires          *time.Time `json:"banExpires,omitempty"`
 	LastLoginMethod     *string    `json:"lastLoginMethod,omitempty"`
+	IsAnonymous         bool       `json:"isAnonymous,omitempty"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	UpdatedAt           time.Time  `json:"updatedAt"`
 }
