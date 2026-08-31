@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
 	"golang.org/x/crypto/bcrypt"
@@ -14,18 +14,18 @@ import (
 
 // MockRepository implements username.Repository for testing purposes.
 type MockRepository struct {
+	*repository.MemorySessionRepository
 	users    map[string]*entity.User    // key: ID
 	byName   map[string]*entity.User    // key: normalized username
 	accounts map[string]*entity.Account // key: userID
-	sessions map[string]*entity.Session // key: token
 }
 
 func NewMockRepository() *MockRepository {
 	return &MockRepository{
-		users:    make(map[string]*entity.User),
-		byName:   make(map[string]*entity.User),
-		accounts: make(map[string]*entity.Account),
-		sessions: make(map[string]*entity.Session),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		users:                   make(map[string]*entity.User),
+		byName:                  make(map[string]*entity.User),
+		accounts:                make(map[string]*entity.Account),
 	}
 }
 
@@ -87,17 +87,6 @@ func (m *MockRepository) GetAccountByUserIDAndProvider(ctx context.Context, user
 		return acc, nil
 	}
 	return nil, username.ErrCredentialAccountNotFound
-}
-
-func (m *MockRepository) CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error) {
-	sess := &entity.Session{
-		ID:        "sess_" + params.Token,
-		UserID:    params.UserID,
-		Token:     params.Token,
-		ExpiresAt: params.ExpiresAt,
-	}
-	m.sessions[params.Token] = sess
-	return sess, nil
 }
 
 // Unit Tests

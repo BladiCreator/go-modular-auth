@@ -70,14 +70,6 @@ func createTestUserAndSession(t *testing.T, store *memory.Store, name, email str
 }
 
 func TestMultiSession(t *testing.T) {
-	t.Run("GetConfigInfo", func(t *testing.T) {
-		p, _, _ := setupTestPlugin(t)
-		info := p.GetConfigInfo()
-		if info.MaximumSessions != 5 || info.CookiePrefix != "modular-auth" {
-			t.Fatalf("unexpected config info: %+v", info)
-		}
-	})
-
 	t.Run("SetCookieOnLogin", func(t *testing.T) {
 		p, store, _ := setupTestPlugin(t)
 		_, session := createTestUserAndSession(t, store, "Alice", "alice@example.com")

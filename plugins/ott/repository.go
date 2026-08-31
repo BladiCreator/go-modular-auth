@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the One-Time Token (OTT) plugin.
@@ -147,46 +148,9 @@ type Repository interface {
 	//   val, err := rdb.GetDel(ctx, "ott:" + identifier).Bytes()
 	ConsumeVerificationValue(ctx context.Context, identifier string) (*VerificationRecord, error)
 
-	// GetSessionByToken retrieves an active session entity matching the specified session token string.
-	//
-	// Function:
-	//   Used after consuming an OTT token to verify and load the target session entity.
-	//
-	// Storage:
-	//   Both (Cache-Aside Strategy) - Fast session retrieval by raw token string.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - token: Raw session token string stored in OTT value.
-	//
-	// Returns:
-	//   - *entity.Session: Active session entity if found.
-	//   - error: ErrSessionNotFound if missing, or ErrSessionExpired if expired.
-	//
-	// Example SQL:
-	//   SELECT id, user_id, token, expires_at, created_at, updated_at FROM sessions WHERE token = $1 LIMIT 1;
-	//
-	// Example Cache (Redis):
-	//   val, err := rdb.Get(ctx, "session:" + token).Bytes()
-	GetSessionByToken(ctx context.Context, token string) (*entity.Session, error)
-
 	// GetUserByID retrieves a user entity matching the specified user identifier.
-	//
-	// Function:
-	//   Used to verify user existence and populate user context after consuming an OTT.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - User primary key lookup.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - userID: Target user primary key ID.
-	//
-	// Returns:
-	//   - *entity.User: Matching user entity if found.
-	//   - error: ErrUserNotFound if missing.
-	//
-	// Example SQL:
-	//   SELECT id, email, name, email_verified, created_at, updated_at FROM users WHERE id = $1 LIMIT 1;
 	GetUserByID(ctx context.Context, userID string) (*entity.User, error)
+
+	// SessionRepository provides session lookup operations.
+	repository.SessionRepository
 }

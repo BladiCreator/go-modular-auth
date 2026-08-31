@@ -9,25 +9,26 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/deviceauth"
 )
 
 // MockRepository implements deviceauth.Repository for testing purposes.
 type MockRepository struct {
+	*repository.MemorySessionRepository
 	mu          sync.Mutex
 	codesByDev  map[string]*deviceauth.DeviceCode
 	codesByUser map[string]*deviceauth.DeviceCode
 	users       map[string]*entity.User
-	sessions    map[string]*entity.Session
 }
 
 func NewMockRepository() *MockRepository {
 	return &MockRepository{
-		codesByDev:  make(map[string]*deviceauth.DeviceCode),
-		codesByUser: make(map[string]*deviceauth.DeviceCode),
-		users:       make(map[string]*entity.User),
-		sessions:    make(map[string]*entity.Session),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		codesByDev:              make(map[string]*deviceauth.DeviceCode),
+		codesByUser:             make(map[string]*deviceauth.DeviceCode),
+		users:                   make(map[string]*entity.User),
 	}
 }
 
@@ -147,15 +148,6 @@ func (m *MockRepository) GetUserByID(ctx context.Context, userID string) (*entit
 		return nil, deviceauth.ErrUserNotFound
 	}
 	cp := *u
-	return &cp, nil
-}
-
-func (m *MockRepository) CreateSession(ctx context.Context, session *entity.Session) (*entity.Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	cp := *session
-	m.sessions[session.Token] = &cp
 	return &cp, nil
 }
 

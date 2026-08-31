@@ -134,12 +134,6 @@ type RevokeOtherSessionsResult struct {
 	Count int `json:"count"`
 }
 
-// MultiSessionConfigInfo represents public metadata regarding active plugin configuration.
-type MultiSessionConfigInfo struct {
-	MaximumSessions int    `json:"maximumSessions"`
-	CookiePrefix    string `json:"cookiePrefix"`
-}
-
 // StatusResponse represents a simple boolean status response payload.
 type StatusResponse struct {
 	Status bool `json:"status"`

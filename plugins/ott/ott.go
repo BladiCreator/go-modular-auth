@@ -2,8 +2,10 @@ package ott
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/google/uuid"
 )
@@ -60,6 +62,9 @@ func (p *Plugin) GenerateToken(ctx context.Context, params GenerateTokenParams) 
 	// Validate underlying session existence and lifetime
 	session, err := p.repo.GetSessionByToken(ctx, params.SessionToken)
 	if err != nil {
+		if errors.Is(err, repository.ErrSessionExpired) {
+			return nil, ErrSessionExpired
+		}
 		return nil, ErrSessionNotFound
 	}
 	if session == nil {
@@ -158,7 +163,13 @@ func (p *Plugin) VerifyToken(ctx context.Context, params VerifyTokenParams) (*Ve
 
 	// Retrieve active session entity
 	session, err := p.repo.GetSessionByToken(ctx, record.Value)
-	if err != nil || session == nil {
+	if err != nil {
+		if errors.Is(err, repository.ErrSessionExpired) {
+			return nil, ErrSessionExpired
+		}
+		return nil, ErrSessionNotFound
+	}
+	if session == nil {
 		return nil, ErrSessionNotFound
 	}
 

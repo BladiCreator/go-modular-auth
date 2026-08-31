@@ -9,7 +9,7 @@ import (
 
 func BenchmarkNumericOTPGenerator(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = phonenumber.DefaultNumericOTPGenerator(6)
 	}
 }
@@ -18,8 +18,8 @@ func BenchmarkSHA256Hasher(b *testing.B) {
 	hasher := phonenumber.DefaultSHA256Hasher{}
 	otp := "123456"
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		hashed, _ := hasher.Hash(otp)
 		_ = hasher.Verify(otp, hashed)
 	}
@@ -32,8 +32,8 @@ func BenchmarkAESGCMCipher(b *testing.B) {
 	}
 	otp := "123456"
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		encrypted, _ := cipher.Encrypt(otp)
 		_, _ = cipher.Decrypt(encrypted)
 	}
@@ -50,8 +50,8 @@ func BenchmarkAtomicVerifyOTP(b *testing.B) {
 	phone := "+1234567890"
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		b.StopTimer()
 		_, _ = p.SendOTP(ctx, phonenumber.SendOTPParams{PhoneNumber: phone})
 		otpRes, _ := p.GetVerificationOTP(ctx, phonenumber.GetVerificationOTPParams{

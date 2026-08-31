@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/asaskevich/EventBus"
@@ -20,19 +21,19 @@ import (
 
 // mockRepository implements magiclink.Repository for unit tests
 type mockRepository struct {
-	mu            sync.Mutex
-	records       map[string]*magiclink.VerificationRecord
-	users         map[string]*entity.User
-	usersByEmail  map[string]*entity.User
-	sessions      map[string]*entity.Session
+	*repository.MemorySessionRepository
+	mu           sync.Mutex
+	records      map[string]*magiclink.VerificationRecord
+	users        map[string]*entity.User
+	usersByEmail map[string]*entity.User
 }
 
 func newMockRepository() *mockRepository {
 	return &mockRepository{
-		records:      make(map[string]*magiclink.VerificationRecord),
-		users:        make(map[string]*entity.User),
-		usersByEmail: make(map[string]*entity.User),
-		sessions:     make(map[string]*entity.Session),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		records:                 make(map[string]*magiclink.VerificationRecord),
+		users:                   make(map[string]*entity.User),
+		usersByEmail:            make(map[string]*entity.User),
 	}
 }
 
@@ -100,16 +101,6 @@ func (m *mockRepository) UpdateEmailVerified(ctx context.Context, userID string,
 		u.EmailVerified = verified
 	}
 	return nil
-}
-
-func (m *mockRepository) CreateSession(ctx context.Context, session *entity.Session) (*entity.Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if session.ID == "" {
-		session.ID = uuid.NewString()
-	}
-	m.sessions[session.ID] = session
-	return session, nil
 }
 
 func TestMagicLink_FullFlow(t *testing.T) {

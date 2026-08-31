@@ -8,24 +8,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 	"github.com/asaskevich/EventBus"
 )
 
 type mockRepository struct {
+	*repository.MemorySessionRepository
 	mu                  sync.RWMutex
 	verificationRecords map[string]*ott.VerificationRecord
-	sessions            map[string]*entity.Session
 	users               map[string]*entity.User
 }
 
 func newMockRepository() *mockRepository {
 	return &mockRepository{
-		verificationRecords: make(map[string]*ott.VerificationRecord),
-		sessions:            make(map[string]*entity.Session),
-		users:               make(map[string]*entity.User),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		verificationRecords:     make(map[string]*ott.VerificationRecord),
+		users:                   make(map[string]*entity.User),
 	}
 }
 
@@ -47,16 +49,6 @@ func (m *mockRepository) ConsumeVerificationValue(ctx context.Context, identifie
 	return rec, nil
 }
 
-func (m *mockRepository) GetSessionByToken(ctx context.Context, token string) (*entity.Session, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	sess, exists := m.sessions[token]
-	if !exists {
-		return nil, ott.ErrSessionNotFound
-	}
-	return sess, nil
-}
-
 func (m *mockRepository) GetUserByID(ctx context.Context, userID string) (*entity.User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -75,16 +67,17 @@ func setupTest(t *testing.T) (*mockRepository, *entity.User, *entity.Session) {
 		Name:      "Test User",
 		CreatedAt: time.Now(),
 	}
-	session := &entity.Session{
-		ID:        "sess_123",
+	repo.users[user.ID] = user
+
+	session, err := repo.CreateSession(context.Background(), &dto.CreateSessionParams{
 		UserID:    user.ID,
 		Token:     "session_token_xyz",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 		CreatedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create session: %v", err)
 	}
-
-	repo.users[user.ID] = user
-	repo.sessions[session.Token] = session
 
 	return repo, user, session
 }
@@ -157,13 +150,12 @@ func TestOTT_SessionExpiredOrNotFound(t *testing.T) {
 	repo, _, _ := setupTest(t)
 
 	// Session expired
-	expiredSess := &entity.Session{
-		ID:        "sess_expired",
+	expiredSess, _ := repo.CreateSession(context.Background(), &dto.CreateSessionParams{
 		UserID:    "user_123",
 		Token:     "token_expired",
 		ExpiresAt: time.Now().Add(-1 * time.Minute),
-	}
-	repo.sessions[expiredSess.Token] = expiredSess
+		CreatedAt: time.Now().Add(-1 * time.Hour),
+	})
 
 	p := ott.New(repo)
 	ctx := context.Background()

@@ -210,6 +210,15 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.Us
 		return nil, ErrInvalidCredentials
 	}
 
+	payload := &SignInEventPayload{
+		User:  user,
+		Extra: input.Extra,
+	}
+
+	if p.ctx != nil && p.ctx.Events() != nil {
+		p.ctx.Events().Publish(EventSignInBefore, ctx, payload)
+	}
+
 	account, err := p.repo.GetAccountByUserIDAndProvider(ctx, user.ID, CredentialProvider)
 	if err != nil || account == nil || account.Password == "" {
 		if p.ctx != nil && p.ctx.Crypto() != nil {
@@ -224,15 +233,6 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.Us
 
 	if p.config.RequireEmailVerification && !user.EmailVerified {
 		return nil, ErrEmailNotVerified
-	}
-
-	payload := &SignInEventPayload{
-		User:  user,
-		Extra: input.Extra,
-	}
-
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInBefore, ctx, payload)
 	}
 
 	if p.ctx != nil && p.ctx.Events() != nil {

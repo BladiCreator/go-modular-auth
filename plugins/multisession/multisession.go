@@ -47,14 +47,6 @@ func (p *Plugin) Config() Config {
 	return p.config
 }
 
-// GetConfigInfo returns a MultiSessionConfigInfo struct containing active public configuration settings.
-func (p *Plugin) GetConfigInfo() MultiSessionConfigInfo {
-	return MultiSessionConfigInfo{
-		MaximumSessions: p.config.MaximumSessions,
-		CookiePrefix:    p.config.CookiePrefix,
-	}
-}
-
 // Repository returns the active storage repository instance.
 func (p *Plugin) Repository() Repository {
 	return p.repo

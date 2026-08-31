@@ -6,6 +6,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 var (
@@ -234,104 +235,6 @@ type Repository interface {
 	//   INSERT INTO accounts (id, user_id, provider_id, password_hash, created_at, updated_at) VALUES ($1, $2, 'credential', $3, $4, $5) ON CONFLICT (user_id, provider_id) DO UPDATE SET password_hash = $3, updated_at = $5;
 	LinkCredentialAccount(ctx context.Context, userID, passwordHash string) error
 
-	// CreateSession persists a new session entity (supporting impersonation tracking).
-	//
-	// Function:
-	//   Called during impersonation flows when an administrator impersonates a target user.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - session: DTO for session creation.
-	//
-	// Returns:
-	//   - *entity.Session: Active session entity.
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
-	CreateSession(ctx context.Context, session *dto.CreateSessionParams) (*entity.Session, error)
-
-	// GetSessionByToken retrieves an active session by its raw token string.
-	//
-	// Function:
-	//   Used during impersonation verification and stop-impersonation flows.
-	//
-	// Storage:
-	//   Both (Cache-Aside Strategy) - Cached in Redis (`session:<token>`) for fast session validation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - token: Session token string.
-	//
-	// Returns:
-	//   - *entity.Session: Session entity.
-	//   - error: ErrAdminSessionNotFound if missing.
-	//
-	// Example SQL:
-	//   SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE token = $1 LIMIT 1;
-	//
-	// Example Cache (Redis):
-	//   val, err := rdb.Get(ctx, "session:" + token).Bytes()
-	GetSessionByToken(ctx context.Context, token string) (*entity.Session, error)
-
-	// ListSessionsByUserID lists all active sessions belonging to the specified user.
-	//
-	// Function:
-	//   Used in admin user session management panels.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Relational user session list query.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - userID: Target user ID.
-	//
-	// Returns:
-	//   - []*entity.Session: List of active sessions.
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   SELECT id, user_id, token, expires_at, ip_address, user_agent, impersonated_by, created_at, updated_at FROM sessions WHERE user_id = $1;
-	ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error)
-
-	// DeleteSession deletes a specific session by token.
-	//
-	// Function:
-	//   Called when an admin revokes a single session.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Session record deletion.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - token: Target session token string.
-	//
-	// Returns:
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   DELETE FROM sessions WHERE token = $1;
-	DeleteSession(ctx context.Context, token string) error
-
-	// DeleteSessionsByUserID deletes all active sessions belonging to a user.
-	//
-	// Function:
-	//   Used during account bans, security locks, and global session revocation.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Bulk user session deletion.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - userID: Target user ID.
-	//
-	// Returns:
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   DELETE FROM sessions WHERE user_id = $1;
-	DeleteSessionsByUserID(ctx context.Context, userID string) error
+	// SessionRepository provides session lifecycle and governance operations (impersonation, user session listing, and revocation).
+	repository.SessionRepository
 }

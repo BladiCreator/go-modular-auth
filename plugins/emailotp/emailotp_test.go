@@ -10,6 +10,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 	"github.com/asaskevich/EventBus"
@@ -18,21 +19,21 @@ import (
 
 // In-Memory Test Repository implementing emailotp.Repository
 type testRepo struct {
-	mu             sync.Mutex
-	users          map[string]*entity.User
-	accounts       map[string]*entity.Account
-	userAccounts   map[string]map[string]*entity.Account // userID -> providerID -> Account
-	sessions       map[string]*entity.Session
-	verifications  map[string]*emailotp.VerificationRecord
+	*repository.MemorySessionRepository
+	mu            sync.Mutex
+	users         map[string]*entity.User
+	accounts      map[string]*entity.Account
+	userAccounts  map[string]map[string]*entity.Account // userID -> providerID -> Account
+	verifications map[string]*emailotp.VerificationRecord
 }
 
 func newTestRepo() *testRepo {
 	return &testRepo{
-		users:         make(map[string]*entity.User),
-		accounts:      make(map[string]*entity.Account),
-		userAccounts:  make(map[string]map[string]*entity.Account),
-		sessions:      make(map[string]*entity.Session),
-		verifications: make(map[string]*emailotp.VerificationRecord),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		users:                   make(map[string]*entity.User),
+		accounts:                make(map[string]*entity.Account),
+		userAccounts:            make(map[string]map[string]*entity.Account),
+		verifications:           make(map[string]*emailotp.VerificationRecord),
 	}
 }
 
@@ -195,34 +196,6 @@ func (r *testRepo) DeleteCredentialAccount(ctx context.Context, userID string) e
 		if acc, ok := userAccs["credential"]; ok {
 			delete(r.accounts, acc.ID)
 			delete(userAccs, "credential")
-		}
-	}
-	return nil
-}
-
-func (r *testRepo) CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	sess := &entity.Session{
-		ID:        "sess_" + uuid.NewString(),
-		UserID:    params.UserID,
-		Token:     params.Token,
-		ExpiresAt: params.ExpiresAt,
-		CreatedAt: params.CreatedAt,
-	}
-	r.sessions[sess.Token] = sess
-	cloned := *sess
-	return &cloned, nil
-}
-
-func (r *testRepo) DeleteSessionsByUserID(ctx context.Context, userID string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for token, sess := range r.sessions {
-		if sess.UserID == userID {
-			delete(r.sessions, token)
 		}
 	}
 	return nil
@@ -501,7 +474,7 @@ func TestPasswordReset(t *testing.T) {
 	}
 
 	// Verify active session was revoked
-	if _, ok := repo.sessions[sess.Token]; ok {
+	if _, err := repo.GetSessionByToken(ctx, sess.Token); err == nil {
 		t.Fatalf("expected active session to be revoked on password reset")
 	}
 

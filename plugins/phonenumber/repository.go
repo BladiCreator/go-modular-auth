@@ -7,6 +7,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Phone Number plugin.
@@ -384,42 +385,6 @@ type Repository interface {
 	//   UPDATE accounts SET password = $1, updated_at = $2 WHERE user_id = $3 AND provider = 'credential';
 	UpdateAccountPassword(ctx context.Context, userID, passwordHash string) error
 
-	// CreateSession persists a new active user session in storage.
-	//
-	// Function:
-	//   Creates a new active session upon successful SMS OTP verification.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - params: Parameters containing userID, token, expiration, and metadata.
-	//
-	// Returns:
-	//   - *entity.Session: The created session entity.
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
-	CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error)
-
-	// DeleteSessionsByUserID invalidates all active sessions for a user (used upon password reset).
-	//
-	// Function:
-	//   Bulk invalidation of user sessions.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Bulk session removal.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - userID: The target user's ID.
-	//
-	// Returns:
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   DELETE FROM sessions WHERE user_id = $1;
-	DeleteSessionsByUserID(ctx context.Context, userID string) error
+	// SessionRepository provides session creation and invalidation operations.
+	repository.SessionRepository
 }

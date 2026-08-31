@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Passkey plugin.
@@ -415,23 +415,6 @@ type Repository interface {
 	//   SELECT id, email, name, email_verified, created_at, updated_at FROM users WHERE email = $1 LIMIT 1;
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 
-	// CreateSession initializes and persists a new authenticated user session.
-	//
-	// Function:
-	//   Called after successful passkey authentication ceremony completion.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - session: DTO containing user ID, token, expiration, IP address, and user agent.
-	//
-	// Returns:
-	//   - *entity.Session: Populated active session entity.
-	//   - error: ErrUnableToCreateSession on failure.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6);
-	CreateSession(ctx context.Context, session *dto.CreateSessionParams) (*entity.Session, error)
+	// SessionRepository provides session creation operations.
+	repository.SessionRepository
 }

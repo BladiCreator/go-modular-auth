@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Device Authorization plugin.
@@ -264,23 +265,6 @@ type Repository interface {
 	//   SELECT id, email, name, email_verified, created_at, updated_at FROM users WHERE id = $1 LIMIT 1;
 	GetUserByID(ctx context.Context, userID string) (*entity.User, error)
 
-	// CreateSession initializes and persists an active user session entity.
-	//
-	// Function:
-	//   Called during successful token exchange to establish a new user session.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - session: Active session entity to persist.
-	//
-	// Returns:
-	//   - *entity.Session: Created session entity.
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6);
-	CreateSession(ctx context.Context, session *entity.Session) (*entity.Session, error)
+	// SessionRepository provides session creation operations.
+	repository.SessionRepository
 }

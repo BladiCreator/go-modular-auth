@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"slices"
 	"strings"
 	"time"
 
@@ -84,13 +85,6 @@ func (p *Plugin) generateToken(length int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// generateRandomID generates a unique identifier prefixed with a resource tag.
-func generateRandomID(prefix string, length int) string {
-	b := make([]byte, length)
-	_, _ = rand.Read(b)
-	return prefix + hex.EncodeToString(b)
-}
-
 // hasPermission checks if the caller satisfies the requested permissions.
 func (p *Plugin) hasPermission(caller CallerContext, perms Permissions, connector Connector) bool {
 	return HasPermission(HasPermissionInput{
@@ -109,13 +103,11 @@ func (p *Plugin) isUserAdmin(user *entity.User) bool {
 	if user == nil {
 		return false
 	}
-	for _, adminID := range p.config.AdminUserIDs {
-		if user.ID == adminID {
-			return true
-		}
+	if slices.Contains(p.config.AdminUserIDs, user.ID) {
+		return true
 	}
-	roleParts := strings.Split(user.Role, ",")
-	for _, part := range roleParts {
+	roleParts := strings.SplitSeq(user.Role, ",")
+	for part := range roleParts {
 		r := strings.TrimSpace(part)
 		for _, adminRole := range p.config.AdminRoles {
 			if strings.EqualFold(r, adminRole) {
@@ -162,10 +154,10 @@ func (p *Plugin) CreateUser(ctx context.Context, params CreateUserParams) (*enti
 	}
 
 	createParams := &dto.CreateUserParams{
-		Name:         strings.TrimSpace(params.Name),
-		Email:        email,
-		PasswordHash: passwordHash,
-		Role:         role,
+		Name:           strings.TrimSpace(params.Name),
+		Email:          email,
+		PasswordHash:   passwordHash,
+		Role:           role,
 		ExtraContainer: params.ExtraContainer,
 	}
 
@@ -179,9 +171,9 @@ func (p *Plugin) CreateUser(ctx context.Context, params CreateUserParams) (*enti
 	}
 
 	p.publishEvent(EventUserCreated, &UserCreatedEventPayload{
-		CallerID:   params.Caller.UserID,
-		CallerRole: params.Caller.Role,
-		User:       user,
+		CallerID:       params.Caller.UserID,
+		CallerRole:     params.Caller.Role,
+		User:           user,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -285,9 +277,9 @@ func (p *Plugin) UpdateUser(ctx context.Context, params UpdateUserParams) (*enti
 	}
 
 	p.publishEvent(EventUserUpdated, &UserUpdatedEventPayload{
-		CallerID:   params.Caller.UserID,
-		CallerRole: params.Caller.Role,
-		User:       user,
+		CallerID:       params.Caller.UserID,
+		CallerRole:     params.Caller.Role,
+		User:           user,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -341,8 +333,8 @@ func (p *Plugin) SetRole(ctx context.Context, params SetRoleParams) (*entity.Use
 	targetRole := strings.TrimSpace(params.Role)
 
 	if p.config.Roles != nil {
-		parts := strings.Split(targetRole, ",")
-		for _, part := range parts {
+		parts := strings.SplitSeq(targetRole, ",")
+		for part := range parts {
 			clean := strings.TrimSpace(part)
 			if clean == "" {
 				continue

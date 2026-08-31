@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 )
@@ -19,13 +20,15 @@ func TestOTTHTTPMiddleware(t *testing.T) {
 	user := &entity.User{ID: "usr_123", Email: "gopher@golang.org"}
 	repo.users[user.ID] = user
 
-	sess := &entity.Session{
-		ID:        "sess_123",
+	sess, err := repo.CreateSession(context.Background(), &dto.CreateSessionParams{
 		UserID:    user.ID,
 		Token:     "raw_session_token",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
+		CreatedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("failed to seed session: %v", err)
 	}
-	repo.sessions[sess.Token] = sess
 
 	genRes, err := p.GenerateToken(context.Background(), ott.GenerateTokenParams{
 		SessionToken: sess.Token,

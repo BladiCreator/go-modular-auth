@@ -13,25 +13,26 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugins/genericoauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/genericoauth/providers"
 )
 
 // mockRepository implements genericoauth.Repository for unit tests.
 type mockRepository struct {
+	*repository.MemorySessionRepository
 	mu       sync.Mutex
 	users    map[string]*entity.User
 	accounts map[string]*entity.Account
-	sessions map[string]*entity.Session
 	states   map[string]*genericoauth.StateData
 }
 
 func newMockRepository() *mockRepository {
 	return &mockRepository{
-		users:    make(map[string]*entity.User),
-		accounts: make(map[string]*entity.Account),
-		sessions: make(map[string]*entity.Session),
-		states:   make(map[string]*genericoauth.StateData),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		users:                   make(map[string]*entity.User),
+		accounts:                make(map[string]*entity.Account),
+		states:                  make(map[string]*genericoauth.StateData),
 	}
 }
 
@@ -80,13 +81,6 @@ func (m *mockRepository) CreateAccount(ctx context.Context, account *entity.Acco
 	// Stored by provider:accountID or account.ID
 	m.accounts[account.Provider+":"+account.ID] = account
 	return account, nil
-}
-
-func (m *mockRepository) CreateSession(ctx context.Context, session *entity.Session) (*entity.Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.sessions[session.ID] = session
-	return session, nil
 }
 
 func (m *mockRepository) SaveState(ctx context.Context, key string, data *genericoauth.StateData, ttl time.Duration) error {

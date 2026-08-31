@@ -13,6 +13,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
@@ -20,19 +21,20 @@ import (
 )
 
 var (
-	_ emailpassword.Repository = (*MockRepo)(nil)
-	_ twofactor.Repository     = (*MockRepo)(nil)
-	_ admin.Repository         = (*MockRepo)(nil)
-	_ passkey.Repository       = (*MockRepo)(nil)
+	_ repository.SessionRepository = (*MockRepo)(nil)
+	_ emailpassword.Repository     = (*MockRepo)(nil)
+	_ twofactor.Repository         = (*MockRepo)(nil)
+	_ admin.Repository             = (*MockRepo)(nil)
+	_ passkey.Repository           = (*MockRepo)(nil)
 )
 
 type MockRepo struct {
+	*repository.MemorySessionRepository
 	mu                     sync.RWMutex
 	users                  map[string]*entity.User
 	accounts               map[string]*entity.Account            // key: accountID
 	userAccounts           map[string]map[string]*entity.Account // key: userID -> provider -> Account
 	tokens                 map[string]*entity.VerificationToken  // key: token string
-	sessions               map[string]*entity.Session
 	totpSecrets            map[string]string
 	twoFactors             map[string]*twofactor.TwoFactor         // key: userID
 	otpChallenges          map[string]*twofactor.OTPChallenge      // key: challenge key
@@ -45,19 +47,19 @@ type MockRepo struct {
 
 func NewMockRepo() *MockRepo {
 	return &MockRepo{
-		users:                  make(map[string]*entity.User),
-		accounts:               make(map[string]*entity.Account),
-		userAccounts:           make(map[string]map[string]*entity.Account),
-		tokens:                 make(map[string]*entity.VerificationToken),
-		sessions:               make(map[string]*entity.Session),
-		totpSecrets:            make(map[string]string),
-		twoFactors:             make(map[string]*twofactor.TwoFactor),
-		otpChallenges:          make(map[string]*twofactor.OTPChallenge),
-		trustedDevices:         make(map[string]*twofactor.TrustDeviceRecord),
-		challenges:             make(map[string]*twofactor.ChallengeRecord),
-		passkeys:               make(map[string]*entity.Passkey),
-		passkeysByCredentialID: make(map[string]*entity.Passkey),
-		passkeyChallenges:      make(map[string]*passkey.PasskeyChallenge),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		users:                   make(map[string]*entity.User),
+		accounts:                make(map[string]*entity.Account),
+		userAccounts:            make(map[string]map[string]*entity.Account),
+		tokens:                  make(map[string]*entity.VerificationToken),
+		totpSecrets:             make(map[string]string),
+		twoFactors:              make(map[string]*twofactor.TwoFactor),
+		otpChallenges:           make(map[string]*twofactor.OTPChallenge),
+		trustedDevices:          make(map[string]*twofactor.TrustDeviceRecord),
+		challenges:              make(map[string]*twofactor.ChallengeRecord),
+		passkeys:                make(map[string]*entity.Passkey),
+		passkeysByCredentialID:  make(map[string]*entity.Passkey),
+		passkeyChallenges:       make(map[string]*passkey.PasskeyChallenge),
 	}
 }
 
@@ -323,72 +325,6 @@ func (m *MockRepo) DeleteVerificationToken(ctx context.Context, token string) er
 	defer m.mu.Unlock()
 
 	delete(m.tokens, token)
-	return nil
-}
-
-// Session Methods
-func (m *MockRepo) CreateSession(ctx context.Context, sessionCtx *dto.CreateSessionParams) (*entity.Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	sess := &entity.Session{
-		ID:             "sess_" + strconv.FormatInt(rand.Int63(), 10),
-		UserID:         sessionCtx.UserID,
-		Token:          sessionCtx.Token,
-		IPAddress:      sessionCtx.IPAddress,
-		UserAgent:      sessionCtx.UserAgent,
-		ImpersonatedBy: sessionCtx.ImpersonatedBy,
-		ExpiresAt:      sessionCtx.ExpiresAt,
-		CreatedAt:      sessionCtx.CreatedAt,
-	}
-	m.sessions[sess.Token] = sess
-	return sess, nil
-}
-
-func (m *MockRepo) GetSessionByToken(ctx context.Context, token string) (*entity.Session, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if sess, ok := m.sessions[token]; ok {
-		return sess, nil
-	}
-	return nil, domain.ErrSessionNotFound
-}
-
-func (m *MockRepo) ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	var result []*entity.Session
-	for _, sess := range m.sessions {
-		if sess.UserID == userID {
-			cloned := *sess
-			result = append(result, &cloned)
-		}
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
-	})
-	return result, nil
-}
-
-func (m *MockRepo) DeleteSession(ctx context.Context, token string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	delete(m.sessions, token)
-	return nil
-}
-
-func (m *MockRepo) DeleteSessionsByUserID(ctx context.Context, userID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for token, sess := range m.sessions {
-		if sess.UserID == userID {
-			delete(m.sessions, token)
-		}
-	}
 	return nil
 }
 

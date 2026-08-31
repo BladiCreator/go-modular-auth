@@ -11,6 +11,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
 	"github.com/asaskevich/EventBus"
@@ -20,21 +21,21 @@ import (
 
 // MockRepository implements phonenumber.Repository in memory with thread safety.
 type MockRepository struct {
+	*repository.MemorySessionRepository
 	mu            sync.RWMutex
 	verifications map[string]*phonenumber.VerificationRecord
 	users         map[string]*entity.User
 	usersByPhone  map[string]*entity.User
 	accounts      map[string]*entity.Account // key: userID:provider
-	sessions      map[string]*entity.Session
 }
 
 func NewMockRepository() *MockRepository {
 	return &MockRepository{
-		verifications: make(map[string]*phonenumber.VerificationRecord),
-		users:         make(map[string]*entity.User),
-		usersByPhone:  make(map[string]*entity.User),
-		accounts:      make(map[string]*entity.Account),
-		sessions:      make(map[string]*entity.Session),
+		MemorySessionRepository: repository.NewMemorySessionRepository(),
+		verifications:           make(map[string]*phonenumber.VerificationRecord),
+		users:                   make(map[string]*entity.User),
+		usersByPhone:            make(map[string]*entity.User),
+		accounts:                make(map[string]*entity.Account),
 	}
 }
 
@@ -183,32 +184,6 @@ func (m *MockRepository) UpdateAccountPassword(ctx context.Context, userID, pass
 	}
 	acc.Password = passwordHash
 	acc.UpdatedAt = time.Now()
-	return nil
-}
-
-func (m *MockRepository) CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	sess := &entity.Session{
-		ID:        uuid.NewString(),
-		UserID:    params.UserID,
-		Token:     params.Token,
-		ExpiresAt: params.ExpiresAt,
-		CreatedAt: params.CreatedAt,
-	}
-	m.sessions[sess.ID] = sess
-	cp := *sess
-	return &cp, nil
-}
-
-func (m *MockRepository) DeleteSessionsByUserID(ctx context.Context, userID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for id, sess := range m.sessions {
-		if sess.UserID == userID {
-			delete(m.sessions, id)
-		}
-	}
 	return nil
 }
 
@@ -610,8 +585,9 @@ func TestPasswordReset_Flow(t *testing.T) {
 	}
 
 	// 3. Verify that old session was revoked
-	if len(repo.sessions) != 0 {
-		t.Errorf("expected all sessions to be revoked on password reset, found %d", len(repo.sessions))
+	userSessions, _ := repo.ListSessionsByUserID(context.Background(), user.ID)
+	if len(userSessions) != 0 {
+		t.Errorf("expected all sessions to be revoked on password reset, found %d", len(userSessions))
 	}
 
 	// 4. Test Sign In with new password

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/google/uuid"
@@ -255,15 +256,14 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 
 	// Create user session
 	sessionToken := uuid.New().String()
-	session := &entity.Session{
-		ID:        uuid.New().String(),
+	sessParams := &dto.CreateSessionParams{
 		UserID:    user.ID,
 		Token:     sessionToken,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 		CreatedAt: time.Now(),
 	}
 
-	createdSession, err := p.repo.CreateSession(ctx, session)
+	createdSession, err := p.repo.CreateSession(ctx, sessParams)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create user session: %w", err)
 	}

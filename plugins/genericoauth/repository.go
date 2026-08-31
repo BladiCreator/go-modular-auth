@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Generic OAuth plugin.
@@ -197,23 +198,8 @@ type Repository interface {
 
 	// CreateSession persists a new active user session after successful OAuth authentication.
 	//
-	// Function:
-	//   Called at the end of Callback flow to issue a new session.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - session: Active session entity to persist.
-	//
-	// Returns:
-	//   - *entity.Session: Active session entity.
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6);
-	CreateSession(ctx context.Context, session *entity.Session) (*entity.Session, error)
+	// SessionRepository provides session creation operations.
+	repository.SessionRepository
 
 	// SaveState persists transient state metadata (e.g. for non-cookie state storage).
 	//

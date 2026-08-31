@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/google/uuid"
@@ -288,15 +289,14 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 		}
 	}
 
-	session := &entity.Session{
-		ID:        uuid.NewString(),
+	sessionParams := &dto.CreateSessionParams{
 		UserID:    user.ID,
 		Token:     uuid.NewString(),
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		CreatedAt: time.Now(),
 	}
 
-	session, err = p.repo.CreateSession(ctx, session)
+	session, err := p.repo.CreateSession(ctx, sessionParams)
 	if err != nil {
 		return nil, err
 	}

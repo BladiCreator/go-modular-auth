@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/google/uuid"
 )
@@ -206,15 +206,14 @@ func (p *Plugin) ExchangeDeviceToken(ctx context.Context, params ExchangeDeviceT
 		}
 
 		sessionExpiry := p.config.SessionExpiry
-		session := &entity.Session{
-			ID:        uuid.New().String(),
+		sessParams := &dto.CreateSessionParams{
 			UserID:    user.ID,
 			Token:     sessionToken,
 			ExpiresAt: now.Add(sessionExpiry),
 			CreatedAt: now,
 		}
 
-		createdSession, err := p.repo.CreateSession(ctx, session)
+		createdSession, err := p.repo.CreateSession(ctx, sessParams)
 		if err != nil {
 			return nil, err
 		}

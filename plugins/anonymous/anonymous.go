@@ -170,7 +170,7 @@ func (p *Plugin) DeleteAnonymousUser(ctx context.Context, session *entity.Sessio
 	p.publishEvent(EventDeleteAnonymousBefore, ctx, &DeleteAnonymousEventPayload{UserID: user.ID})
 
 	// Purge sessions first, then user record
-	if err := p.repo.DeleteUserSessions(ctx, user.ID); err != nil {
+	if err := p.repo.DeleteSessionsByUserID(ctx, user.ID); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +200,7 @@ func (p *Plugin) LinkAccount(ctx context.Context, data *OnLinkAccountData) error
 	if !p.config.DisableDeleteAnonymousUser &&
 		data.AnonymousUser.User.ID != data.NewUser.User.ID &&
 		data.AnonymousUser.User.IsAnonymous {
-		_ = p.repo.DeleteUserSessions(ctx, data.AnonymousUser.User.ID)
+		_ = p.repo.DeleteSessionsByUserID(ctx, data.AnonymousUser.User.ID)
 		_ = p.repo.DeleteUser(ctx, data.AnonymousUser.User.ID)
 	}
 

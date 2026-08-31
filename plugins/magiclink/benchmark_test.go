@@ -17,9 +17,8 @@ func BenchmarkSignInMagicLink(b *testing.B) {
 	)
 
 	ctx := context.Background()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		email := fmt.Sprintf("user_%d@example.com", i)
 		_, _ = p.SignInMagicLink(ctx, magiclink.SignInMagicLinkParams{
 			Email: email,
@@ -39,9 +38,8 @@ func BenchmarkVerifyMagicLink(b *testing.B) {
 	)
 
 	ctx := context.Background()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		b.StopTimer()
 		email := fmt.Sprintf("benchuser_%d@example.com", i)
 		_, _ = p.SignInMagicLink(ctx, magiclink.SignInMagicLinkParams{

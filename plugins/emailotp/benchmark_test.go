@@ -11,8 +11,8 @@ import (
 
 func BenchmarkDefaultNumericOTPGenerator(b *testing.B) {
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		_, err := emailotp.DefaultNumericOTPGenerator(6)
 		if err != nil {
 			b.Fatal(err)
@@ -29,8 +29,8 @@ func BenchmarkDefaultSHA256Hasher(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		_ = hasher.Verify(otp, hash)
 	}
 }
@@ -43,8 +43,8 @@ func BenchmarkAESGCMCipher(b *testing.B) {
 	otp := "987654"
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		enc, err := cipher.Encrypt(otp)
 		if err != nil {
 			b.Fatal(err)
@@ -69,9 +69,8 @@ func BenchmarkAtomicVerifyOTP(b *testing.B) {
 	})
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		identifier := emailotp.ToOTPIdentifier(emailotp.OTPTypeEmailVerification, user.Email)
 		_ = repo.CreateVerificationValue(ctx, &emailotp.VerificationRecord{
 			ID:         "bench_id",

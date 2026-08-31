@@ -14,6 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
@@ -27,16 +28,17 @@ import (
 )
 
 var (
-	_ emailpassword.Repository   = (*Store)(nil)
-	_ twofactor.Repository       = (*Store)(nil)
-	_ bearer.Repository          = (*Store)(nil)
-	_ jwt.Repository             = (*Store)(nil)
-	_ organization.Repository    = (*Store)(nil)
-	_ admin.Repository           = (*Store)(nil)
-	_ passkey.Repository         = (*Store)(nil)
-	_ oauth2.Repository          = (*Store)(nil)
-	_ multisession.Repository    = (*Store)(nil)
-	_ lastloginmethod.Repository = (*Store)(nil)
+	_ repository.SessionRepository = (*Store)(nil)
+	_ emailpassword.Repository     = (*Store)(nil)
+	_ twofactor.Repository         = (*Store)(nil)
+	_ bearer.Repository            = (*Store)(nil)
+	_ jwt.Repository               = (*Store)(nil)
+	_ organization.Repository      = (*Store)(nil)
+	_ admin.Repository             = (*Store)(nil)
+	_ passkey.Repository           = (*Store)(nil)
+	_ oauth2.Repository            = (*Store)(nil)
+	_ multisession.Repository      = (*Store)(nil)
+	_ lastloginmethod.Repository   = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
@@ -45,9 +47,11 @@ type Store struct {
 	users          map[string]*entity.User
 	accounts       map[string]*entity.Account            // key: accountID
 	userAccounts   map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens         map[string]*entity.VerificationToken  // key: token string
-	sessions       map[string]*entity.Session
-	totpSecrets    map[string]string
+	tokens              map[string]*entity.VerificationToken // key: token string
+	sessions            map[string]*entity.Session           // key: token string
+	sessionsByID        map[string]*entity.Session           // key: session.ID
+	customSessionFields map[string]map[string]any            // key: session.ID -> fields
+	totpSecrets         map[string]string
 	twoFactors     map[string]*twofactor.TwoFactor    // key: userID
 	otpChallenges  map[string]*twofactor.OTPChallenge // key: challenge key
 	trustedDevices map[string]*twofactor.TrustDeviceRecord
@@ -83,6 +87,8 @@ func New() *Store {
 		userAccounts:           make(map[string]map[string]*entity.Account),
 		tokens:                 make(map[string]*entity.VerificationToken),
 		sessions:               make(map[string]*entity.Session),
+		sessionsByID:           make(map[string]*entity.Session),
+		customSessionFields:    make(map[string]map[string]any),
 		totpSecrets:            make(map[string]string),
 		twoFactors:             make(map[string]*twofactor.TwoFactor),
 		otpChallenges:          make(map[string]*twofactor.OTPChallenge),
@@ -408,16 +414,22 @@ func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionPar
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sessionCreated := &entity.Session{
-		ID:             "memory:" + strconv.FormatInt(rand.Int63(), 10),
-		UserID:         session.UserID,
-		Token:          session.Token,
-		IPAddress:      session.IPAddress,
-		UserAgent:      session.UserAgent,
-		ImpersonatedBy: session.ImpersonatedBy,
-		ExpiresAt:      session.ExpiresAt,
-		CreatedAt:      session.CreatedAt,
+		ID:                   "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:               session.UserID,
+		Token:                session.Token,
+		IPAddress:            session.IPAddress,
+		UserAgent:            session.UserAgent,
+		ImpersonatedBy:       session.ImpersonatedBy,
+		ActiveOrganizationID: session.ActiveOrganizationID,
+		ActiveTeamID:         session.ActiveTeamID,
+		ExpiresAt:            session.ExpiresAt,
+		CreatedAt:            session.CreatedAt,
+	}
+	if session.DeviceID != "" {
+		sessionCreated.DeviceID = &session.DeviceID
 	}
 	s.sessions[session.Token] = sessionCreated
+	s.sessionsByID[sessionCreated.ID] = sessionCreated
 	return sessionCreated, nil
 }
 
@@ -425,6 +437,18 @@ func (s *Store) GetSessionByToken(ctx context.Context, token string) (*entity.Se
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if sess, ok := s.sessions[token]; ok {
+		return sess, nil
+	}
+	return nil, domain.ErrSessionNotFound
+}
+
+func (s *Store) GetSessionByID(ctx context.Context, id string) (*entity.Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if sess, ok := s.sessionsByID[id]; ok {
+		return sess, nil
+	}
+	if sess, ok := s.sessions[id]; ok {
 		return sess, nil
 	}
 	return nil, domain.ErrSessionNotFound
@@ -447,9 +471,79 @@ func (s *Store) ListSessionsByUserID(ctx context.Context, userID string) ([]*ent
 	return result, nil
 }
 
+func (s *Store) UpdateSession(ctx context.Context, session *entity.Session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if session == nil {
+		return domain.ErrSessionNotFound
+	}
+	s.sessions[session.Token] = session
+	s.sessionsByID[session.ID] = session
+	return nil
+}
+
+func (s *Store) SetActiveOrganization(ctx context.Context, sessionID, orgID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok := s.sessionsByID[sessionID]
+	if !ok {
+		sess, ok = s.sessions[sessionID]
+		if !ok {
+			return domain.ErrSessionNotFound
+		}
+	}
+	sess.ActiveOrganizationID = &orgID
+	return nil
+}
+
+func (s *Store) SetActiveTeam(ctx context.Context, sessionID, teamID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok := s.sessionsByID[sessionID]
+	if !ok {
+		sess, ok = s.sessions[sessionID]
+		if !ok {
+			return domain.ErrSessionNotFound
+		}
+	}
+	sess.ActiveTeamID = &teamID
+	return nil
+}
+
+func (s *Store) SaveCustomSessionFields(ctx context.Context, sessionID string, fields map[string]any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.customSessionFields == nil {
+		s.customSessionFields = make(map[string]map[string]any)
+	}
+	cp := make(map[string]any, len(fields))
+	for k, v := range fields {
+		cp[k] = v
+	}
+	s.customSessionFields[sessionID] = cp
+	return nil
+}
+
+func (s *Store) GetCustomSessionFields(ctx context.Context, sessionID string) (map[string]any, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if fields, ok := s.customSessionFields[sessionID]; ok {
+		cp := make(map[string]any, len(fields))
+		for k, v := range fields {
+			cp[k] = v
+		}
+		return cp, nil
+	}
+	return make(map[string]any), nil
+}
+
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if sess, ok := s.sessions[token]; ok {
+		delete(s.sessionsByID, sess.ID)
+		delete(s.customSessionFields, sess.ID)
+	}
 	delete(s.sessions, token)
 	return nil
 }
@@ -460,6 +554,8 @@ func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) error
 
 	for token, sess := range s.sessions {
 		if sess.UserID == userID {
+			delete(s.sessionsByID, sess.ID)
+			delete(s.customSessionFields, sess.ID)
 			delete(s.sessions, token)
 		}
 	}
@@ -471,9 +567,30 @@ func (s *Store) DeleteSessions(ctx context.Context, tokens []string) error {
 	defer s.mu.Unlock()
 
 	for _, token := range tokens {
+		if sess, ok := s.sessions[token]; ok {
+			delete(s.sessionsByID, sess.ID)
+			delete(s.customSessionFields, sess.ID)
+		}
 		delete(s.sessions, token)
 	}
 	return nil
+}
+
+func (s *Store) DeleteExpiredSessions(ctx context.Context) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	var count int64
+	for token, sess := range s.sessions {
+		if now.After(sess.ExpiresAt) {
+			delete(s.sessionsByID, sess.ID)
+			delete(s.customSessionFields, sess.ID)
+			delete(s.sessions, token)
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (s *Store) FindSessionsByTokens(ctx context.Context, tokens []string) ([]*entity.Session, []*entity.User, error) {

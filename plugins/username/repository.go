@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Username plugin.
@@ -163,23 +163,6 @@ type Repository interface {
 	//   SELECT id, user_id, provider, password_hash FROM accounts WHERE user_id = $1 AND provider = $2 LIMIT 1;
 	GetAccountByUserIDAndProvider(ctx context.Context, userID, providerID string) (*entity.Account, error)
 
-	// CreateSession persists a new active user session in storage.
-	//
-	// Function:
-	//   Called after successful username + password verification to issue a session.
-	//
-	// Storage:
-	//   Database (GORM / SQL) - Active session creation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - params: Session creation parameters.
-	//
-	// Returns:
-	//   - *entity.Session: Active session entity.
-	//   - error: Nil on success.
-	//
-	// Example SQL:
-	//   INSERT INTO sessions (id, user_id, token, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6);
-	CreateSession(ctx context.Context, params *dto.CreateSessionParams) (*entity.Session, error)
+	// SessionRepository provides session creation operations.
+	repository.SessionRepository
 }
