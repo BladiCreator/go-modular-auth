@@ -50,22 +50,7 @@ const (
 	ActionCancel = "cancel"
 )
 
-// InvitationStatus represents the lifecycle state of a member invitation.
-type InvitationStatus string
 
-const (
-	// InvitationStatusPending indicates an invitation is awaiting acceptance or rejection.
-	InvitationStatusPending InvitationStatus = "pending"
-
-	// InvitationStatusAccepted indicates an invitation has been accepted by the recipient.
-	InvitationStatusAccepted InvitationStatus = "accepted"
-
-	// InvitationStatusRejected indicates an invitation has been explicitly declined.
-	InvitationStatusRejected InvitationStatus = "rejected"
-
-	// InvitationStatusCanceled indicates an invitation was revoked by an organization admin.
-	InvitationStatusCanceled InvitationStatus = "canceled"
-)
 
 // Standard Extra metadata keys that can be set or consumed in organization operations and events.
 const (
