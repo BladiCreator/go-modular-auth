@@ -1553,7 +1553,7 @@ func Stripe(repo stripe.Repository, opts ...stripe.Option) (*stripe.Plugin, erro
 //
 //	polarPlugin := auth.Plugin[polar.Plugin](app)
 //	_ = polarPlugin
-func Polar(repo polar.Repository, opts ...polar.Option) (*polar.Plugin, error) {
+func Polar(repo polar.Repository, opts ...polar.Option) *polar.Plugin {
 	return polar.New(repo, opts...)
 }
 

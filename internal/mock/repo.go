@@ -253,21 +253,24 @@ func (m *MockRepo) LinkCredentialAccount(ctx context.Context, userID, passwordHa
 }
 
 // Account Methods
-func (m *MockRepo) CreateAccount(ctx context.Context, account *entity.Account) error {
+func (m *MockRepo) CreateAccount(ctx context.Context, params *dto.CreateAccountParams) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if account.ID == "" {
-		account.ID = "acc_" + strconv.FormatInt(rand.Int63(), 10)
+	acc := &entity.Account{
+		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:    params.UserID,
+		Provider:  params.Provider,
+		Password:  params.Password,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	account.CreatedAt = time.Now()
-	account.UpdatedAt = time.Now()
 
-	m.accounts[account.ID] = account
-	if _, ok := m.userAccounts[account.UserID]; !ok {
-		m.userAccounts[account.UserID] = make(map[string]*entity.Account)
+	m.accounts[acc.ID] = acc
+	if _, ok := m.userAccounts[params.UserID]; !ok {
+		m.userAccounts[params.UserID] = make(map[string]*entity.Account)
 	}
-	m.userAccounts[account.UserID][account.Provider] = account
+	m.userAccounts[params.UserID][params.Provider] = acc
 	return nil
 }
 

@@ -18,11 +18,7 @@ type Plugin struct {
 }
 
 // New instantiates a new Polar plugin configured with a mandatory Repository implementation and functional options.
-func New(repo Repository, opts ...Option) (*Plugin, error) {
-	if repo == nil {
-		return nil, ErrRepositoryRequired
-	}
-
+func New(repo Repository, opts ...Option) *Plugin {
 	cfg := DefaultConfig()
 	for _, opt := range opts {
 		opt(&cfg)
@@ -40,7 +36,7 @@ func New(repo Repository, opts ...Option) (*Plugin, error) {
 		p.client = newSDKClient(cfg.AccessToken, cfg.Server)
 	}
 
-	return p, nil
+	return p
 }
 
 // ID returns the unique string identifier for the plugin ("polar").

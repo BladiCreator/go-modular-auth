@@ -133,13 +133,14 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 		return nil, err
 	}
 
-	account := &entity.Account{
-		UserID:   newUser.ID,
-		Provider: CredentialProvider,
-		Password: hashedPassword,
+	accountParams := &dto.CreateAccountParams{
+		UserID:         newUser.ID,
+		Provider:       CredentialProvider,
+		Password:       hashedPassword,
+		ExtraContainer: input.ExtraContainer,
 	}
 
-	if err := p.repo.CreateAccount(ctx, account); err != nil {
+	if err := p.repo.CreateAccount(ctx, accountParams); err != nil {
 		return nil, err
 	}
 

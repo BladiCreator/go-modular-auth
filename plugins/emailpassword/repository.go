@@ -192,14 +192,14 @@ type Repository interface {
 	//
 	// Arguments:
 	//   - ctx: Request cancellation and deadline context.
-	//   - account: The credentials account entity to insert.
+	//   - params: Pointer to CreateAccountParams containing UserID, Provider, Password, and Extra metadata.
 	//
 	// Returns:
 	//   - error: Nil on success, or database error on failure.
 	//
 	// Example SQL:
 	//   INSERT INTO accounts (id, user_id, provider, password, created_at) VALUES ($1, $2, $3, $4, $5);
-	CreateAccount(ctx context.Context, account *entity.Account) error
+	CreateAccount(ctx context.Context, params *dto.CreateAccountParams) error
 
 	// UpdateAccountPassword updates the hashed password for a specific account record.
 	//

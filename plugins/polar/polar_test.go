@@ -16,15 +16,11 @@ import (
 
 func TestPolarPlugin_Initialization(t *testing.T) {
 	repo := polar.NewMemoryRepository()
-	p, err := polar.New(repo,
+	p := polar.New(repo,
 		polar.WithAccessToken("polar_token_123"),
 		polar.WithWebhookSecret("whsec_test_secret"),
 		polar.WithServer("sandbox"),
 	)
-
-	if err != nil {
-		t.Fatalf("expected no error creating plugin, got %v", err)
-	}
 
 	if p.ID() != "polar" {
 		t.Errorf("expected plugin ID 'polar', got %s", p.ID())
@@ -41,11 +37,8 @@ func TestPolarPlugin_Initialization(t *testing.T) {
 
 func TestPolarPlugin_UserCreatedHook(t *testing.T) {
 	repo := polar.NewMemoryRepository()
-	p, err := polar.New(repo, polar.WithAccessToken("test_token"))
-	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
-	}
-
+	p := polar.New(repo, polar.WithAccessToken("test_token"))
+	
 	ctx := context.Background()
 	user := &entity.User{
 		ID:    "user_123",
@@ -53,7 +46,7 @@ func TestPolarPlugin_UserCreatedHook(t *testing.T) {
 		Email: "gopher@example.com",
 	}
 
-	err = p.OnUserCreated(ctx, user)
+	err := p.OnUserCreated(ctx, user)
 	if err != nil {
 		t.Fatalf("expected no error on user created hook, got %v", err)
 	}
@@ -66,7 +59,7 @@ func TestPolarPlugin_UserCreatedHook(t *testing.T) {
 
 func TestPolarPlugin_CheckoutAndPortal(t *testing.T) {
 	repo := polar.NewMemoryRepository()
-	p, err := polar.New(repo,
+	p := polar.New(repo,
 		polar.WithAccessToken("test_token"),
 		polar.WithPlans(polar.PolarPlan{
 			ID:        "pro_plan",
@@ -75,9 +68,6 @@ func TestPolarPlugin_CheckoutAndPortal(t *testing.T) {
 			PriceID:   "price_pro_123",
 		}),
 	)
-	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
-	}
 
 	ctx := context.Background()
 	_ = repo.SaveCustomerPolarID(ctx, "user", "user_123", "pol_cust_123")
@@ -111,16 +101,14 @@ func TestPolarPlugin_Webhooks(t *testing.T) {
 	secret := "whsec_mysecretkey"
 
 	var createdSub *polar.Subscription
-	p, err := polar.New(repo,
+	p := polar.New(repo,
 		polar.WithWebhookSecret(secret),
 		polar.WithOnSubscriptionCreated(func(ctx context.Context, sub *polar.Subscription) error {
 			createdSub = sub
 			return nil
 		}),
 	)
-	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
-	}
+
 
 	rawPayload := []byte(`{
 		"id": "evt_123",
@@ -167,10 +155,8 @@ func TestPolarPlugin_Webhooks(t *testing.T) {
 
 func TestPolarPlugin_Middleware(t *testing.T) {
 	repo := polar.NewMemoryRepository()
-	p, err := polar.New(repo)
-	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
-	}
+	p := polar.New(repo)
+
 
 	ctx := context.Background()
 	_ = repo.CreateSubscription(ctx, &polar.Subscription{

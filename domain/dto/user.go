@@ -2,6 +2,8 @@
 package dto
 
 import (
+	"time"
+
 	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
@@ -23,8 +25,18 @@ type (
 
 	// UpdateUserParams defines the data payload for updating user details.
 	UpdateUserParams struct {
-		Name  string `json:"name" binding:"required"`
-		Email string `json:"email" binding:"required,email"`
+		ID                  string     `json:"id" binding:"required"`
+		Name                string     `json:"name,omitempty"`
+		Email               string     `json:"email,omitempty"`
+		EmailVerified       *bool      `json:"emailVerified,omitempty"`
+		PhoneNumber         *string    `json:"phoneNumber,omitempty"`
+		PhoneNumberVerified *bool      `json:"phoneNumberVerified,omitempty"`
+		TwoFactorEnabled    *bool      `json:"twoFactorEnabled,omitempty"`
+		Role                string     `json:"role,omitempty"`
+		Banned              *bool      `json:"banned,omitempty"`
+		BanReason           *string    `json:"banReason,omitempty"`
+		BanExpires          *time.Time `json:"banExpires,omitempty"`
+		LastLoginMethod     *string    `json:"lastLoginMethod,omitempty"`
 		plugin.ExtraContainer
 	}
 

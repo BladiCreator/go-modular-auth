@@ -330,21 +330,24 @@ func (s *Store) LinkCredentialAccount(ctx context.Context, userID, passwordHash 
 }
 
 // Account Methods
-func (s *Store) CreateAccount(ctx context.Context, account *entity.Account) error {
+func (s *Store) CreateAccount(ctx context.Context, params *dto.CreateAccountParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if account.ID == "" {
-		account.ID = "acc_" + strconv.FormatInt(rand.Int63(), 10)
+	acc := &entity.Account{
+		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		UserID:    params.UserID,
+		Provider:  params.Provider,
+		Password:  params.Password,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	account.CreatedAt = time.Now()
-	account.UpdatedAt = time.Now()
 
-	s.accounts[account.ID] = account
-	if _, ok := s.userAccounts[account.UserID]; !ok {
-		s.userAccounts[account.UserID] = make(map[string]*entity.Account)
+	s.accounts[acc.ID] = acc
+	if _, ok := s.userAccounts[params.UserID]; !ok {
+		s.userAccounts[params.UserID] = make(map[string]*entity.Account)
 	}
-	s.userAccounts[account.UserID][account.Provider] = account
+	s.userAccounts[params.UserID][params.Provider] = acc
 	return nil
 }
 
