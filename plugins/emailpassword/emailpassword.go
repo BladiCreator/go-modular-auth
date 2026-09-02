@@ -2,6 +2,7 @@ package emailpassword
 
 import (
 	"context"
+	"fmt"
 	"net/mail"
 	"strings"
 	"time"
@@ -9,7 +10,25 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
+	"golang.org/x/crypto/bcrypt"
 )
+
+// SessionOption represents a functional option for configuring session creation on SignIn.
+type SessionOption = plugin.SessionOption
+
+// Functional option constructors for configuring session creation.
+var (
+	WithDuration   = plugin.WithDuration
+	WithRememberMe = plugin.WithRememberMe
+	WithIPAddress  = plugin.WithIPAddress
+	WithUserAgent  = plugin.WithUserAgent
+	WithDeviceID   = plugin.WithDeviceID
+	WithExtra      = plugin.WithExtra
+	WithExtraMap   = plugin.WithExtraMap
+)
+
+// ErrSessionManagerRequired is returned when sign-in attempts to create a session without an active SessionManager in context.
+var ErrSessionManagerRequired = plugin.ErrSessionManagerRequired
 
 const (
 	// PluginID is the unique string identifier for the EmailPassword plugin ("email-password").
@@ -162,12 +181,62 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 	return newUser, nil
 }
 
-// SignIn authenticates user credentials by verifying email existence and comparing the password hash.
+// VerifyCredentials validates user credentials by checking email existence and password hash
+// without creating or emitting an active authentication session.
+//
+// Brief Explanation:
+//
+//	Verifies user identity for headless checks, re-authentication challenges, or step-up flows.
+//	Mitigates timing attacks and user enumeration with constant-time password hashing if the user does not exist.
+//
+// Function:
+//
+//	Validates credentials without session side-effects.
+//
+// Arguments:
+//   - ctx: Request cancellation context.
+//   - email: User email address.
+//   - password: User plaintext password to verify.
+//
+// Returns:
+//   - *entity.User: The matching user entity if credentials are valid.
+//   - error: ErrInvalidCredentials, ErrEmailNotVerified, or database error.
+func (p *Plugin) VerifyCredentials(ctx context.Context, email, password string) (*entity.User, error) {
+	normEmail := strings.ToLower(strings.TrimSpace(email))
+	if normEmail == "" || password == "" {
+		return nil, ErrInvalidCredentials
+	}
+
+	user, err := p.repo.GetUserByEmail(ctx, normEmail)
+	if err != nil || user == nil {
+		p.fakeHash(password)
+		return nil, ErrInvalidCredentials
+	}
+
+	account, err := p.repo.GetAccountByUserIDAndProvider(ctx, user.ID, CredentialProvider)
+	if err != nil || account == nil || account.Password == "" {
+		p.fakeHash(password)
+		return nil, ErrInvalidCredentials
+	}
+
+	if !p.comparePassword(account.Password, password) {
+		return nil, ErrInvalidCredentials
+	}
+
+	if p.config.RequireEmailVerification && !user.EmailVerified {
+		return nil, ErrEmailNotVerified
+	}
+
+	return user, nil
+}
+
+// SignIn authenticates user credentials, creates an active session via the central SessionManager, and returns SessionData.
 //
 // Brief Explanation:
 //
 //	Fetches the user and corresponding credentials account, securely verifies the password using constant-time
-//	comparison, checks email verification prerequisites (if configured), and publishes EventSignInBefore and EventSignInAfter.
+//	comparison, checks email verification prerequisites (if configured), emits a cryptographically secure session
+//	through the core SessionManager, and publishes EventSignInBefore and EventSignInAfter.
 //	Mitigates timing attacks and user enumeration by executing a constant-time fake password hash if the user does not exist.
 //
 // Function:
@@ -180,22 +249,23 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 //   - Email (string, required): User email address.
 //   - Password (string, required): Plaintext password to compare against stored hash.
 //   - Extra (map[string]any, optional): Dynamic metadata passed through event interceptors.
+//   - opts: Optional functional session options (WithRememberMe, WithIPAddress, WithUserAgent, WithDuration, etc.).
 //
 // Returns:
-//   - *entity.User: The authenticated user profile.
-//   - error: ErrInvalidCredentials, ErrEmailNotVerified, or database error.
+//   - *dto.SessionData: Combined authenticated user profile and active session.
+//   - error: ErrInvalidCredentials, ErrEmailNotVerified, ErrSessionManagerRequired, or database error.
 //
 // Example:
 //
-//	user, err := epPlugin.SignIn(ctx, dto.SignInParams{
+//	sessionData, err := epPlugin.SignIn(ctx, dto.SignInParams{
 //		Email:    "john.doe@example.com",
 //		Password: "SuperSecretPassword123!",
 //	})
 //	if err != nil {
 //		log.Fatalf("Authentication failed: %v", err)
 //	}
-//	fmt.Printf("Authenticated as: %s\n", user.Name)
-func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.User, error) {
+//	fmt.Printf("Authenticated as: %s (Session Token: %s)\n", sessionData.User.Name, sessionData.Session.Token)
+func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if email == "" || input.Password == "" {
 		return nil, ErrInvalidCredentials
@@ -204,9 +274,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.Us
 	user, err := p.repo.GetUserByEmail(ctx, email)
 	if err != nil || user == nil {
 		// Timing attack mitigation: compute fake hash to maintain constant-time response
-		if p.ctx != nil && p.ctx.Crypto() != nil {
-			_, _ = p.ctx.Crypto().HashPassword(input.Password)
-		}
+		p.fakeHash(input.Password)
 		return nil, ErrInvalidCredentials
 	}
 
@@ -221,13 +289,11 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.Us
 
 	account, err := p.repo.GetAccountByUserIDAndProvider(ctx, user.ID, CredentialProvider)
 	if err != nil || account == nil || account.Password == "" {
-		if p.ctx != nil && p.ctx.Crypto() != nil {
-			_, _ = p.ctx.Crypto().HashPassword(input.Password)
-		}
+		p.fakeHash(input.Password)
 		return nil, ErrInvalidCredentials
 	}
 
-	if !p.ctx.Crypto().ComparePassword(account.Password, input.Password) {
+	if !p.comparePassword(account.Password, input.Password) {
 		return nil, ErrInvalidCredentials
 	}
 
@@ -235,11 +301,35 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams) (*entity.Us
 		return nil, ErrEmailNotVerified
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
+	if p.ctx == nil || p.ctx.Session() == nil {
+		return nil, ErrSessionManagerRequired
+	}
+
+	combinedOpts := make([]plugin.SessionOption, 0, len(opts)+1)
+	if len(input.Extra) > 0 {
+		combinedOpts = append(combinedOpts, plugin.WithExtraMap(input.Extra))
+	}
+	combinedOpts = append(combinedOpts, opts...)
+
+	sess, err := p.ctx.Session().CreateSession(ctx, user.ID, combinedOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("emailpassword: failed to create session: %w", err)
+	}
+
+	payload.Session = sess
+	if p.ctx.Events() != nil {
 		p.ctx.Events().Publish(EventSignInAfter, ctx, payload)
 	}
 
-	return user, nil
+	sessionData := &dto.SessionData{
+		Session: sess,
+		User:    user,
+	}
+	if sess.Extra != nil {
+		sessionData.Extra = sess.Extra
+	}
+
+	return sessionData, nil
 }
 
 // ChangePassword updates an existing authenticated user's password after verifying their current password.
@@ -666,8 +756,25 @@ func (p *Plugin) VerifyPassword(ctx context.Context, input dto.VerifyPasswordPar
 		return false, ErrAccountNotFound
 	}
 
-	valid := p.ctx.Crypto().ComparePassword(account.Password, input.Password)
+	valid := p.comparePassword(account.Password, input.Password)
 	return valid, nil
+}
+
+// comparePassword securely verifies a password hash using context CryptoUtils or bcrypt fallback.
+func (p *Plugin) comparePassword(hash, password string) bool {
+	if p.ctx != nil && p.ctx.Crypto() != nil {
+		return p.ctx.Crypto().ComparePassword(hash, password)
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+// fakeHash computes a dummy password hash to maintain constant response times against timing attacks.
+func (p *Plugin) fakeHash(password string) {
+	if p.ctx != nil && p.ctx.Crypto() != nil {
+		_, _ = p.ctx.Crypto().HashPassword(password)
+	} else {
+		_, _ = bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	}
 }
 
 // isValidEmail checks whether the provided string is a valid email address.

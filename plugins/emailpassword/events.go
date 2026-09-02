@@ -68,10 +68,13 @@ type SignUpEventPayload struct {
 	Extra map[string]any
 }
 
-// SignInEventPayload contains the authenticated user entity associated with a sign-in event.
+// SignInEventPayload contains the authenticated user entity and session associated with a sign-in event.
 type SignInEventPayload struct {
 	// User is the authenticated user entity.
 	User *entity.User
+
+	// Session is the authenticated session entity created upon sign-in.
+	Session *entity.Session
 
 	// Extra holds dynamic request metadata.
 	Extra map[string]any

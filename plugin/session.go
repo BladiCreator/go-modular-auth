@@ -2,11 +2,15 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 )
+
+// ErrSessionManagerRequired is returned when a session operation is attempted but no SessionManager is configured in context.
+var ErrSessionManagerRequired = errors.New("plugin: session manager is required")
 
 // SessionManager defines the contract for central session management exposed to plugins and the core engine.
 type SessionManager interface {
@@ -18,6 +22,8 @@ type SessionManager interface {
 	RevokeSession(ctx context.Context, token string) error
 	// GetSessionByToken retrieves an active session by its token string without loading the user.
 	GetSessionByToken(ctx context.Context, token string) (*entity.Session, error)
+	// RevokeSessionsByUserID revokes all active sessions belonging to the specified user.
+	RevokeSessionsByUserID(ctx context.Context, userID string) error
 }
 
 // SessionOptions holds configurable options when creating or modifying a session.

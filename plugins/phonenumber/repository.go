@@ -7,7 +7,6 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Phone Number plugin.
@@ -384,7 +383,4 @@ type Repository interface {
 	// Example SQL:
 	//   UPDATE accounts SET password = $1, updated_at = $2 WHERE user_id = $3 AND provider = 'credential';
 	UpdateAccountPassword(ctx context.Context, userID, passwordHash string) error
-
-	// SessionRepository provides session creation and invalidation operations.
-	repository.SessionRepository
 }

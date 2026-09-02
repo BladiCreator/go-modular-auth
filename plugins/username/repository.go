@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Username plugin.
@@ -162,7 +161,4 @@ type Repository interface {
 	// Example SQL:
 	//   SELECT id, user_id, provider, password_hash FROM accounts WHERE user_id = $1 AND provider = $2 LIMIT 1;
 	GetAccountByUserIDAndProvider(ctx context.Context, userID, providerID string) (*entity.Account, error)
-
-	// SessionRepository provides session creation operations.
-	repository.SessionRepository
 }

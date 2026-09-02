@@ -2,6 +2,7 @@ package emailpassword_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -9,9 +10,11 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/internal/mock"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func setupTestAuth(t *testing.T, opts ...emailpassword.Option) (*auth.Auth, *emailpassword.Plugin, *mock.MockRepo) {
@@ -19,6 +22,7 @@ func setupTestAuth(t *testing.T, opts ...emailpassword.Option) (*auth.Auth, *ema
 	repo := mock.NewMockRepo()
 
 	app, err := auth.New(
+		config.WithSessionRepository(repo),
 		config.WithPlugins(
 			plugins.EmailPassword(repo, opts...),
 		),
@@ -163,15 +167,21 @@ func TestSignIn(t *testing.T) {
 	}
 
 	// 3. Successful sign in
-	signedInUser, err := p.SignIn(ctx, dto.SignInParams{
+	sessionData, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "password123",
 	})
 	if err != nil {
 		t.Fatalf("SignIn failed: %v", err)
 	}
-	if signedInUser.ID != user.ID {
-		t.Errorf("Expected user ID %s, got %s", user.ID, signedInUser.ID)
+	if sessionData == nil || sessionData.User == nil || sessionData.Session == nil {
+		t.Fatalf("Expected non-nil SessionData, User, and Session, got %+v", sessionData)
+	}
+	if sessionData.User.ID != user.ID {
+		t.Errorf("Expected user ID %s, got %s", user.ID, sessionData.User.ID)
+	}
+	if sessionData.Session.Token == "" {
+		t.Errorf("Expected generated session token to be non-empty")
 	}
 
 	// 4. Email verification required scenario
@@ -197,12 +207,163 @@ func TestSignIn(t *testing.T) {
 	unverifiedUser.EmailVerified = true
 	_ = repo.UpdateUser(ctx, unverifiedUser)
 
-	_, err = pVerify.SignIn(ctx, dto.SignInParams{
+	verifiedSessionData, err := pVerify.SignIn(ctx, dto.SignInParams{
 		Email:    "unverified@example.com",
 		Password: "password123",
 	})
 	if err != nil {
 		t.Errorf("Expected signin to succeed after email verification, got %v", err)
+	}
+	if verifiedSessionData.Session == nil || verifiedSessionData.Session.Token == "" {
+		t.Errorf("Expected session to be created after email verified")
+	}
+}
+
+func TestVerifyCredentials(t *testing.T) {
+	_, p, repo := setupTestAuth(t, emailpassword.WithMinPasswordLength(8))
+	ctx := context.Background()
+
+	user, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "verifycred@example.com",
+		Password: "password123",
+		Name:     "Verify Credential User",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	// 1. Correct credentials
+	verifiedUser, err := p.VerifyCredentials(ctx, "verifycred@example.com", "password123")
+	if err != nil {
+		t.Fatalf("VerifyCredentials failed: %v", err)
+	}
+	if verifiedUser.ID != user.ID {
+		t.Errorf("Expected user ID %s, got %s", user.ID, verifiedUser.ID)
+	}
+
+	// 2. Wrong password
+	_, err = p.VerifyCredentials(ctx, "verifycred@example.com", "wrongpass")
+	if err != emailpassword.ErrInvalidCredentials {
+		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
+	}
+
+	// 3. Nonexistent email
+	_, err = p.VerifyCredentials(ctx, "nonexistent@example.com", "password123")
+	if err != emailpassword.ErrInvalidCredentials {
+		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
+	}
+
+	// 4. Empty email / password
+	_, err = p.VerifyCredentials(ctx, "", "password123")
+	if err != emailpassword.ErrInvalidCredentials {
+		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
+	}
+
+	// 5. Email verification enforcement
+	_, pVerify, _ := setupTestAuth(t, emailpassword.WithRequireEmailVerification(true))
+	unverifiedUser, err := pVerify.SignUp(ctx, dto.SignUpParams{
+		Email:    "unverified_cred@example.com",
+		Password: "password123",
+		Name:     "Unverified Cred",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	_, err = pVerify.VerifyCredentials(ctx, "unverified_cred@example.com", "password123")
+	if err != emailpassword.ErrEmailNotVerified {
+		t.Errorf("Expected ErrEmailNotVerified, got %v", err)
+	}
+
+	unverifiedUser.EmailVerified = true
+	_ = repo.UpdateUser(ctx, unverifiedUser)
+
+	vUser, err := pVerify.VerifyCredentials(ctx, "unverified_cred@example.com", "password123")
+	if err != nil || vUser == nil {
+		t.Errorf("Expected VerifyCredentials to succeed after email verified, got %v", err)
+	}
+}
+
+func TestSignIn_WithOptionsAndSessionManager(t *testing.T) {
+	_, p, _ := setupTestAuth(t, emailpassword.WithMinPasswordLength(8))
+	ctx := context.Background()
+
+	_, err := p.SignUp(ctx, dto.SignUpParams{
+		Email:    "opts@example.com",
+		Password: "password123",
+		Name:     "Options User",
+	})
+	if err != nil {
+		t.Fatalf("SignUp failed: %v", err)
+	}
+
+	sessionData, err := p.SignIn(ctx, dto.SignInParams{
+		Email:    "opts@example.com",
+		Password: "password123",
+		ExtraContainer: entity.ExtraContainer{
+			Extra: map[string]any{
+				"paramExtra": "from_params",
+			},
+		},
+	},
+		emailpassword.WithRememberMe(true),
+		emailpassword.WithIPAddress("192.168.1.50"),
+		emailpassword.WithUserAgent("Mozilla/5.0 TestAgent"),
+		emailpassword.WithDeviceID("device-999"),
+		emailpassword.WithExtra("optExtra", "from_opts"),
+	)
+	if err != nil {
+		t.Fatalf("SignIn with options failed: %v", err)
+	}
+
+	sess := sessionData.Session
+	if sess == nil {
+		t.Fatalf("Expected session to be non-nil")
+	}
+	if sess.IPAddress != "192.168.1.50" {
+		t.Errorf("Expected IP 192.168.1.50, got %s", sess.IPAddress)
+	}
+	if sess.UserAgent != "Mozilla/5.0 TestAgent" {
+		t.Errorf("Expected User-Agent Mozilla/5.0 TestAgent, got %s", sess.UserAgent)
+	}
+	if sess.DeviceID == nil || *sess.DeviceID != "device-999" {
+		t.Errorf("Expected DeviceID device-999, got %v", sess.DeviceID)
+	}
+	if sess.Extra == nil || sess.Extra["optExtra"] != "from_opts" {
+		t.Errorf("Expected extra metadata 'optExtra' to be 'from_opts', got %v", sess.Extra)
+	}
+
+	// Verify RememberMe extended expiration (should be roughly 30 days instead of 24 hours)
+	expectedMinExpiry := time.Now().Add(25 * 24 * time.Hour)
+	if sess.ExpiresAt.Before(expectedMinExpiry) {
+		t.Errorf("Expected RememberMe expiration > 25 days, got %v", sess.ExpiresAt)
+	}
+}
+
+func TestSignIn_WithoutSessionManager_ReturnsError(t *testing.T) {
+	repo := mock.NewMockRepo()
+	p := emailpassword.New(repo)
+	ctx := context.Background()
+
+	// Provision user directly in repo
+	hashed, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
+	u, _ := repo.CreateUser(ctx, &dto.CreateUserParams{
+		Email: "existing@example.com",
+		Name:  "Existing",
+	})
+	_ = repo.CreateAccount(ctx, &dto.CreateAccountParams{
+		UserID:   u.ID,
+		Provider: emailpassword.CredentialProvider,
+		Password: string(hashed),
+	})
+
+	// Direct call without SessionManager configured in context
+	_, err := p.SignIn(ctx, dto.SignInParams{
+		Email:    "existing@example.com",
+		Password: "password123",
+	})
+	if !errors.Is(err, emailpassword.ErrSessionManagerRequired) {
+		t.Errorf("Expected ErrSessionManagerRequired when context has no SessionManager, got %v", err)
 	}
 }
 
@@ -564,7 +725,7 @@ func TestEventEmissions(t *testing.T) {
 	app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
-		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil {
+		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil && req.Session != nil {
 			signInAfterEmitted = true
 		}
 	})

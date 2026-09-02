@@ -2,20 +2,38 @@ package username
 
 import (
 	"context"
+	"fmt"
 	"strings"
-	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// PluginID is the unique string identifier for the Username plugin ("username").
-const PluginID = "username"
+// SessionOption represents a functional option for configuring session creation on SignIn.
+type SessionOption = plugin.SessionOption
 
-// CredentialProvider is the default account provider ID for password authentication ("credential").
-const CredentialProvider = "credential"
+// Functional option constructors for configuring session creation.
+var (
+	WithDuration   = plugin.WithDuration
+	WithRememberMe = plugin.WithRememberMe
+	WithIPAddress  = plugin.WithIPAddress
+	WithUserAgent  = plugin.WithUserAgent
+	WithDeviceID   = plugin.WithDeviceID
+	WithExtra      = plugin.WithExtra
+	WithExtraMap   = plugin.WithExtraMap
+)
+
+// ErrSessionManagerRequired is returned when sign-in attempts to create a session without an active SessionManager in context.
+var ErrSessionManagerRequired = plugin.ErrSessionManagerRequired
+
+const (
+	// PluginID is the unique string identifier for the Username plugin ("username").
+	PluginID = "username"
+
+	// CredentialProvider is the default account provider ID for password authentication ("credential").
+	CredentialProvider = "credential"
+)
 
 // Pre-calculated valid bcrypt hash used to prevent timing attacks when querying nonexistent users.
 // Hashed value of "DummyTimingAttackPassword123!" with cost 10.
@@ -141,9 +159,9 @@ func (p *Plugin) ProcessSignUpUsername(ctx context.Context, rawUsername, rawDisp
 	return normalizedUsername, finalDisplayUsername, nil
 }
 
-// SignIn authenticates a user by username and password.
+// SignIn authenticates a user by username and password, emits an active session via SessionManager, and returns SessionData.
 // Employs a dummy bcrypt check on nonexistent users to prevent timing attacks.
-func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams) (*SignInUsernameResult, error) {
+func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
 	rawUsername := strings.TrimSpace(params.Username)
 	password := params.Password
 
@@ -179,33 +197,37 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams) (*Sign
 		return nil, ErrInvalidUsernameOrPassword
 	}
 
-	sessionToken := uuid.New().String()
-	expiresAt := time.Now().Add(24 * time.Hour)
-	if params.RememberMe != nil && *params.RememberMe {
-		expiresAt = time.Now().Add(30 * 24 * time.Hour)
+	if p.ctx == nil || p.ctx.Session() == nil {
+		return nil, ErrSessionManagerRequired
 	}
 
-	session, err := p.repo.CreateSession(ctx, &dto.CreateSessionParams{
-		UserID:    user.ID,
-		Token:     sessionToken,
-		ExpiresAt:      expiresAt,
-		ExtraContainer: params.ExtraContainer,
-	})
+	combinedOpts := make([]plugin.SessionOption, 0, len(opts)+2)
+	if params.RememberMe != nil {
+		combinedOpts = append(combinedOpts, plugin.WithRememberMe(*params.RememberMe))
+	}
+	if len(params.Extra) > 0 {
+		combinedOpts = append(combinedOpts, plugin.WithExtraMap(params.Extra))
+	}
+	combinedOpts = append(combinedOpts, opts...)
+
+	sess, err := p.ctx.Session().CreateSession(ctx, user.ID, combinedOpts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("username: failed to create session: %w", err)
 	}
 
-	result := &SignInUsernameResult{
-		User:         user,
-		SessionToken: sessionToken,
-		Session:      session,
+	sessionData := &dto.SessionData{
+		Session: sess,
+		User:    user,
+	}
+	if sess.Extra != nil {
+		sessionData.Extra = sess.Extra
 	}
 
 	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInAfter, ctx, result)
+		p.ctx.Events().Publish(EventSignInAfter, ctx, sessionData)
 	}
 
-	return result, nil
+	return sessionData, nil
 }
 
 // UpdateUsername validates and modifies the username and displayUsername for a user entity.

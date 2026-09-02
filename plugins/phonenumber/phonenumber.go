@@ -18,6 +18,23 @@ import (
 // PluginID is the unique string identifier for the Phone Number plugin ("phone-number").
 const PluginID = "phone-number"
 
+// SessionOption represents a functional option for configuring session creation on SignIn.
+type SessionOption = plugin.SessionOption
+
+// Functional option constructors for configuring session creation.
+var (
+	WithDuration   = plugin.WithDuration
+	WithRememberMe = plugin.WithRememberMe
+	WithIPAddress  = plugin.WithIPAddress
+	WithUserAgent  = plugin.WithUserAgent
+	WithDeviceID   = plugin.WithDeviceID
+	WithExtra      = plugin.WithExtra
+	WithExtraMap   = plugin.WithExtraMap
+)
+
+// ErrSessionManagerRequired is returned when session operations are attempted without an active SessionManager in context.
+var ErrSessionManagerRequired = plugin.ErrSessionManagerRequired
+
 // Plugin implements the Phone Number (SMS OTP) authentication plugin.
 type Plugin struct {
 	repo   Repository
@@ -289,22 +306,19 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	var session *entity.Session
 	var sessionToken string
 	if !params.DisableSession {
-		token, tokenErr := p.generateSessionToken()
-		if tokenErr != nil {
-			return nil, fmt.Errorf("phonenumber: failed to generate session token: %w", tokenErr)
+		if p.ctx == nil || p.ctx.Session() == nil {
+			return nil, ErrSessionManagerRequired
 		}
-		sess, sessErr := p.repo.CreateSession(ctx, &dto.CreateSessionParams{
-			UserID:    user.ID,
-			Token:     token,
-			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
-			CreatedAt: time.Now(),
-			ExtraContainer: params.ExtraContainer,
-		})
+		var opts []plugin.SessionOption
+		if len(params.Extra) > 0 {
+			opts = append(opts, plugin.WithExtraMap(params.Extra))
+		}
+		sess, sessErr := p.ctx.Session().CreateSession(ctx, user.ID, opts...)
 		if sessErr != nil {
 			return nil, fmt.Errorf("phonenumber: failed to create session: %w", sessErr)
 		}
 		session = sess
-		sessionToken = token
+		sessionToken = sess.Token
 	}
 
 	p.publishEvent(EventPhoneNumberOTPVerified, &OTPVerifiedPayload{
@@ -339,8 +353,8 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	}, nil
 }
 
-// SignIn authenticates a user using their phone number and password.
-func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult, error) {
+// SignIn authenticates a user using their phone number and password, emits an active session via SessionManager, and returns SessionData.
+func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
 	if params.PhoneNumber == "" {
 		return nil, ErrInvalidPhoneNumber
 	}
@@ -374,23 +388,20 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult
 		return nil, ErrInvalidPhoneNumberOrPassword
 	}
 
-	token, err := p.generateSessionToken()
-	if err != nil {
-		return nil, fmt.Errorf("phonenumber: failed to generate session token: %w", err)
+	if p.ctx == nil || p.ctx.Session() == nil {
+		return nil, ErrSessionManagerRequired
 	}
 
-	sessionExpiry := 7 * 24 * time.Hour
-	if params.RememberMe != nil && *params.RememberMe {
-		sessionExpiry = 30 * 24 * time.Hour
+	combinedOpts := make([]plugin.SessionOption, 0, len(opts)+2)
+	if params.RememberMe != nil {
+		combinedOpts = append(combinedOpts, plugin.WithRememberMe(*params.RememberMe))
 	}
+	if len(params.Extra) > 0 {
+		combinedOpts = append(combinedOpts, plugin.WithExtraMap(params.Extra))
+	}
+	combinedOpts = append(combinedOpts, opts...)
 
-	sess, err := p.repo.CreateSession(ctx, &dto.CreateSessionParams{
-		UserID:    user.ID,
-		Token:     token,
-		ExpiresAt: time.Now().Add(sessionExpiry),
-		CreatedAt: time.Now(),
-		ExtraContainer: params.ExtraContainer,
-	})
+	sess, err := p.ctx.Session().CreateSession(ctx, user.ID, combinedOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("phonenumber: failed to create session: %w", err)
 	}
@@ -402,11 +413,15 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams) (*SignInResult
 		ExtraContainer: params.ExtraContainer,
 	})
 
-	return &SignInResult{
-		User:         user,
-		SessionToken: token,
-		Session:      sess,
-	}, nil
+	sessionData := &dto.SessionData{
+		Session: sess,
+		User:    user,
+	}
+	if sess.Extra != nil {
+		sessionData.Extra = sess.Extra
+	}
+
+	return sessionData, nil
 }
 
 // RequestPasswordReset dispatches a numeric OTP via SMS to enable password resetting.
@@ -506,7 +521,9 @@ func (p *Plugin) ResetPassword(ctx context.Context, params ResetPasswordParams) 
 	}
 
 	if p.config.RevokeSessionsOnPasswordReset {
-		_ = p.repo.DeleteSessionsByUserID(ctx, user.ID)
+		if p.ctx != nil && p.ctx.Session() != nil {
+			_ = p.ctx.Session().RevokeSessionsByUserID(ctx, user.ID)
+		}
 	}
 
 	p.publishEvent(EventPhoneNumberPasswordResetSuccess, &PasswordResetPayload{

@@ -39,7 +39,8 @@ import (
 // # Available Methods
 //
 //   - SignUp(ctx context.Context, input dto.SignUpParams) (*entity.User, error): Register a new user with email and password.
-//   - SignIn(ctx context.Context, input dto.SignInParams) (*entity.User, error): Authenticate an existing user with email and password credentials.
+//   - SignIn(ctx context.Context, input dto.SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error): Authenticate an existing user with email and password credentials, emitting an active session via SessionManager.
+//   - VerifyCredentials(ctx context.Context, email, password string) (*entity.User, error): Authenticate user credentials without emitting a session.
 //   - ChangePassword(ctx context.Context, input dto.ChangePasswordParams) error: Update the password for an authenticated user.
 //   - ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.VerificationToken, error): Generate a secure password reset token and dispatch email.
 //   - ResetPassword(ctx context.Context, input dto.ResetPasswordParams) error: Reset a user password using a valid reset token.
@@ -575,7 +576,7 @@ func EmailOTP(repo emailotp.Repository, opts ...emailotp.Option) *emailotp.Plugi
 //
 //   - SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPResult, error): Generate and dispatch a numeric OTP code via SMS callback.
 //   - Verify(ctx context.Context, params VerifyParams) (*VerifyResult, error): Verify an SMS OTP code for passwordless sign-in, registration, or phone update.
-//   - SignIn(ctx context.Context, params SignInParams) (*SignInResult, error): Authenticate an existing user using verified phone number and password credentials.
+//   - SignIn(ctx context.Context, params SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error): Authenticate an existing user using verified phone number and password credentials and emit active session.
 //   - RequestPasswordReset(ctx context.Context, params RequestPasswordResetParams) (*RequestPasswordResetResult, error): Initiate password reset flow via SMS OTP code.
 //   - ResetPassword(ctx context.Context, params ResetPasswordParams) (*ResetPasswordResult, error): Finalize password reset using verified SMS OTP code.
 //   - UnlinkPhoneNumber(ctx context.Context, userID string) (*entity.User, error): Remove associated phone number from user account.
@@ -921,7 +922,7 @@ func MagicLink(repo magiclink.Repository, opts ...magiclink.Option) *magiclink.P
 //
 // # Available Methods
 //
-//   - SignIn(ctx context.Context, params SignInUsernameParams) (*SignInUsernameResult, error): Authenticate a user with username and password credentials.
+//   - SignIn(ctx context.Context, params SignInUsernameParams, opts ...plugin.SessionOption) (*dto.SessionData, error): Authenticate a user with username and password credentials and emit active session.
 //   - IsAvailable(ctx context.Context, username string) (*IsUsernameAvailableResult, error): Check if a username is available for registration.
 //   - UpdateUsername(ctx context.Context, params UpdateUsernameParams) (*UpdateUsernameResult, error): Update a user's username and display name.
 //   - ProcessSignUpUsername(ctx context.Context, username, displayUsername string) (normalized, finalDisplay string, err error): Validate and normalize credentials for user registration.

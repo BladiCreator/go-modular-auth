@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
@@ -203,10 +204,19 @@ func (c *MockCryptoUtils) GenerateRandomToken(length int) (string, error) {
 	return uuid.NewString(), nil
 }
 
-func setupTestContext(t *testing.T) *plugin.Context {
+func setupTestContext(t *testing.T, repos ...repository.SessionRepository) *plugin.Context {
 	bus := EventBus.New()
 	crypto := &MockCryptoUtils{}
-	return plugin.NewContext(crypto, bus)
+	ctx := plugin.NewContext(crypto, bus)
+	var sessRepo repository.SessionRepository
+	if len(repos) > 0 && repos[0] != nil {
+		sessRepo = repos[0]
+	} else {
+		sessRepo = repository.NewMemorySessionRepository()
+	}
+	sm := auth.NewSessionManager(sessRepo, auth.DefaultSessionConfig(), crypto, bus)
+	ctx.SetSessionManager(sm)
+	return ctx
 }
 
 func TestSendOTP_Success(t *testing.T) {
@@ -517,7 +527,7 @@ func TestSignIn_PhonePassword_And_RequireVerification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected sign in success, got %v", err)
 	}
-	if signInRes.User.ID != user.ID || signInRes.SessionToken == "" {
+	if signInRes.User == nil || signInRes.User.ID != user.ID || signInRes.Session == nil || signInRes.Session.Token == "" {
 		t.Errorf("invalid sign in result: %+v", signInRes)
 	}
 
@@ -528,6 +538,101 @@ func TestSignIn_PhonePassword_And_RequireVerification(t *testing.T) {
 	})
 	if !errors.Is(err, phonenumber.ErrInvalidPhoneNumberOrPassword) {
 		t.Errorf("expected ErrInvalidPhoneNumberOrPassword, got %v", err)
+	}
+}
+
+func TestSignIn_WithOptions(t *testing.T) {
+	repo := NewMockRepository()
+	ctx := setupTestContext(t, repo.MemorySessionRepository)
+
+	p := phonenumber.New(repo)
+	_ = p.Init(ctx)
+
+	phone := "+1555666777"
+	password := "SecretPass123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+
+	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
+		Email: "opts_phone@example.com",
+		Name:  "Options Phone User",
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{
+				phonenumber.ExtraKeyPhoneNumber:         phone,
+				phonenumber.ExtraKeyPhoneNumberVerified: true,
+			},
+		},
+	})
+	_ = repo.CreateAccount(context.Background(), &entity.Account{
+		ID:       uuid.NewString(),
+		UserID:   user.ID,
+		Provider: "credential",
+		Password: string(hashed),
+	})
+
+	remember := true
+	res, err := p.SignIn(context.Background(), phonenumber.SignInParams{
+		PhoneNumber: phone,
+		Password:    password,
+		RememberMe:  &remember,
+	},
+		phonenumber.WithIPAddress("172.16.0.5"),
+		phonenumber.WithUserAgent("PhoneClient/2.0"),
+		phonenumber.WithExtra("channel", "sms_auth"),
+	)
+	if err != nil {
+		t.Fatalf("SignIn with options failed: %v", err)
+	}
+
+	sess := res.Session
+	if sess == nil {
+		t.Fatalf("Expected non-nil session")
+	}
+	if sess.IPAddress != "172.16.0.5" {
+		t.Errorf("Expected IP 172.16.0.5, got %s", sess.IPAddress)
+	}
+	if sess.UserAgent != "PhoneClient/2.0" {
+		t.Errorf("Expected UserAgent PhoneClient/2.0, got %s", sess.UserAgent)
+	}
+	if sess.Extra == nil || sess.Extra["channel"] != "sms_auth" {
+		t.Errorf("Expected extra metadata 'channel'='sms_auth', got %v", sess.Extra)
+	}
+	if sess.ExpiresAt.Before(time.Now().Add(25 * 24 * time.Hour)) {
+		t.Errorf("Expected extended RememberMe expiration, got %v", sess.ExpiresAt)
+	}
+}
+
+func TestSignIn_WithoutSessionManager_ReturnsError(t *testing.T) {
+	repo := NewMockRepository()
+	p := phonenumber.New(repo)
+	// No Init called, so p.ctx is nil
+
+	phone := "+1888999000"
+	password := "SecretPass123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+
+	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
+		Email: "no_sm@example.com",
+		Name:  "No SM User",
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{
+				phonenumber.ExtraKeyPhoneNumber:         phone,
+				phonenumber.ExtraKeyPhoneNumberVerified: true,
+			},
+		},
+	})
+	_ = repo.CreateAccount(context.Background(), &entity.Account{
+		ID:       uuid.NewString(),
+		UserID:   user.ID,
+		Provider: "credential",
+		Password: string(hashed),
+	})
+
+	_, err := p.SignIn(context.Background(), phonenumber.SignInParams{
+		PhoneNumber: phone,
+		Password:    password,
+	})
+	if !errors.Is(err, phonenumber.ErrSessionManagerRequired) {
+		t.Errorf("Expected ErrSessionManagerRequired, got %v", err)
 	}
 }
 
@@ -595,8 +700,8 @@ func TestPasswordReset_Flow(t *testing.T) {
 		PhoneNumber: phone,
 		Password:    newPass,
 	})
-	if err != nil || signInRes.User.ID != user.ID {
-		t.Fatalf("Sign in with new password failed: %v", err)
+	if err != nil || signInRes.User == nil || signInRes.User.ID != user.ID || signInRes.Session == nil || signInRes.Session.Token == "" {
+		t.Fatalf("Sign in with new password failed or session missing: %v", err)
 	}
 }
 

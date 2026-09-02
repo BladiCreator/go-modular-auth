@@ -4,13 +4,47 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
+	"github.com/asaskevich/EventBus"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// MockCrypto implements plugin.CryptoUtils for username tests.
+type MockCrypto struct{}
+
+func (c *MockCrypto) HashPassword(password string) (string, error) {
+	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	return string(h), err
+}
+
+func (c *MockCrypto) ComparePassword(hash, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+func (c *MockCrypto) GenerateRandomToken(length int) (string, error) {
+	return "test_token_" + uuid.NewString(), nil
+}
+
+func setupTestPlugin(t *testing.T, repo *MockRepository, opts ...username.Option) (*username.Plugin, *plugin.Context) {
+	t.Helper()
+	p := username.New(repo, opts...)
+	bus := EventBus.New()
+	crypto := &MockCrypto{}
+	pCtx := plugin.NewContext(crypto, bus)
+	sm := auth.NewSessionManager(repo.MemorySessionRepository, auth.DefaultSessionConfig(), crypto, bus)
+	pCtx.SetSessionManager(sm)
+	if err := p.Init(pCtx); err != nil {
+		t.Fatalf("failed to init username plugin: %v", err)
+	}
+	return p, pCtx
+}
 
 // MockRepository implements username.Repository for testing purposes.
 type MockRepository struct {
@@ -235,7 +269,7 @@ func TestUsername_SignIn(t *testing.T) {
 		EmailVerified: true,
 	}, "SecretPass123!")
 
-	p := username.New(repo)
+	p, _ := setupTestPlugin(t, repo)
 
 	// Successful sign in (case-insensitive)
 	res, err := p.SignIn(ctx, username.SignInUsernameParams{
@@ -245,11 +279,11 @@ func TestUsername_SignIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected sign in error: %v", err)
 	}
-	if res.User.ID != "usr_2" {
-		t.Errorf("expected user ID 'usr_2', got '%s'", res.User.ID)
+	if res.User == nil || res.User.ID != "usr_2" {
+		t.Errorf("expected user ID 'usr_2', got '%v'", res.User)
 	}
-	if res.SessionToken == "" {
-		t.Errorf("expected non-empty session token")
+	if res.Session == nil || res.Session.Token == "" {
+		t.Errorf("expected non-empty session and token")
 	}
 
 	// Wrong password
@@ -271,6 +305,74 @@ func TestUsername_SignIn(t *testing.T) {
 	}
 }
 
+func TestUsername_SignIn_WithOptions(t *testing.T) {
+	repo := NewMockRepository()
+	ctx := context.Background()
+
+	_ = repo.AddUser(&entity.User{
+		ID:            "usr_opts",
+		Username:      "opts_user",
+		EmailVerified: true,
+	}, "Password123!")
+
+	p, _ := setupTestPlugin(t, repo)
+
+	remember := true
+	res, err := p.SignIn(ctx, username.SignInUsernameParams{
+		Username:   "opts_user",
+		Password:   "Password123!",
+		RememberMe: &remember,
+		ExtraContainer: plugin.ExtraContainer{
+			Extra: map[string]any{"param_key": "param_val"},
+		},
+	},
+		username.WithIPAddress("10.0.0.1"),
+		username.WithUserAgent("Go-Agent/1.0"),
+		username.WithExtra("custom_opt", "opt_val"),
+	)
+	if err != nil {
+		t.Fatalf("SignIn with options failed: %v", err)
+	}
+
+	sess := res.Session
+	if sess == nil {
+		t.Fatalf("Expected non-nil session")
+	}
+	if sess.IPAddress != "10.0.0.1" {
+		t.Errorf("Expected IP 10.0.0.1, got %s", sess.IPAddress)
+	}
+	if sess.UserAgent != "Go-Agent/1.0" {
+		t.Errorf("Expected User-Agent Go-Agent/1.0, got %s", sess.UserAgent)
+	}
+	if sess.Extra == nil || sess.Extra["custom_opt"] != "opt_val" {
+		t.Errorf("Expected extra metadata 'custom_opt'='opt_val', got %v", sess.Extra)
+	}
+	if sess.ExpiresAt.Before(time.Now().Add(25 * 24 * time.Hour)) {
+		t.Errorf("Expected RememberMe expiration > 25 days, got %v", sess.ExpiresAt)
+	}
+}
+
+func TestUsername_SignIn_WithoutSessionManager_ReturnsError(t *testing.T) {
+	repo := NewMockRepository()
+	ctx := context.Background()
+
+	_ = repo.AddUser(&entity.User{
+		ID:            "usr_no_sm",
+		Username:      "no_sm_user",
+		EmailVerified: true,
+	}, "Password123!")
+
+	// Directly initialize plugin without SessionManager
+	p := username.New(repo)
+	_, err := p.SignIn(ctx, username.SignInUsernameParams{
+		Username: "no_sm_user",
+		Password: "Password123!",
+	})
+	if !errors.Is(err, username.ErrSessionManagerRequired) {
+		t.Errorf("expected ErrSessionManagerRequired, got %v", err)
+	}
+}
+
 func TestUsername_SignIn_EmailVerificationRequired(t *testing.T) {
 	repo := NewMockRepository()
 	ctx := context.Background()
@@ -282,7 +384,7 @@ func TestUsername_SignIn_EmailVerificationRequired(t *testing.T) {
 		EmailVerified: false,
 	}, "SecretPass123!")
 
-	p := username.New(repo, username.WithRequireEmailVerification(true))
+	p, _ := setupTestPlugin(t, repo, username.WithRequireEmailVerification(true))
 
 	_, err := p.SignIn(ctx, username.SignInUsernameParams{
 		Username: "unverified_gopher",

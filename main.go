@@ -27,6 +27,7 @@ func main() {
 
 	// 1. Initialize GoModularAuth with EmailPassword and TwoFactor plugins
 	app, err := auth.New(
+		config.WithSessionRepository(storage),
 		config.WithPlugins(
 			plugins.EmailPassword(storage, emailpassword.WithMinPasswordLength(8)),
 			plugins.TwoFactor(
@@ -76,14 +77,14 @@ func main() {
 	fmt.Printf("✔ User created: %s (%s)\n", user.Name, user.ID)
 
 	// 4. User authentication (Sign-in)
-	signedInUser, err := epPlugin.SignIn(ctx, dto.SignInParams{
+	sessionData, err := epPlugin.SignIn(ctx, dto.SignInParams{
 		Email:    "gopher@golang.org",
 		Password: "SecurePassword123!",
-	})
+	}, auth.WithIPAddress("127.0.0.1"), auth.WithUserAgent("GoModularAuth-Demo/1.0"))
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ Session started for: %s (%s)\n", signedInUser.Name, signedInUser.ID)
+	fmt.Printf("✔ Session started for: %s (%s, Token: %s)\n", sessionData.User.Name, sessionData.User.ID, sessionData.Session.Token)
 
 	// 5. Two-Factor Authentication (2FA) Enrollment
 	tfPlugin := auth.Plugin[twofactor.Plugin](app)

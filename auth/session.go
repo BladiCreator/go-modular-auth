@@ -30,6 +30,9 @@ var (
 	// ErrSessionRepositoryRequired is returned when session operations are invoked without configuring a SessionRepository.
 	ErrSessionRepositoryRequired = errors.New("auth: session repository is required")
 
+	// ErrSessionManagerRequired is returned when session operations are invoked without an active SessionManager in context.
+	ErrSessionManagerRequired = plugin.ErrSessionManagerRequired
+
 	// ErrInvalidUserID is returned when an empty user ID is provided to session creation.
 	ErrInvalidUserID = errors.New("auth: user ID cannot be empty")
 )
