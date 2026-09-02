@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
@@ -38,9 +39,23 @@ func (p *Plugin) ID() string {
 	return "custom-session"
 }
 
-// Init initializes the plugin with the shared execution context.
+// Init initializes the plugin with the shared execution context and registers lifecycle event handlers.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
+	if ctx != nil && ctx.Events() != nil {
+		_ = ctx.Events().Subscribe("auth:session:created", func(c context.Context, payload any) {
+			if scp, ok := payload.(interface {
+				GetSession() *entity.Session
+				GetExtra() map[string]any
+			}); ok {
+				sess := scp.GetSession()
+				extra := scp.GetExtra()
+				if sess != nil && len(extra) > 0 && p.repo != nil {
+					_ = p.repo.SaveCustomSessionFields(c, sess.ID, extra)
+				}
+			}
+		})
+	}
 	return nil
 }
 

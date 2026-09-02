@@ -428,6 +428,17 @@ func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionPar
 	if session.DeviceID != "" {
 		sessionCreated.DeviceID = &session.DeviceID
 	}
+	if session.Extra != nil {
+		cpFields := make(map[string]any, len(session.Extra))
+		for k, v := range session.Extra {
+			cpFields[k] = v
+		}
+		if s.customSessionFields == nil {
+			s.customSessionFields = make(map[string]map[string]any)
+		}
+		s.customSessionFields[sessionCreated.ID] = cpFields
+		sessionCreated.Extra = cpFields
+	}
 	s.sessions[session.Token] = sessionCreated
 	s.sessionsByID[sessionCreated.ID] = sessionCreated
 	return sessionCreated, nil

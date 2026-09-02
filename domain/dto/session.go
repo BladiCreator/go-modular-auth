@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 type (
@@ -20,7 +19,7 @@ type (
 		ActiveTeamID         *string   `json:"active_team_id,omitempty"`
 		ExpiresAt            time.Time `json:"expires_at" binding:"required"`
 		CreatedAt            time.Time `json:"created_at" binding:"required"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// UpdateSessionParams defines mutable fields when updating an active session.
@@ -32,7 +31,7 @@ type (
 		ActiveTeamID         *string    `json:"active_team_id,omitempty"`
 		ExpiresAt            *time.Time `json:"expires_at,omitempty"`
 		UpdatedAt            *time.Time `json:"updated_at,omitempty"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// SessionFilter defines criteria for searching and paginating user sessions.
@@ -47,7 +46,7 @@ type (
 	SessionData struct {
 		Session *entity.Session `json:"session"`
 		User    *entity.User    `json:"user"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 )
 

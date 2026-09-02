@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/BladiCreator/go-modular-auth/plugin"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 )
 
 type (
@@ -10,6 +10,6 @@ type (
 		UserID   string `json:"userId" binding:"required"`
 		Provider string `json:"provider" binding:"required"`
 		Password string `json:"-"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 )

@@ -13,11 +13,12 @@ type CryptoUtils interface {
 	GenerateRandomToken(length int) (string, error)
 }
 
-// Context represents the shared environment provided to plugins upon initialization, containing cryptographic tools, event buses, and a key-value store.
+// Context represents the shared environment provided to plugins upon initialization, containing cryptographic tools, event buses, a session manager, and a key-value store.
 type Context struct {
-	crypto CryptoUtils
-	events EventBus.Bus
-	store  sync.Map
+	crypto         CryptoUtils
+	events         EventBus.Bus
+	sessionManager SessionManager
+	store          sync.Map
 }
 
 // NewContext creates a new Context with the specified cryptographic utilities and event bus.
@@ -33,6 +34,15 @@ func (c *Context) Crypto() CryptoUtils { return c.crypto }
 
 // Events returns the shared EventBus instance for subscribing or publishing plugin lifecycle events.
 func (c *Context) Events() EventBus.Bus { return c.events }
+
+// Session returns the central SessionManager instance available in the execution environment.
+func (c *Context) Session() SessionManager { return c.sessionManager }
+
+// SessionManager returns the central SessionManager instance (alias for Session).
+func (c *Context) SessionManager() SessionManager { return c.sessionManager }
+
+// SetSessionManager configures the central SessionManager instance into the shared context.
+func (c *Context) SetSessionManager(sm SessionManager) { c.sessionManager = sm }
 
 // Set stores a key-value pair in the shared thread-safe context store.
 func (c *Context) Set(key string, value any) { c.store.Store(key, value) }

@@ -4,7 +4,7 @@ package dto
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugin"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 )
 
 type (
@@ -13,14 +13,14 @@ type (
 		Name     string `json:"name" binding:"required"`
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required,min=6"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// SignInParams defines the credentials payload for authentication.
 	SignInParams struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required,min=6"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// UpdateUserParams defines the data payload for updating user details.
@@ -37,7 +37,7 @@ type (
 		BanReason           *string    `json:"banReason,omitempty"`
 		BanExpires          *time.Time `json:"banExpires,omitempty"`
 		LastLoginMethod     *string    `json:"lastLoginMethod,omitempty"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// ChangePasswordParams defines the payload for password change requests.
@@ -45,39 +45,39 @@ type (
 		UserID          string `json:"userId"`
 		CurrentPassword string `json:"currentPassword" binding:"required"`
 		NewPassword     string `json:"newPassword" binding:"required,min=6"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// SendVerificationEmailParams defines the payload for requesting an email verification link or token.
 	SendVerificationEmailParams struct {
 		Email string `json:"email" binding:"required,email"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// VerifyEmailParams defines the token payload for email verification.
 	VerifyEmailParams struct {
 		Token string `json:"token" binding:"required"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// VerifyPasswordParams defines the payload for checking if the provided password matches the user's current password.
 	VerifyPasswordParams struct {
 		UserID   string `json:"userId" binding:"required"`
 		Password string `json:"password" binding:"required"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// ForgotPasswordParams defines the payload for requesting a password reset email.
 	ForgotPasswordParams struct {
 		Email string `json:"email" binding:"required,email"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// ResetPasswordParams defines the payload for setting a new password using a reset token.
 	ResetPasswordParams struct {
 		Token       string `json:"token" binding:"required"`
 		NewPassword string `json:"newPassword" binding:"required,min=6"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 
 	// CreateUserParams defines the mutable parameter payload passed to repository user creation operations.
@@ -87,6 +87,6 @@ type (
 		Name            string  `json:"name"`
 		Role            string  `json:"role,omitempty"`
 		LastLoginMethod *string `json:"lastLoginMethod,omitempty"`
-		plugin.ExtraContainer
+		entity.ExtraContainer
 	}
 )

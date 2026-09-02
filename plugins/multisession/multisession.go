@@ -36,9 +36,21 @@ func (p *Plugin) ID() string {
 	return PluginID
 }
 
-// Init initializes the plugin with the shared execution context.
+// Init initializes the plugin with the shared execution context and registers lifecycle event handlers.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
+	if ctx != nil && ctx.Events() != nil {
+		_ = ctx.Events().Subscribe("auth:session:created", func(c context.Context, payload any) {
+			if scp, ok := payload.(interface{ GetSession() *entity.Session }); ok {
+				sess := scp.GetSession()
+				if sess != nil {
+					go p.publishEvent(EventSessionCreated, c, &SessionCreatedEventPayload{
+						Session: sess,
+					})
+				}
+			}
+		})
+	}
 	return nil
 }
 
