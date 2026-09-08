@@ -3,6 +3,8 @@ package bearer
 import (
 	"context"
 	"net/http"
+
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
 // Context keys for request context store.
@@ -36,6 +38,7 @@ func (p *Plugin) Authenticate() func(next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, SignedTokenContextKey, res.SignedToken)
 			if res.Session != nil {
 				ctx = context.WithValue(ctx, SessionContextKey, res.Session)
+				ctx = httpauth.WithSession(ctx, res.Session)
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))

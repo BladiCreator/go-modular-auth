@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strings"
+
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
 // Context keys for request context store.
@@ -18,11 +20,12 @@ const (
 func (p *Plugin) Authenticate() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := r.Header.Get("X-OTT-Token")
-			if token == "" {
-				token = r.URL.Query().Get("ott")
-			}
-			if token == "" {
+			token, err := httpauth.ExtractToken(r,
+				httpauth.WithSources(httpauth.SourceHeader, httpauth.SourceQuery),
+				httpauth.WithExtractHeader("X-OTT-Token", ""),
+				httpauth.WithExtractQueryParam("ott"),
+			)
+			if err != nil || token == "" {
 				http.Error(w, "Unauthorized: Missing OTT token", http.StatusUnauthorized)
 				return
 			}
@@ -37,6 +40,12 @@ func (p *Plugin) Authenticate() func(next http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), SessionContextKey, res.Session)
 			ctx = context.WithValue(ctx, UserContextKey, res.User)
+			if res.Session != nil {
+				ctx = httpauth.WithSession(ctx, res.Session)
+			}
+			if res.User != nil {
+				ctx = httpauth.WithUser(ctx, res.User)
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

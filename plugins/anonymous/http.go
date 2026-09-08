@@ -6,48 +6,39 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
-// SetAnonymousSessionCookie sets the session token cookie on the HTTP response writer.
+// SetAnonymousSessionCookie sets the session token cookie on the HTTP response writer using httpauth.
 func SetAnonymousSessionCookie(w http.ResponseWriter, token string, cfg Config) {
 	if w == nil || token == "" {
 		return
 	}
 
-	cookie := &http.Cookie{
-		Name:     cfg.CookieName,
-		Value:    token,
-		Path:     cfg.CookiePath,
-		Domain:   cfg.CookieDomain,
-		Expires:  time.Now().Add(cfg.CookieMaxAge),
-		MaxAge:   int(cfg.CookieMaxAge.Seconds()),
-		Secure:   cfg.CookieSecure,
-		HttpOnly: true,
-		SameSite: cfg.CookieSameSite,
-	}
-
-	http.SetCookie(w, cookie)
+	httpauth.SetSessionCookie(w, token, time.Now().Add(cfg.CookieMaxAge),
+		httpauth.WithCookieName(cfg.CookieName),
+		httpauth.WithPath(cfg.CookiePath),
+		httpauth.WithDomain(cfg.CookieDomain),
+		httpauth.WithSecure(cfg.CookieSecure),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSameSite(cfg.CookieSameSite),
+	)
 }
 
-// ClearAnonymousSessionCookie expires and deletes the session token cookie.
+// ClearAnonymousSessionCookie expires and deletes the session token cookie using httpauth.
 func ClearAnonymousSessionCookie(w http.ResponseWriter, cfg Config) {
 	if w == nil {
 		return
 	}
 
-	cookie := &http.Cookie{
-		Name:     cfg.CookieName,
-		Value:    "",
-		Path:     cfg.CookiePath,
-		Domain:   cfg.CookieDomain,
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		Secure:   cfg.CookieSecure,
-		HttpOnly: true,
-		SameSite: cfg.CookieSameSite,
-	}
-
-	http.SetCookie(w, cookie)
+	httpauth.ClearSessionCookie(w,
+		httpauth.WithCookieName(cfg.CookieName),
+		httpauth.WithPath(cfg.CookiePath),
+		httpauth.WithDomain(cfg.CookieDomain),
+		httpauth.WithSecure(cfg.CookieSecure),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSameSite(cfg.CookieSameSite),
+	)
 }
 
 // ServeSignInAnonymous handles HTTP POST /sign-in/anonymous requests.
@@ -61,10 +52,10 @@ func (p *Plugin) ServeSignInAnonymous(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&params)
 
 	if params.IPAddress == "" {
-		params.IPAddress = r.RemoteAddr
+		params.IPAddress = httpauth.GetClientIP(r)
 	}
 	if params.UserAgent == "" {
-		params.UserAgent = r.UserAgent()
+		params.UserAgent = httpauth.GetUserAgent(r)
 	}
 
 	var currentSession *entity.Session

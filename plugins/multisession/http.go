@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
 var invalidCookieNameChars = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
@@ -42,8 +44,11 @@ func (p *Plugin) ExtractMainSessionToken(r *http.Request) string {
 		"session_token",
 	}
 	for _, name := range mainCookieNames {
-		if c, err := r.Cookie(name); err == nil && c.Value != "" {
-			val, err := VerifyCookieValue(c.Value, p.config.Secret)
+		if signedVal, err := httpauth.ExtractToken(r,
+			httpauth.WithSources(httpauth.SourceCookie),
+			httpauth.WithExtractCookie(name),
+		); err == nil && signedVal != "" {
+			val, err := VerifyCookieValue(signedVal, p.config.Secret)
 			if err == nil && val != "" {
 				return val
 			}
@@ -58,67 +63,61 @@ func (p *Plugin) GetMultiCookieName(token string) string {
 	return fmt.Sprintf("%s_multi-%s", p.config.CookiePrefix, strings.ToLower(sanitizedToken))
 }
 
-// SetMainSessionCookie writes the primary signed session cookie to an HTTP response.
+// SetMainSessionCookie writes the primary signed session cookie to an HTTP response using httpauth.
 func (p *Plugin) SetMainSessionCookie(w http.ResponseWriter, token string, expiresAt time.Time) {
 	if w == nil {
 		return
 	}
 	cookieName := p.config.CookiePrefix + ".session_token"
 	signedVal := SignCookieValue(token, p.config.Secret)
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    signedVal,
-		Path:     "/",
-		Expires:  expiresAt,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	httpauth.SetSessionCookie(w, signedVal, expiresAt,
+		httpauth.WithCookieName(cookieName),
+		httpauth.WithPath("/"),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSecure(false),
+		httpauth.WithSameSite(http.SameSiteLaxMode),
+	)
 }
 
-// ExpireMainSessionCookie marks the primary session cookie for immediate expiration in an HTTP response.
+// ExpireMainSessionCookie marks the primary session cookie for immediate expiration in an HTTP response using httpauth.
 func (p *Plugin) ExpireMainSessionCookie(w http.ResponseWriter) {
 	if w == nil {
 		return
 	}
 	cookieName := p.config.CookiePrefix + ".session_token"
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-	})
+	httpauth.ClearSessionCookie(w,
+		httpauth.WithCookieName(cookieName),
+		httpauth.WithPath("/"),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSecure(false),
+	)
 }
 
-// SetMultiSessionCookie writes a signed multi-session cookie to an HTTP response.
+// SetMultiSessionCookie writes a signed multi-session cookie to an HTTP response using httpauth.
 func (p *Plugin) SetMultiSessionCookie(w http.ResponseWriter, token string, expiresAt time.Time) {
 	if w == nil {
 		return
 	}
 	cookieName := p.GetMultiCookieName(token)
 	signedVal := SignCookieValue(token, p.config.Secret)
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    signedVal,
-		Path:     "/",
-		Expires:  expiresAt,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	httpauth.SetSessionCookie(w, signedVal, expiresAt,
+		httpauth.WithCookieName(cookieName),
+		httpauth.WithPath("/"),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSecure(false),
+		httpauth.WithSameSite(http.SameSiteLaxMode),
+	)
 }
 
-// ExpireCookie marks a specified cookie name for immediate expiration in an HTTP response.
+// ExpireCookie marks a specified cookie name for immediate expiration in an HTTP response using httpauth.
 func (p *Plugin) ExpireCookie(w http.ResponseWriter, cookieName string) {
 	if w == nil {
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-	})
+	httpauth.ClearSessionCookie(w,
+		httpauth.WithCookieName(cookieName),
+		httpauth.WithPath("/"),
+		httpauth.WithHTTPOnly(true),
+		httpauth.WithSecure(false),
+	)
 }

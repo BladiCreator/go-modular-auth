@@ -1,10 +1,10 @@
 package captcha
 
 import (
-	"net"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
 // Provider identifies a supported captcha verification provider.
@@ -27,35 +27,9 @@ const (
 // IPExtractorFunc extracts the client's remote IP address from an incoming HTTP request.
 type IPExtractorFunc func(r *http.Request) string
 
-// DefaultIPExtractor extracts remote client IP address from request headers or RemoteAddr.
+// DefaultIPExtractor extracts remote client IP address from request headers or RemoteAddr using httpauth.GetClientIP.
 func DefaultIPExtractor(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		if len(parts) > 0 {
-			ip := strings.TrimSpace(parts[0])
-			if ip != "" {
-				return ip
-			}
-		}
-	}
-
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		ip := strings.TrimSpace(realIP)
-		if ip != "" {
-			return ip
-		}
-	}
-
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && host != "" {
-		return host
-	}
-
-	return r.RemoteAddr
+	return httpauth.GetClientIP(r)
 }
 
 // Config structures all operational settings for the Captcha plugin.

@@ -3,7 +3,8 @@ package jwt
 import (
 	"context"
 	"net/http"
-	"strings"
+
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 )
 
 // Context keys for request context store.
@@ -19,18 +20,9 @@ const (
 func (p *Plugin) Authenticate() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
+			token, err := httpauth.ExtractToken(r, httpauth.WithSources(httpauth.SourceHeader))
+			if err != nil || token == "" {
 				http.Error(w, "Unauthorized: Missing authorization header", http.StatusUnauthorized)
-				return
-			}
-
-			token := authHeader
-			if strings.HasPrefix(strings.ToLower(authHeader), BearerSchemePrefix) {
-				token = strings.TrimSpace(authHeader[len(BearerSchemePrefix):])
-			}
-			if token == "" {
-				http.Error(w, "Unauthorized: Missing JWT token", http.StatusUnauthorized)
 				return
 			}
 
