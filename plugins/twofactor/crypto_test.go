@@ -221,3 +221,67 @@ func TestCrypto_TrustedDeviceTokens(t *testing.T) {
 		t.Error("Expected VerifyTrustDeviceToken to reject expired token")
 	}
 }
+
+func TestChallengeToken_SigningAndVerification(t *testing.T) {
+	secret := "app-crypto-hmac-secret"
+	challengeID := "ch_12345"
+	userID := "usr_789"
+	factor := "totp"
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	sig := twofactor.SignChallengeToken(challengeID, userID, factor, expiresAt, secret)
+	if sig == "" {
+		t.Fatal("Expected non-empty HMAC signature")
+	}
+
+	// Valid verification
+	if !twofactor.VerifyChallengeSignature(challengeID, userID, factor, sig, secret, expiresAt) {
+		t.Error("Expected VerifyChallengeSignature to succeed for valid signature")
+	}
+
+	// Tampered userID
+	if twofactor.VerifyChallengeSignature(challengeID, "usr_tampered", factor, sig, secret, expiresAt) {
+		t.Error("Expected VerifyChallengeSignature to reject tampered userID")
+	}
+
+	// Tampered challengeID
+	if twofactor.VerifyChallengeSignature("ch_other", userID, factor, sig, secret, expiresAt) {
+		t.Error("Expected VerifyChallengeSignature to reject tampered challengeID")
+	}
+
+	// Tampered factor
+	if twofactor.VerifyChallengeSignature(challengeID, userID, "otp", sig, secret, expiresAt) {
+		t.Error("Expected VerifyChallengeSignature to reject tampered factor")
+	}
+
+	// Tampered expiration
+	if twofactor.VerifyChallengeSignature(challengeID, userID, factor, sig, secret, expiresAt.Add(time.Hour)) {
+		t.Error("Expected VerifyChallengeSignature to reject altered expiration")
+	}
+
+	// Tampered secret
+	if twofactor.VerifyChallengeSignature(challengeID, userID, factor, sig, "wrong-secret", expiresAt) {
+		t.Error("Expected VerifyChallengeSignature to reject wrong secret")
+	}
+
+	// Encoding / Decoding
+	rawToken := "abcdef123456"
+	encoded := twofactor.EncodeChallengeToken(rawToken, sig)
+	if !strings.HasPrefix(encoded, "mfa_") {
+		t.Errorf("Expected encoded token to start with mfa_, got %s", encoded)
+	}
+
+	decRaw, decSig := twofactor.DecodeChallengeToken(encoded)
+	if decRaw != rawToken {
+		t.Errorf("Expected raw token %s, got %s", rawToken, decRaw)
+	}
+	if decSig != sig {
+		t.Errorf("Expected signature %s, got %s", sig, decSig)
+	}
+
+	// Fallback decoding for plain tokens
+	plainRaw, plainSig := twofactor.DecodeChallengeToken("raw_token_without_sig")
+	if plainRaw != "raw_token_without_sig" || plainSig != "" {
+		t.Errorf("Expected fallback decoding for plain token")
+	}
+}

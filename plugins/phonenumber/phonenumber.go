@@ -353,8 +353,8 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	}, nil
 }
 
-// SignIn authenticates a user using their phone number and password, emits an active session via SessionManager, and returns SessionData.
-func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
+// SignIn authenticates a user using their phone number and password, emits an active session via SessionManager (or challenge if MFA is required), and returns AuthResult.
+func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin.SessionOption) (*dto.AuthResult, error) {
 	if params.PhoneNumber == "" {
 		return nil, ErrInvalidPhoneNumber
 	}
@@ -386,6 +386,34 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin
 
 	if !p.comparePassword(account.Password, params.Password) {
 		return nil, ErrInvalidPhoneNumberOrPassword
+	}
+
+	optsData := plugin.SessionOptions{}
+	for _, opt := range opts {
+		opt(&optsData)
+	}
+
+	// Step-Up / Multi-Factor Authentication (MFA) Check
+	if p.ctx != nil && p.ctx.MFAProvider() != nil {
+		mfa := p.ctx.MFAProvider()
+		combinedExtra := make(map[string]any)
+		for k, v := range params.Extra {
+			combinedExtra[k] = v
+		}
+		for k, v := range optsData.Extra {
+			combinedExtra[k] = v
+		}
+		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, combinedExtra)
+		if err != nil {
+			return nil, fmt.Errorf("phonenumber: failed to evaluate 2FA: %w", err)
+		}
+		if requiresMFA {
+			challenge, err := mfa.CreateMFAChallenge(ctx, user.ID, "totp")
+			if err != nil {
+				return nil, fmt.Errorf("phonenumber: failed to create 2FA challenge: %w", err)
+			}
+			return dto.NewAuthResultChallenge(challenge), nil
+		}
 	}
 
 	if p.ctx == nil || p.ctx.Session() == nil {
@@ -421,7 +449,11 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin
 		sessionData.Extra = sess.Extra
 	}
 
-	return sessionData, nil
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().DispatchUserSignedIn(ctx, sessionData)
+	}
+
+	return dto.NewAuthResultCompleted(sessionData), nil
 }
 
 // RequestPasswordReset dispatches a numeric OTP via SMS to enable password resetting.

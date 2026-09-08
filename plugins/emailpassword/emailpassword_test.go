@@ -167,13 +167,17 @@ func TestSignIn(t *testing.T) {
 	}
 
 	// 3. Successful sign in
-	sessionData, err := p.SignIn(ctx, dto.SignInParams{
+	authRes, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "signin@example.com",
 		Password: "password123",
 	})
 	if err != nil {
 		t.Fatalf("SignIn failed: %v", err)
 	}
+	if !authRes.IsComplete() {
+		t.Fatalf("Expected IsComplete() to be true")
+	}
+	sessionData := authRes.SessionData()
 	if sessionData == nil || sessionData.User == nil || sessionData.Session == nil {
 		t.Fatalf("Expected non-nil SessionData, User, and Session, got %+v", sessionData)
 	}
@@ -207,13 +211,14 @@ func TestSignIn(t *testing.T) {
 	unverifiedUser.EmailVerified = true
 	_ = repo.UpdateUser(ctx, unverifiedUser)
 
-	verifiedSessionData, err := pVerify.SignIn(ctx, dto.SignInParams{
+	verifiedRes, err := pVerify.SignIn(ctx, dto.SignInParams{
 		Email:    "unverified@example.com",
 		Password: "password123",
 	})
 	if err != nil {
 		t.Errorf("Expected signin to succeed after email verification, got %v", err)
 	}
+	verifiedSessionData := verifiedRes.SessionData()
 	if verifiedSessionData.Session == nil || verifiedSessionData.Session.Token == "" {
 		t.Errorf("Expected session to be created after email verified")
 	}
@@ -297,7 +302,7 @@ func TestSignIn_WithOptionsAndSessionManager(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	sessionData, err := p.SignIn(ctx, dto.SignInParams{
+	authRes, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "opts@example.com",
 		Password: "password123",
 		ExtraContainer: entity.ExtraContainer{
@@ -316,6 +321,7 @@ func TestSignIn_WithOptionsAndSessionManager(t *testing.T) {
 		t.Fatalf("SignIn with options failed: %v", err)
 	}
 
+	sessionData := authRes.SessionData()
 	sess := sessionData.Session
 	if sess == nil {
 		t.Fatalf("Expected session to be non-nil")

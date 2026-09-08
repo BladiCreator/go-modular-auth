@@ -7,12 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 )
 
 // PluginID is the unique string identifier for the TwoFactor plugin ("two-factor").
 const PluginID = "two-factor"
+
+var _ plugin.MFAProvider = (*Plugin)(nil)
 
 // Plugin implements pure Go Two-Factor Authentication capabilities.
 type Plugin struct {
@@ -41,6 +44,7 @@ func (p *Plugin) ID() string {
 // Init initializes the plugin within the global GoModularAuth context.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
+	p.ctx.SetMFAProvider(p)
 
 	// Automatic reaction following a successful email/password sign-in
 	p.ctx.Hooks().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
@@ -389,19 +393,69 @@ func (p *Plugin) VerifyOTP(ctx context.Context, params VerifyOTPParams) (*Verify
 	}, nil
 }
 
-// CreateChallenge generates a short-lived sign-in challenge token following primary credentials verification.
-func (p *Plugin) CreateChallenge(ctx context.Context, params CreateChallengeParams) (*ChallengeResult, error) {
-	token, err := GenerateRandomToken(32)
+func (p *Plugin) getChallengeSecret() string {
+	if p.config.TrustDeviceSecret != "" {
+		return p.config.TrustDeviceSecret
+	}
+	return "go-modular-auth-challenge-secret"
+}
+
+// RequiresMFA evaluates whether the user must complete an MFA challenge.
+// If the client has supplied an authorized trusted device token in extra, 2FA is safely bypassed.
+func (p *Plugin) RequiresMFA(ctx context.Context, userID string, extra map[string]any) (bool, error) {
+	tf, err := p.repo.FindByUserID(ctx, userID)
+	if err != nil || tf == nil || !tf.Verified {
+		return false, nil
+	}
+
+	// Check if client provided an active, authorized trusted device token
+	if len(extra) > 0 {
+		deviceID, _ := extra["device_id"].(string)
+		trustToken, _ := extra["trust_device_token"].(string)
+		if deviceID != "" && trustToken != "" {
+			valid, err := p.VerifyTrustDevice(ctx, VerifyTrustDeviceParams{
+				UserID:   userID,
+				DeviceID: deviceID,
+				Token:    trustToken,
+			})
+			if err == nil && valid {
+				return false, nil // Bypassed by verified trusted device
+			}
+		}
+	}
+
+	return true, nil
+}
+
+// CreateMFAChallenge generates a short-lived sign-in challenge token with anti-tampering protection.
+func (p *Plugin) CreateMFAChallenge(ctx context.Context, userID string, factor string) (*dto.AuthChallenge, error) {
+	if factor == "" {
+		factor = MethodTOTP
+	}
+	rawToken, err := GenerateRandomToken(32)
 	if err != nil {
 		return nil, err
 	}
 
-	expiresAt := time.Now().Add(p.config.ChallengeExpiry)
+	expiry := p.config.ChallengeExpiry
+	if expiry <= 0 {
+		expiry = 5 * time.Minute
+	}
+	now := time.Now()
+	expiresAt := now.Add(expiry)
+	challengeID := fmt.Sprintf("ch_%s", rawToken[:12])
+
+	sig := SignChallengeToken(challengeID, userID, factor, expiresAt, p.getChallengeSecret())
+	compositeToken := EncodeChallengeToken(rawToken, sig)
+
 	rec := &ChallengeRecord{
-		Token:     token,
-		UserID:    params.UserID,
-		ExpiresAt: expiresAt,
-		CreatedAt: time.Now(),
+		ID:             challengeID,
+		Token:          rawToken,
+		UserID:         userID,
+		FactorRequired: factor,
+		Signature:      sig,
+		ExpiresAt:      expiresAt,
+		CreatedAt:      now,
 	}
 
 	if err := p.repo.SaveChallenge(ctx, rec); err != nil {
@@ -410,49 +464,99 @@ func (p *Plugin) CreateChallenge(ctx context.Context, params CreateChallengePara
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventChallengeCreated, ctx, &ChallengeCreatedEventPayload{
-			Token:     token,
-			UserID:    params.UserID,
+			Token:     compositeToken,
+			UserID:    userID,
 			ExpiresAt: expiresAt,
 		})
 	}
 
-	return &ChallengeResult{
-		ChallengeToken: token,
-		UserID:         params.UserID,
+	return &dto.AuthChallenge{
+		ChallengeID:    challengeID,
+		UserID:         userID,
+		FactorRequired: factor,
+		TempToken:      compositeToken,
 		ExpiresAt:      expiresAt,
+		CreatedAt:      now,
 	}, nil
 }
 
-// VerifyChallenge validates a sign-in challenge token using the requested method (TOTP, Backup Code, OTP).
-func (p *Plugin) VerifyChallenge(ctx context.Context, params VerifyChallengeParams) (*VerifyResult, error) {
-	challenge, err := p.repo.GetChallenge(ctx, params.ChallengeToken)
+// CreateChallenge generates a short-lived sign-in challenge token following primary credentials verification.
+func (p *Plugin) CreateChallenge(ctx context.Context, params CreateChallengeParams) (*ChallengeResult, error) {
+	ch, err := p.CreateMFAChallenge(ctx, params.UserID, MethodTOTP)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChallengeResult{
+		ChallengeToken: ch.TempToken,
+		UserID:         ch.UserID,
+		ExpiresAt:      ch.ExpiresAt,
+	}, nil
+}
+
+// VerifyMFAChallenge validates a sign-in challenge token using anti-tampering verification and the requested factor.
+func (p *Plugin) VerifyMFAChallenge(ctx context.Context, params dto.VerifyChallengeParams) (*dto.ChallengeVerificationResult, error) {
+	rawToken, sig := DecodeChallengeToken(params.ChallengeToken)
+
+	challenge, err := p.repo.GetChallenge(ctx, rawToken)
 	if err != nil || challenge == nil {
-		return nil, ErrInvalidChallengeToken
+		// Also query by full composite token if custom store indexed it directly
+		challenge, err = p.repo.GetChallenge(ctx, params.ChallengeToken)
+		if err != nil || challenge == nil {
+			return nil, ErrInvalidChallengeToken
+		}
 	}
 
 	if time.Now().After(challenge.ExpiresAt) {
+		_ = p.repo.DeleteChallenge(ctx, rawToken)
 		_ = p.repo.DeleteChallenge(ctx, params.ChallengeToken)
 		return nil, ErrChallengeExpired
 	}
 
-	var res *VerifyResult
-	switch strings.ToLower(params.Method) {
+	// Anti-tampering signature verification (if signature was present)
+	if sig != "" && challenge.Signature != "" {
+		if !VerifyChallengeSignature(challenge.ID, challenge.UserID, challenge.FactorRequired, sig, p.getChallengeSecret(), challenge.ExpiresAt) {
+			return nil, ErrInvalidChallengeToken
+		}
+	}
+
+	method := strings.ToLower(params.Method)
+	if method == "" {
+		method = challenge.FactorRequired
+		if method == "" {
+			method = MethodTOTP
+		}
+	}
+
+	var vRes *VerifyResult
+	switch method {
 	case MethodTOTP:
-		res, err = p.VerifyTOTP(ctx, VerifyTOTPParams{
+		vRes, err = p.VerifyTOTP(ctx, VerifyTOTPParams{
 			UserID:         challenge.UserID,
 			Code:           params.Code,
 			TrustDevice:    params.TrustDevice,
 			DeviceID:       params.DeviceID,
 			ExtraContainer: params.ExtraContainer,
 		})
+		// Fallback: if TOTP fails, check if the provided code is a valid single-use backup code
+		if err != nil {
+			if bRes, bErr := p.VerifyBackupCode(ctx, VerifyBackupCodeParams{
+				UserID:         challenge.UserID,
+				Code:           params.Code,
+				ExtraContainer: params.ExtraContainer,
+			}); bErr == nil {
+				vRes = bRes
+				err = nil
+			}
+		}
 	case MethodBackupCode:
-		res, err = p.VerifyBackupCode(ctx, VerifyBackupCodeParams{
+		vRes, err = p.VerifyBackupCode(ctx, VerifyBackupCodeParams{
 			UserID:         challenge.UserID,
 			Code:           params.Code,
 			ExtraContainer: params.ExtraContainer,
 		})
 	case MethodOTP, MethodSMS, MethodEmail:
-		res, err = p.VerifyOTP(ctx, VerifyOTPParams{
+		vRes, err = p.VerifyOTP(ctx, VerifyOTPParams{
 			UserID:         challenge.UserID,
 			Code:           params.Code,
 			ExtraContainer: params.ExtraContainer,
@@ -465,10 +569,65 @@ func (p *Plugin) VerifyChallenge(ctx context.Context, params VerifyChallengePara
 		return nil, err
 	}
 
-	// Consume challenge token upon successful verification
+	// Atomically revoke the challenge token upon success to prevent replay attacks
+	_ = p.repo.DeleteChallenge(ctx, rawToken)
 	_ = p.repo.DeleteChallenge(ctx, params.ChallengeToken)
 
-	return res, nil
+	return &dto.ChallengeVerificationResult{
+		UserID:           challenge.UserID,
+		Method:           vRes.Method,
+		TrustDeviceToken: vRes.TrustDeviceToken,
+		RemainingCodes:   vRes.RemainingCodes,
+	}, nil
+}
+
+// VerifyChallenge validates a sign-in challenge token using the requested method (TOTP, Backup Code, OTP).
+func (p *Plugin) VerifyChallenge(ctx context.Context, params VerifyChallengeParams) (*VerifyResult, error) {
+	res, err := p.VerifyMFAChallenge(ctx, dto.VerifyChallengeParams{
+		ChallengeToken: params.ChallengeToken,
+		Code:           params.Code,
+		Method:         params.Method,
+		TrustDevice:    params.TrustDevice,
+		DeviceID:       params.DeviceID,
+		ExtraContainer: params.ExtraContainer,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &VerifyResult{
+		Success:          true,
+		UserID:           res.UserID,
+		Method:           res.Method,
+		TrustDeviceToken: res.TrustDeviceToken,
+		RemainingCodes:   res.RemainingCodes,
+	}, nil
+}
+
+// VerifyChallengeSession completes challenge verification and directly issues an active session via SessionManager.
+func (p *Plugin) VerifyChallengeSession(ctx context.Context, params dto.VerifyChallengeParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
+	if p.ctx == nil || p.ctx.Session() == nil {
+		return nil, plugin.ErrSessionManagerRequired
+	}
+
+	verRes, err := p.VerifyMFAChallenge(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	sess, err := p.ctx.Session().CreateSession(ctx, verRes.UserID, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("twofactor: failed to issue session: %w", err)
+	}
+
+	sessionData := &dto.SessionData{
+		Session: sess,
+	}
+	if sess.Extra != nil {
+		sessionData.Extra = sess.Extra
+	}
+
+	return sessionData, nil
 }
 
 // TrustDevice explicitly authorizes a client device for the configured trust duration.

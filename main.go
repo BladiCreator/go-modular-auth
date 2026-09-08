@@ -75,15 +75,16 @@ func main() {
 	}
 	fmt.Printf("✔ User created: %s (%s)\n", user.Name, user.ID)
 
-	// 4. User authentication (Sign-in)
-	sessionData, err := epPlugin.SignIn(ctx, dto.SignInParams{
+	// 4. User authentication (Sign-in before 2FA is enabled)
+	authRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
 		Email:    "gopher@golang.org",
 		Password: "SecurePassword123!",
 	}, auth.WithIPAddress("127.0.0.1"), auth.WithUserAgent("GoModularAuth-Demo/1.0"))
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ Session started for: %s (%s, Token: %s)\n", sessionData.User.Name, sessionData.User.ID, sessionData.Session.Token)
+	sessionData := authRes.SessionData()
+	fmt.Printf("✔ Initial session started (No MFA required): %s (%s, Token: %s)\n", sessionData.User.Name, sessionData.User.ID, sessionData.Session.Token)
 
 	// 5. Two-Factor Authentication (2FA) Enrollment
 	tfPlugin := auth.Plugin[twofactor.Plugin](app)
@@ -104,7 +105,7 @@ func main() {
 	currentTOTP := generateTOTPCode(tfRecord.Secret, 30, 6)
 	fmt.Printf("✔ Generated current TOTP code: %s\n", currentTOTP)
 
-	// 7. Verify TOTP code
+	// 7. Verify TOTP code (Enables 2FA on account)
 	validTOTP, err := tfPlugin.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
 		UserID: user.ID,
 		Code:   currentTOTP,
@@ -112,7 +113,27 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("✔ TOTP verification result: %v\n", validTOTP.Success)
+	fmt.Printf("✔ TOTP verification result: %v (2FA is now verified & active)\n", validTOTP.Success)
+
+	// 7b. Step-Up / Multi-Factor Sign-In with Challenge Resolution
+	mfaSignInRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
+		Email:    "gopher@golang.org",
+		Password: "SecurePassword123!",
+	}, auth.WithIPAddress("127.0.0.1"), auth.WithUserAgent("GoModularAuth-Demo/1.0"))
+	if err != nil {
+		panic(err)
+	}
+	if !mfaSignInRes.RequiresChallenge() {
+		panic("Expected MFA challenge requirement when 2FA is active")
+	}
+	fmt.Printf("✔ MFA Challenge received: %s (factor: %s)\n", mfaSignInRes.Challenge().TempToken, mfaSignInRes.Challenge().FactorRequired)
+
+	// Resolve the challenge via central auth.VerifyTwoFactorChallenge
+	mfaSessionData, err := app.VerifyTwoFactorChallenge(ctx, mfaSignInRes.Challenge().TempToken, currentTOTP)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("✔ Challenge solved! Final session emitted: %s (User: %s)\n", mfaSessionData.Session.Token, mfaSessionData.User.Name)
 
 	// 8. Verify and consume a single-use backup code
 	firstBackupCode := enableRes.BackupCodes[0]

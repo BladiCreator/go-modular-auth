@@ -10,6 +10,7 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"hash"
 	"math/big"
@@ -271,11 +272,21 @@ func GenerateRandomToken(byteLength int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+type trustDevicePayload struct {
+	UserID    string `json:"uid"`
+	DeviceID  string `json:"did"`
+	ExpiresAt int64  `json:"exp"`
+}
+
 // GenerateTrustDeviceToken generates a signed cryptographic token authorizing a trusted device.
-// Format: "<payload_base64>.<hmac_signature_base64>" where payload is "userID:deviceID:expiresAtUnix".
+// Format: "<payload_base64>.<hmac_signature_base64>" where payload is a JSON structure {"uid":...,"did":...,"exp":...}.
 func GenerateTrustDeviceToken(userID, deviceID, secret string, expiresAt time.Time) string {
-	payload := fmt.Sprintf("%s:%s:%d", userID, deviceID, expiresAt.Unix())
-	payloadEncoded := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	payloadBytes, _ := json.Marshal(trustDevicePayload{
+		UserID:    userID,
+		DeviceID:  deviceID,
+		ExpiresAt: expiresAt.Unix(),
+	})
+	payloadEncoded := base64.RawURLEncoding.EncodeToString(payloadBytes)
 
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payloadEncoded))
@@ -318,25 +329,70 @@ func VerifyTrustDeviceToken(token, userID, deviceID, secret string) bool {
 		return false
 	}
 
-	payloadParts := strings.Split(string(payloadBytes), ":")
-	if len(payloadParts) != 3 {
+	var p trustDevicePayload
+	if err := json.Unmarshal(payloadBytes, &p); err != nil {
+		// Fallback for legacy colon-separated tokens (e.g. "uid:did:12345678")
+		payloadParts := strings.Split(string(payloadBytes), ":")
+		if len(payloadParts) >= 3 {
+			p.UserID = strings.Join(payloadParts[:len(payloadParts)-2], ":")
+			p.DeviceID = payloadParts[len(payloadParts)-2]
+			p.ExpiresAt, _ = strconv.ParseInt(payloadParts[len(payloadParts)-1], 10, 64)
+		} else {
+			return false
+		}
+	}
+
+	if p.UserID != userID || p.DeviceID != deviceID {
 		return false
 	}
 
-	tokenUserID := payloadParts[0]
-	tokenDeviceID := payloadParts[1]
-	expUnix, err := strconv.ParseInt(payloadParts[2], 10, 64)
-	if err != nil {
-		return false
-	}
-
-	if tokenUserID != userID || tokenDeviceID != deviceID {
-		return false
-	}
-
-	if time.Now().Unix() > expUnix {
+	if time.Now().Unix() > p.ExpiresAt {
 		return false
 	}
 
 	return true
+}
+
+// SignChallengeToken computes an HMAC-SHA256 signature for anti-tampering verification of MFA challenges.
+func SignChallengeToken(challengeID, userID, factor string, expiresAt time.Time, secret string) string {
+	payload := fmt.Sprintf("%s:%s:%s:%d", challengeID, userID, factor, expiresAt.Unix())
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// VerifyChallengeSignature checks whether a provided signature matches the expected HMAC-SHA256 signature.
+func VerifyChallengeSignature(challengeID, userID, factor, signature, secret string, expiresAt time.Time) bool {
+	if signature == "" || secret == "" {
+		return false
+	}
+	expectedSig := SignChallengeToken(challengeID, userID, factor, expiresAt, secret)
+	expectedBytes, err := base64.RawURLEncoding.DecodeString(expectedSig)
+	if err != nil {
+		return false
+	}
+	providedBytes, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		return false
+	}
+	return subtle.ConstantTimeCompare(expectedBytes, providedBytes) == 1
+}
+
+// EncodeChallengeToken encodes a raw token and its cryptographic anti-tampering signature into a composite string.
+// Format: "mfa_<rawToken>.<signature>"
+func EncodeChallengeToken(rawToken, signature string) string {
+	if signature == "" {
+		return rawToken
+	}
+	return "mfa_" + rawToken + "." + signature
+}
+
+// DecodeChallengeToken extracts the raw token and signature from a composite challenge token string.
+func DecodeChallengeToken(token string) (rawToken string, signature string) {
+	clean := strings.TrimPrefix(token, "mfa_")
+	parts := strings.Split(clean, ".")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return clean, ""
 }

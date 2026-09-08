@@ -39,6 +39,13 @@ func WithContextSessionManager(sm SessionManager) ContextOption {
 	}
 }
 
+// WithMFAProvider configures an MFAProvider into the plugin Context.
+func WithMFAProvider(p MFAProvider) ContextOption {
+	return func(c *Context) {
+		c.mfaProvider = p
+	}
+}
+
 // Context represents the shared environment provided to plugins upon initialization,
 // containing cryptographic tools, synchronous execution pipelines, typed lifecycle hooks,
 // central session management, and a thread-safe key-value store.
@@ -47,6 +54,7 @@ type Context struct {
 	pipeline       *Pipeline
 	hooks          *Hooks
 	sessionManager SessionManager
+	mfaProvider    MFAProvider
 	store          sync.Map
 }
 
@@ -88,6 +96,12 @@ func (c *Context) SessionManager() SessionManager { return c.sessionManager }
 
 // SetSessionManager configures the central SessionManager instance into the shared context.
 func (c *Context) SetSessionManager(sm SessionManager) { c.sessionManager = sm }
+
+// MFAProvider returns the registered multi-factor authentication provider, or nil if none is configured.
+func (c *Context) MFAProvider() MFAProvider { return c.mfaProvider }
+
+// SetMFAProvider registers an MFAProvider into the shared plugin context.
+func (c *Context) SetMFAProvider(p MFAProvider) { c.mfaProvider = p }
 
 // Set stores a key-value pair in the shared thread-safe context store.
 func (c *Context) Set(key string, value any) { c.store.Store(key, value) }

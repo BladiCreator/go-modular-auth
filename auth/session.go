@@ -34,6 +34,15 @@ var (
 
 	// ErrInvalidUserID is returned when an empty user ID is provided to session creation.
 	ErrInvalidUserID = errors.New("auth: user ID cannot be empty")
+
+	// ErrMFAEngineNotConfigured is returned when attempting MFA challenge verification without a registered MFAProvider plugin.
+	ErrMFAEngineNotConfigured = domain.ErrMFAEngineNotConfigured
+
+	// ErrInvalidChallengeToken is returned when an invalid challenge token is submitted.
+	ErrInvalidChallengeToken = domain.ErrInvalidChallengeToken
+
+	// ErrChallengeExpired is returned when a challenge token has exceeded its validity time.
+	ErrChallengeExpired = domain.ErrChallengeExpired
 )
 
 // SessionCreatedPayload defines the payload published on EventSessionCreated.
@@ -366,4 +375,21 @@ func (sm *SessionManager) ListSessionsByUserID(ctx context.Context, userID strin
 		return nil, ErrInvalidUserID
 	}
 	return sm.repo.ListSessionsByUserID(ctx, userID)
+}
+
+// ResolveUser retrieves the user entity associated with a user ID using the configured UserResolver or SessionRepository.
+func (sm *SessionManager) ResolveUser(ctx context.Context, userID string) (*entity.User, error) {
+	if sm == nil {
+		return nil, ErrSessionRepositoryRequired
+	}
+	resolver := sm.userResolver
+	if resolver == nil {
+		if r, ok := sm.repo.(UserResolver); ok {
+			resolver = r
+		}
+	}
+	if resolver != nil {
+		return resolver.GetUserByID(ctx, userID)
+	}
+	return nil, nil
 }

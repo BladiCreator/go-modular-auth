@@ -112,11 +112,20 @@ type TrustDeviceRecord struct {
 
 // ChallengeRecord represents a temporary sign-in challenge issued after primary credential validation.
 type ChallengeRecord struct {
+	// ID is the unique challenge identifier.
+	ID string `json:"id,omitempty"`
+
 	// Token is the unique challenge token string.
 	Token string `json:"token"`
 
 	// UserID is the target user required to fulfill the 2FA challenge.
 	UserID string `json:"user_id"`
+
+	// FactorRequired specifies the expected authentication factor ("totp", "otp", "backup_code").
+	FactorRequired string `json:"factor_required,omitempty"`
+
+	// Signature stores the cryptographic anti-tampering HMAC signature.
+	Signature string `json:"signature,omitempty"`
 
 	// ExpiresAt is the timestamp after which this challenge token becomes invalid.
 	ExpiresAt time.Time `json:"expires_at"`

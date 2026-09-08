@@ -24,4 +24,9 @@ var (
 	ErrUserBanned         = errors.New("AuthService: user is banned")
 	ErrTenantInactive     = errors.New("AuthService: tenant is inactive")
 	ErrOperationCancelled = errors.New("AuthService: operation cancelled by interceptor")
+
+	// MFA and Step-Up challenge errors
+	ErrMFAEngineNotConfigured = errors.New("AuthService: multi-factor authentication engine is not configured")
+	ErrInvalidChallengeToken  = errors.New("AuthService: invalid challenge token")
+	ErrChallengeExpired       = errors.New("AuthService: challenge token has expired")
 )

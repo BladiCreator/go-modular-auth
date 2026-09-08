@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/BladiCreator/go-modular-auth/config"
+	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
@@ -123,6 +125,55 @@ func (a *Auth) RevokeSession(ctx context.Context, token string) error {
 		return ErrSessionRepositoryRequired
 	}
 	return a.sessionManager.RevokeSession(ctx, token)
+}
+
+// VerifyChallenge completes an active MFA challenge (TOTP, backup code, OTP), atomically revoking the challenge token,
+// and issues an authenticated session via the central SessionManager.
+func (a *Auth) VerifyChallenge(ctx context.Context, params dto.VerifyChallengeParams, opts ...SessionOption) (*dto.SessionData, error) {
+	if a.ctx == nil || a.ctx.MFAProvider() == nil {
+		return nil, ErrMFAEngineNotConfigured
+	}
+	if a.sessionManager == nil {
+		return nil, ErrSessionRepositoryRequired
+	}
+
+	verRes, err := a.ctx.MFAProvider().VerifyMFAChallenge(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := a.sessionManager.ResolveUser(ctx, verRes.UserID)
+	if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
+		return nil, fmt.Errorf("auth: failed to resolve user for verified challenge: %w", err)
+	}
+
+	sess, err := a.sessionManager.CreateSession(ctx, verRes.UserID, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("auth: failed to issue session: %w", err)
+	}
+
+	sessionData := &dto.SessionData{
+		Session: sess,
+		User:    user,
+	}
+	if sess.Extra != nil {
+		sessionData.Extra = sess.Extra
+	}
+
+	if a.hooks != nil {
+		a.hooks.DispatchUserSignedIn(ctx, sessionData)
+	}
+
+	return sessionData, nil
+}
+
+// VerifyTwoFactorChallenge is a convenient shortcut to verify a TOTP or backup code MFA challenge by token and code.
+func (a *Auth) VerifyTwoFactorChallenge(ctx context.Context, challengeToken string, code string, opts ...SessionOption) (*dto.SessionData, error) {
+	return a.VerifyChallenge(ctx, dto.VerifyChallengeParams{
+		ChallengeToken: challengeToken,
+		Code:           code,
+		Method:         "totp",
+	}, opts...)
 }
 
 // Plugin retrieves a registered plugin instance of type P from the Auth engine in a strongly-typed manner.

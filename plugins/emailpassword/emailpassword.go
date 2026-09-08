@@ -269,20 +269,24 @@ func (p *Plugin) VerifyCredentials(ctx context.Context, email, password string) 
 //   - opts: Optional functional session options (WithRememberMe, WithIPAddress, WithUserAgent, WithDuration, etc.).
 //
 // Returns:
-//   - *dto.SessionData: Combined authenticated user profile and active session.
+//   - *dto.AuthResult: Combined authenticated user profile and active session (or pending MFA challenge).
 //   - error: ErrInvalidCredentials, ErrEmailNotVerified, ErrSessionManagerRequired, or database error.
 //
 // Example:
 //
-//	sessionData, err := epPlugin.SignIn(ctx, dto.SignInParams{
+//	authRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
 //		Email:    "john.doe@example.com",
 //		Password: "SuperSecretPassword123!",
 //	})
 //	if err != nil {
 //		log.Fatalf("Authentication failed: %v", err)
 //	}
-//	fmt.Printf("Authenticated as: %s (Session Token: %s)\n", sessionData.User.Name, sessionData.Session.Token)
-func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plugin.SessionOption) (*dto.SessionData, error) {
+//	if authRes.RequiresChallenge() {
+//		fmt.Printf("MFA required: token=%s\n", authRes.Challenge().TempToken)
+//	} else {
+//		fmt.Printf("Authenticated as: %s (Session Token: %s)\n", authRes.User.Name, authRes.Session.Token)
+//	}
+func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plugin.SessionOption) (*dto.AuthResult, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if email == "" || input.Password == "" {
 		return nil, ErrInvalidCredentials
@@ -333,6 +337,29 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		return nil, ErrEmailNotVerified
 	}
 
+	// 3. Step-Up / Multi-Factor Authentication (MFA) Check
+	if p.ctx != nil && p.ctx.MFAProvider() != nil {
+		mfa := p.ctx.MFAProvider()
+		combinedExtra := make(map[string]any)
+		for k, v := range input.Extra {
+			combinedExtra[k] = v
+		}
+		for k, v := range optsData.Extra {
+			combinedExtra[k] = v
+		}
+		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, combinedExtra)
+		if err != nil {
+			return nil, fmt.Errorf("emailpassword: failed to evaluate 2FA: %w", err)
+		}
+		if requiresMFA {
+			challenge, err := mfa.CreateMFAChallenge(ctx, user.ID, "totp")
+			if err != nil {
+				return nil, fmt.Errorf("emailpassword: failed to create 2FA challenge: %w", err)
+			}
+			return dto.NewAuthResultChallenge(challenge), nil
+		}
+	}
+
 	if p.ctx == nil || p.ctx.Session() == nil {
 		return nil, ErrSessionManagerRequired
 	}
@@ -356,7 +383,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		sessionData.Extra = sess.Extra
 	}
 
-	// 3. Run AfterSignIn interceptors (allows mutating sessionData.Session.Extra or aborting)
+	// 4. Run AfterSignIn interceptors (allows mutating sessionData.Session.Extra or aborting)
 	if p.ctx != nil && p.ctx.Pipeline() != nil {
 		if err := p.ctx.Pipeline().ExecuteAfterSignIn(ctx, sessionData, optsData.Interceptors...); err != nil {
 			_ = p.ctx.Session().RevokeSession(ctx, sess.Token)
@@ -370,7 +397,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		p.ctx.Hooks().DispatchUserSignedIn(ctx, sessionData)
 	}
 
-	return sessionData, nil
+	return dto.NewAuthResultCompleted(sessionData), nil
 }
 
 // ChangePassword updates an existing authenticated user's password after verifying their current password.
