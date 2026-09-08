@@ -7,6 +7,7 @@ import (
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
+	"net/http/httptest"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/httpauth"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -158,6 +160,27 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("✔ Out-of-band OTP verification result: %v\n", validOTP.Success)
+
+	// 10. HTTP standard utilities (httpauth) demonstration
+	rec := httptest.NewRecorder()
+	httpauth.SetSessionCookie(rec, mfaSessionData.Session.Token, mfaSessionData.Session.ExpiresAt)
+
+	httpReq := httptest.NewRequest("GET", "/api/profile", nil)
+	httpReq.Header.Set("Cookie", rec.Header().Get("Set-Cookie"))
+	extractedToken, err := httpauth.ExtractToken(httpReq)
+	if err != nil {
+		panic(err)
+	}
+
+	// Validate session and inject into request context
+	verifiedSession, err := app.ValidateSession(ctx, extractedToken)
+	if err != nil {
+		panic(err)
+	}
+	authCtx := httpauth.WithSessionData(httpReq.Context(), verifiedSession)
+	ctxSession, _ := httpauth.SessionFromContext(authCtx)
+	fmt.Printf("✔ [httpauth] Verified session from HTTP cookie: %s (User ID: %s)\n", ctxSession.Token, ctxSession.UserID)
+
 	fmt.Println("\n🎉 All GoModularAuth authentication flows completed successfully!")
 }
 

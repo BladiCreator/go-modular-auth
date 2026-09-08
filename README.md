@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://pkg.go.dev/github.com/BladiCreator/go-modular-auth"><img src="https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth.svg" alt="Go Reference"></a>
   <a href="https://goreportcard.com/report/github.com/BladiCreator/go-modular-auth"><img src="https://goreportcard.com/badge/github.com/BladiCreator/go-modular-auth" alt="Go Report Card"></a>
+  <a href="https://github.com/BladiCreator/go-modular-auth/releases/tag/v1.0.0"><img src="https://img.shields.io/badge/Release-v1.0.0-007EC6.svg" alt="Release: v1.0.0"></a>
   <a href="https://github.com/BladiCreator/go-modular-auth/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
@@ -19,32 +20,37 @@
 
 ## 🌟 Overview
 
-**Go Modular Auth** is a decoupled authentication engine designed to provide maximum flexibility and developer ergonomics in Go applications. Inspired by modern modular authentication architectures, it allows developers to compose authentication systems from independent plugins (`emailpassword`, `twofactor`, OAuth2, etc.) without locking the project into any specific web framework (compatible with **Gin**, **Fiber**, **Echo**, **Chi**, **net/http**, or **gRPC**).
+**Go Modular Auth** is a production-grade, highly extensible authentication and authorization engine for Go. Designed with clean architecture and maximum developer ergonomics, it allows developers to compose full-featured authentication systems from independent, pluggable modules (`emailpassword`, `twofactor`, `passkey`, `oauth2`, `jwt`, `organization`, `admin`, and 20+ more) without locking your codebase into any web framework.
+
+It is 100% compatible with standard **`net/http`**, **Gin**, **Fiber**, **Echo**, **Chi**, or **gRPC** services.
 
 ---
 
 ## 🚀 Key Features
 
-- 🧩 **100% Modular Plugin-Based Architecture**: Add or remove authentication capabilities based on project requirements.
-- ⚡ **Strong Typing with Generics (Go 1.18+)**: Safe access to individual plugin APIs with full IDE autocomplete and no manual casting via `auth.Plugin[emailpassword.Plugin](app)`.
-- 📦 **Mutable Parameters Pattern (`Params.Extra`)**: Allows plugins and interceptors to dynamically enrich request parameters (`Set`/`Get`) before database persistence.
-- 📢 **Native Pipeline & Reactive Lifecycle Hooks**: Zero external dependencies! Synchronous interceptor pipeline (`Pipeline()`) for in-flight parameter mutation/validation and typed reactive hooks (`Hooks()`) for asynchronous notifications, metrics, and audit logging.
-- 🔐 **Production-Grade Security**: Strong password hashing using `bcrypt`, cryptographically secure token generation via `crypto/rand`, and 2FA TOTP (RFC 6238).
-- 🗄️ **Decoupled Storage**: Connect any database (**PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**, **Redis**, **GORM**) through clean repository interfaces. Includes a built-in thread-safe in-memory store.
+- 🧩 **25+ Pluggable Authentication Modules**: Add or remove credentials, multi-factor auth, social sign-ins, organizations, or payment entitlements as simple plug-and-play modules.
+- 🔑 **Centralized Session Orchestration (`SessionManager`)**: Single source of truth for session lifecycles, sliding windows, remember-me durations, cryptographically hashed tokens, IP/User-Agent tracking, and multi-device revocation via `config.WithSessionRepository(store)`.
+- 🛡️ **Polymorphic AuthResult & Step-Up Auth Engine (MFA)**: `SignIn` returns `*dto.AuthResult`, automatically issuing complete sessions or signed multi-factor challenges (`authRes.RequiresChallenge()`) without manual handler branching.
+- 🔒 **Cryptographic Anti-Tampering & Anti-Replay Protection**: MFA challenge tokens (`mfa_<token>.<hmacSig>`) are signed using HMAC-SHA256 with strict 5-minute TTLs and atomic single-use invalidation upon verification.
+- 📱 **Trusted Device Bypass**: Authorize verified devices (`TrustDevice=true`) to safely bypass 2FA challenges on subsequent logins.
+- 🌐 **Standard HTTP Utilities (`httpauth` package)**: Pure `net/http` utilities for cookie management (`CookieManager`), Bearer token extraction, session resolution, and request context injection (`httpauth.WithSession`, `httpauth.SessionFromContext`).
+- 📢 **Synchronous Pipeline & Typed Reactive Hooks**: Intercept in-flight parameters with `Pipeline()` (e.g. `ErrUserBanned`, `ErrTenantInactive`) and subscribe to typed lifecycle notifications with `Hooks()` (e.g. `OnUserSignedUp`, `EventSignInAfter`).
+- ⚡ **Strong Typing with Generics (Go 1.18+)**: Access plugin APIs with zero casting and full IDE autocomplete via `auth.Plugin[P](app)`.
+- 🗄️ **Decoupled Storage**: Bring your own database (**PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**, **Redis**, **GORM**) through clean repository interfaces, or use the built-in thread-safe in-memory adapter.
 
 ---
 
 ## 📦 Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth
+go get github.com/BladiCreator/go-modular-auth@v1.0.0
 ```
 
 ---
 
-## 💡 Production Example
+## 💡 Quickstart & Production Example
 
-The following complete example demonstrates user registration with synchronous parameter interception, typed lifecycle hooks, user sign-in, 2FA TOTP secret generation, and TOTP code verification:
+The following example demonstrates user registration, synchronous parameter interception, user sign-in with session emission, 2FA TOTP activation, MFA challenge interception, and challenge resolution:
 
 ```go
 package main
@@ -53,13 +59,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/BladiCreator/go-modular-auth/adapters/memory"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -68,90 +74,226 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Storage adapter (in-memory store for this example)
+	// 1. Storage adapter (shared in-memory repository for this example)
 	storage := memory.New()
 
-	// 1. Initialize engine with configuration and plugins
+	// 2. Initialize the central Auth engine with SessionRepository and plugins
 	app, err := auth.New(
-		config.WithBcryptCost(12),
+		config.WithSessionRepository(storage),
+		config.WithSessionConfig(auth.SessionConfig{
+			DefaultDuration: 24 * time.Hour,
+			RememberMeDuration: 30 * 24 * time.Hour,
+		}),
 		config.WithPlugins(
 			plugins.EmailPassword(storage, emailpassword.WithMinPasswordLength(8)),
-			plugins.TwoFactor(storage, twofactor.WithIssuer("Enterprise ERP")),
+			plugins.TwoFactor(storage, twofactor.WithIssuer("My Secure App")),
 		),
 	)
 	if err != nil {
-		log.Fatalf("Failed to initialize Auth: %v", err)
+		log.Fatalf("Failed to initialize Auth engine: %v", err)
 	}
 
-	// 2. Intercept registration via synchronous pipeline to attach dynamic metadata
-	app.Pipeline().AddInterceptor(func(ctx context.Context, stage plugin.PipelineStage, payload any) error {
-		if stage == plugin.StageBeforeSignUp {
-			if params, ok := payload.(*dto.CreateUserParams); ok {
-				params.Set("role", "admin")
-				params.Set("org_id", "org_123")
-			}
-		}
-		return nil
-	})
-
-	// 3. Subscribe to post-action notifications via typed Hooks or pub/sub
+	// 3. Typed Lifecycle Hooks: Welcome email & audit log
 	app.Hooks().OnUserSignedUp(func(c context.Context, user *entity.User) {
-		log.Printf("📧 [HOOK] Sending welcome email to: %s", user.Email)
+		fmt.Printf("📢 [Hook] Sending welcome email to: %s\n", user.Email)
 	})
 
-	app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
-		log.Printf("🛡️ [AUDIT] Successful sign-in - User ID: %s | Email: %s", payload.User.ID, payload.User.Email)
+	app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, p *emailpassword.SignInEventPayload) {
+		fmt.Printf("🛡️ [Audit] Sign-in succeeded for: %s (ID: %s)\n", p.User.Email, p.User.ID)
 	})
 
-	// 4. Flow 1: User Registration
+	// 4. Register a new user
 	fmt.Println("--- 1. User Registration ---")
-	newUser, err := auth.Plugin[emailpassword.Plugin](app).SignUp(ctx, dto.SignUpParams{
-		Name:     "Carlos Mendoza",
-		Email:    "carlos@enterprise.com",
-		Password: "SuperSecurePassword123!",
+	epPlugin := auth.Plugin[emailpassword.Plugin](app)
+	newUser, err := epPlugin.SignUp(ctx, dto.SignUpParams{
+		Name:     "Gopher Developer",
+		Email:    "gopher@golang.org",
+		Password: "SecurePassword123!",
 	})
 	if err != nil {
 		log.Fatalf("Sign up failed: %v", err)
 	}
-	fmt.Printf("✔ Registered User: %s (ID: %s)\n\n", newUser.Name, newUser.ID)
+	fmt.Printf("✔ Registered User: %s (%s)\n\n", newUser.Name, newUser.ID)
 
-	// 5. Flow 2: User Sign-In
-	fmt.Println("--- 2. User Sign-In ---")
-	signedInUser, err := auth.Plugin[emailpassword.Plugin](app).SignIn(ctx, dto.SignInParams{
-		Email:    "carlos@enterprise.com",
-		Password: "SuperSecurePassword123!",
+	// 5. Initial Sign-In (before 2FA: returns active session immediately)
+	fmt.Println("--- 2. Initial Sign-In (No MFA) ---")
+	initialAuth, err := epPlugin.SignIn(ctx, dto.SignInParams{
+		Email:    "gopher@golang.org",
+		Password: "SecurePassword123!",
 	})
 	if err != nil {
 		log.Fatalf("Sign in failed: %v", err)
 	}
-	fmt.Printf("✔ Successfully authenticated as: %s (ID: %s)\n\n", signedInUser.Email, signedInUser.ID)
 
-	// 6. Flow 3: 2FA TOTP Configuration
-	fmt.Println("--- 3. 2FA TOTP Setup ---")
-	otpURI, err := auth.Plugin[twofactor.Plugin](app).GenerateTOTPSecret(ctx, newUser.ID)
-	if err != nil {
-		log.Fatalf("Failed to generate 2FA: %v", err)
+	if initialAuth.IsComplete() {
+		fmt.Printf("✔ Authenticated: User=%s, Session Token=%s\n\n",
+			initialAuth.User.Name, initialAuth.Session.Token)
 	}
-	fmt.Printf("✔ Authenticator App URI: %s\n\n", otpURI)
 
-	// 7. Flow 4: 2FA Code Verification
-	fmt.Println("--- 4. 2FA Code Verification ---")
-	valid, err := auth.Plugin[twofactor.Plugin](app).VerifyCode(ctx, newUser.ID, "123456")
-	if err != nil || !valid {
-		fmt.Println("❌ Invalid 2FA code")
-	} else {
-		fmt.Println("✔ 2FA code successfully verified")
+	// 6. Enroll and verify 2FA TOTP
+	fmt.Println("--- 3. 2FA TOTP Enrollment ---")
+	tfPlugin := auth.Plugin[twofactor.Plugin](app)
+	enableRes, err := tfPlugin.Enable(ctx, twofactor.EnableParams{
+		UserID: newUser.ID,
+	})
+	if err != nil {
+		log.Fatalf("Enable 2FA failed: %v", err)
+	}
+	fmt.Printf("✔ 2FA Setup URI: %s\n", enableRes.TOTPURI)
+	fmt.Printf("✔ Backup Codes: %v\n", enableRes.BackupCodes)
+
+	// Generate current TOTP code and verify to activate 2FA
+	totpCode, _ := twofactor.GenerateTOTPCode(enableRes.Secret, time.Now().Unix(), 30, 6, twofactor.AlgorithmSHA1)
+	_, err = tfPlugin.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
+		UserID: newUser.ID,
+		Code:   totpCode,
+	})
+	if err != nil {
+		log.Fatalf("2FA verification failed: %v", err)
+	}
+	fmt.Printf("✔ 2FA activated successfully!\n\n")
+
+	// 7. Sign in with 2FA active (Step-Up Auth Challenge)
+	fmt.Println("--- 4. Sign-In with 2FA Active (MFA Challenge) ---")
+	mfaAuth, err := epPlugin.SignIn(ctx, dto.SignInParams{
+		Email:    "gopher@golang.org",
+		Password: "SecurePassword123!",
+	})
+	if err != nil {
+		log.Fatalf("Sign in failed: %v", err)
+	}
+
+	if mfaAuth.RequiresChallenge() {
+		fmt.Printf("⚠️ MFA Challenge Required: factor=%s, token=%s (Expires: %s)\n\n",
+			mfaAuth.Challenge().FactorRequired,
+			mfaAuth.Challenge().TempToken,
+			mfaAuth.Challenge().ExpiresAt.Format(time.RFC3339))
+
+		// 8. Resolve Challenge using the central Auth engine
+		fmt.Println("--- 5. Challenge Resolution ---")
+		freshTOTP, _ := twofactor.GenerateTOTPCode(enableRes.Secret, time.Now().Unix(), 30, 6, twofactor.AlgorithmSHA1)
+		sessionData, err := app.VerifyTwoFactorChallenge(ctx, mfaAuth.Challenge().TempToken, freshTOTP)
+		if err != nil {
+			log.Fatalf("Challenge resolution failed: %v", err)
+		}
+		fmt.Printf("🎉 Final Session Issued: Token=%s (User: %s)\n",
+			sessionData.Session.Token, sessionData.User.Name)
 	}
 }
 ```
 
 ---
 
-## 🗄️ Custom Repository Implementation (GORM + PostgreSQL)
+## 🌐 HTTP Transport Integration (`httpauth` Package)
 
-In production applications, user records and sessions are persisted to a relational or document database. Implement the repository interfaces required by each plugin to use your database of choice.
+The `httpauth` package provides idiomatic, framework-agnostic utilities for standard `net/http` handlers and middlewares:
 
-### 1. Database Table / Schema Definition with GORM
+```go
+package main
+
+import (
+	"net/http"
+
+	"github.com/BladiCreator/go-modular-auth/auth"
+	"github.com/BladiCreator/go-modular-auth/httpauth"
+)
+
+func RegisterHTTPRoutes(mux *http.ServeMux, app *auth.Auth) {
+	// Protected handler reading authenticated session and user from context
+	protectedEndpoint := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := httpauth.SessionFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		w.Write([]byte("Hello, User: " + session.UserID))
+	})
+
+	// Middleware validating session token from cookies or Authorization Bearer header
+	authMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token, err := httpauth.ExtractToken(r, httpauth.WithExtractBearer())
+			if err != nil || token == "" {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			sessionData, err := app.ValidateSession(r.Context(), token)
+			if err != nil {
+				httpauth.ClearSessionCookie(w)
+				http.Error(w, "Session expired or invalid", http.StatusUnauthorized)
+				return
+			}
+
+			ctx := httpauth.WithSessionData(r.Context(), sessionData)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+
+	mux.Handle("/api/profile", authMiddleware(protectedEndpoint))
+}
+```
+
+---
+
+## 🛡️ Step-Up Auth & MFA Challenge Engine
+
+When multi-factor authentication is active on an account, `SignIn` intercepts credential verification and produces a pending `dto.AuthChallenge`:
+
+```go
+authRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
+    Email:    "user@example.com",
+    Password: "password123",
+})
+if err != nil {
+    return err
+}
+
+if authRes.RequiresChallenge() {
+    challenge := authRes.Challenge()
+    // Respond with HTTP 428 Precondition Required or JSON containing challenge details:
+    // { "mfa_required": true, "challenge_token": challenge.TempToken, "factor": challenge.FactorRequired }
+    return nil
+}
+
+// 2FA not required: session is ready
+session := authRes.Session
+```
+
+### Challenge Resolution
+Clients submit their verification code (TOTP, backup code, or SMS/email OTP) alongside the signed challenge token:
+
+```go
+sessionData, err := app.VerifyChallenge(ctx, dto.VerifyChallengeParams{
+    ChallengeToken: req.ChallengeToken,
+    Code:           req.Code,
+    Method:         "totp", // or "backup_code", "otp"
+    TrustDevice:    req.RememberDevice,
+    DeviceID:       req.DeviceID,
+})
+if err != nil {
+    // ErrInvalidChallengeToken, ErrChallengeExpired, ErrInvalidCode, ErrAccountLocked
+    return err
+}
+
+// Challenge solved: sessionData contains *entity.Session and *entity.User
+```
+
+### Trusted Device Bypass
+By setting `TrustDevice: true` along with a unique `DeviceID`, a cryptographically signed device token is generated. On subsequent sign-ins, supplying `device_id` and `trust_device_token` via session options bypasses 2FA automatically:
+
+```go
+authRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
+    Email:    "user@example.com",
+    Password: "password123",
+}, auth.WithExtra("device_id", clientDeviceID), auth.WithExtra("trust_device_token", savedDeviceToken))
+```
+
+---
+
+## 🗄️ Custom Repository Implementation (GORM + PostgreSQL / MySQL)
+
+To connect your persistent database, implement the required repository interfaces. The central `SessionRepository` handles sessions, while each plugin defines its own minimal domain storage contract:
 
 ```go
 package store
@@ -161,6 +303,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
@@ -172,24 +315,35 @@ import (
 
 // Compile-time interface checks
 var (
+	_ auth.SessionRepository   = (*GormAuthRepository)(nil)
 	_ emailpassword.Repository = (*GormAuthRepository)(nil)
 	_ twofactor.Repository     = (*GormAuthRepository)(nil)
 )
 
-// ORM Models for GORM
+// --- GORM ORM Models ---
+
 type UserModel struct {
-	ID            string    `gorm:"primaryKey;type:uuid"`
+	ID            string    `gorm:"primaryKey;type:varchar(64)"`
 	Name          string    `gorm:"not null"`
 	Email         string    `gorm:"uniqueIndex;not null"`
 	PasswordHash  string    `gorm:"not null"`
 	EmailVerified bool      `gorm:"default:false"`
-	TOTPSecret    string    `gorm:"default:''"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
 
+type SessionModel struct {
+	ID        string    `gorm:"primaryKey;type:varchar(64)"`
+	UserID    string    `gorm:"index;not null"`
+	Token     string    `gorm:"uniqueIndex;not null"`
+	IPAddress string
+	UserAgent string
+	ExpiresAt time.Time `gorm:"index"`
+	CreatedAt time.Time
+}
+
 type TwoFactorModel struct {
-	ID          string     `gorm:"primaryKey;type:uuid"`
+	ID          string     `gorm:"primaryKey;type:varchar(64)"`
 	UserID      string     `gorm:"uniqueIndex;not null"`
 	Secret      string     `gorm:"not null"`
 	BackupCodes string     `gorm:"type:text"`
@@ -200,59 +354,43 @@ type TwoFactorModel struct {
 	UpdatedAt   time.Time
 }
 
-type OTPChallengeModel struct {
-	Key       string    `gorm:"primaryKey"`
-	UserID    string    `gorm:"index;not null"`
-	CodeHash  string    `gorm:"not null"`
-	Attempts  int       `gorm:"default:0"`
-	ExpiresAt time.Time `gorm:"index"`
+type ChallengeModel struct {
+	Token          string    `gorm:"primaryKey;type:varchar(128)"`
+	ID             string    `gorm:"index;not null"`
+	UserID         string    `gorm:"index;not null"`
+	FactorRequired string    `gorm:"not null"`
+	Signature      string    `gorm:"not null"`
+	ExpiresAt      time.Time `gorm:"index"`
+	CreatedAt      time.Time
 }
 
-// Main Repository Struct
+type TrustDeviceModel struct {
+	ID        string    `gorm:"primaryKey;type:varchar(128)"`
+	UserID    string    `gorm:"index;not null"`
+	DeviceID  string    `gorm:"index;not null"`
+	TokenHash string    `gorm:"not null"`
+	ExpiresAt time.Time `gorm:"index"`
+	CreatedAt time.Time
+}
+
+// --- Main Repository Struct ---
+
 type GormAuthRepository struct {
 	db *gorm.DB
 }
 
 func NewGormAuthRepository(db *gorm.DB) *GormAuthRepository {
-	// AutoMigrate creates tables automatically in PostgreSQL / MySQL / SQLite
-	_ = db.AutoMigrate(&UserModel{}, &SessionModel{}, &TwoFactorModel{}, &OTPChallengeModel{})
+	_ = db.AutoMigrate(
+		&UserModel{},
+		&SessionModel{},
+		&TwoFactorModel{},
+		&ChallengeModel{},
+		&TrustDeviceModel{},
+	)
 	return &GormAuthRepository{db: db}
 }
 
-// --- emailpassword.Repository Methods ---
-
-func (r *GormAuthRepository) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error) {
-	model := UserModel{
-		ID:           uuid.New().String(),
-		Name:         params.Name,
-		Email:        params.Email,
-		PasswordHash: params.PasswordHash,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
-	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
-		return nil, err
-	}
-	return toUserEntity(&model), nil
-}
-
-func (r *GormAuthRepository) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
-	var model UserModel
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, domain.ErrUserNotFound
-	}
-	return toUserEntity(&model), err
-}
-
-func (r *GormAuthRepository) GetUserByID(ctx context.Context, id string) (*entity.User, error) {
-	var model UserModel
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&model).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, domain.ErrUserNotFound
-	}
-	return toUserEntity(&model), err
-}
+// --- auth.SessionRepository Implementation ---
 
 func (r *GormAuthRepository) CreateSession(ctx context.Context, s *dto.CreateSessionParams) (*entity.Session, error) {
 	model := SessionModel{
@@ -267,7 +405,11 @@ func (r *GormAuthRepository) CreateSession(ctx context.Context, s *dto.CreateSes
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return nil, err
 	}
-	return toSessionEntity(&model), nil
+	return &entity.Session{
+		ID: model.ID, UserID: model.UserID, Token: model.Token,
+		IPAddress: model.IPAddress, UserAgent: model.UserAgent,
+		ExpiresAt: model.ExpiresAt, CreatedAt: model.CreatedAt,
+	}, nil
 }
 
 func (r *GormAuthRepository) GetSessionByToken(ctx context.Context, token string) (*entity.Session, error) {
@@ -276,190 +418,273 @@ func (r *GormAuthRepository) GetSessionByToken(ctx context.Context, token string
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrSessionNotFound
 	}
-	return toSessionEntity(&model), err
+	return &entity.Session{
+		ID: model.ID, UserID: model.UserID, Token: model.Token,
+		IPAddress: model.IPAddress, UserAgent: model.UserAgent,
+		ExpiresAt: model.ExpiresAt, CreatedAt: model.CreatedAt,
+	}, err
 }
 
 func (r *GormAuthRepository) DeleteSession(ctx context.Context, token string) error {
 	return r.db.WithContext(ctx).Where("token = ?", token).Delete(&SessionModel{}).Error
 }
 
-// --- twofactor.Repository Methods ---
+func (r *GormAuthRepository) DeleteSessionsByUserID(ctx context.Context, userID string) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&SessionModel{}).Error
+}
+
+// --- emailpassword.Repository Implementation ---
+
+func (r *GormAuthRepository) CreateUser(ctx context.Context, p *dto.CreateUserParams) (*entity.User, error) {
+	model := UserModel{
+		ID:           uuid.New().String(),
+		Name:         p.Name,
+		Email:        p.Email,
+		PasswordHash: p.PasswordHash,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
+		return nil, err
+	}
+	return &entity.User{
+		ID: model.ID, Name: model.Name, Email: model.Email,
+		PasswordHash: model.PasswordHash, EmailVerified: model.EmailVerified,
+		CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
+	}, nil
+}
+
+func (r *GormAuthRepository) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
+	var m UserModel
+	err := r.db.WithContext(ctx).Where("email = ?", email).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrUserNotFound
+	}
+	return &entity.User{
+		ID: m.ID, Name: m.Name, Email: m.Email,
+		PasswordHash: m.PasswordHash, EmailVerified: m.EmailVerified,
+		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
+	}, err
+}
+
+func (r *GormAuthRepository) GetUserByID(ctx context.Context, id string) (*entity.User, error) {
+	var m UserModel
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrUserNotFound
+	}
+	return &entity.User{
+		ID: m.ID, Name: m.Name, Email: m.Email,
+		PasswordHash: m.PasswordHash, EmailVerified: m.EmailVerified,
+		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
+	}, err
+}
+
+func (r *GormAuthRepository) UpdateUser(ctx context.Context, u *entity.User) error {
+	return r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", u.ID).Updates(map[string]any{
+		"name":           u.Name,
+		"email":          u.Email,
+		"password_hash":  u.PasswordHash,
+		"email_verified": u.EmailVerified,
+		"updated_at":     time.Now(),
+	}).Error
+}
+
+func (r *GormAuthRepository) GetAccountByUserIDAndProvider(ctx context.Context, userID, provider string) (*dto.AccountData, error) {
+	var m UserModel
+	err := r.db.WithContext(ctx).Where("id = ?", userID).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &dto.AccountData{
+		UserID:   m.ID,
+		Provider: provider,
+		Password: m.PasswordHash,
+	}, err
+}
+
+func (r *GormAuthRepository) CreateAccount(ctx context.Context, p *dto.CreateAccountParams) error {
+	return nil // Merged into UserModel in this single-table example
+}
+
+func (r *GormAuthRepository) UpdateAccountPassword(ctx context.Context, userID, newHash string) error {
+	return r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", userID).Update("password_hash", newHash).Error
+}
+
+// --- twofactor.Repository Implementation ---
 
 func (r *GormAuthRepository) FindByUserID(ctx context.Context, userID string) (*twofactor.TwoFactor, error) {
-	var model TwoFactorModel
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&model).Error
+	var m TwoFactorModel
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, twofactor.ErrTwoFactorNotEnabled
 	}
 	return &twofactor.TwoFactor{
-		ID:          model.ID,
-		UserID:      model.UserID,
-		Secret:      model.Secret,
-		BackupCodes: model.BackupCodes,
-		Verified:    model.Verified,
-		Failures:    model.Failures,
-		LockedUntil: model.LockedUntil,
-		CreatedAt:   model.CreatedAt,
-		UpdatedAt:   model.UpdatedAt,
+		ID: m.ID, UserID: m.UserID, Secret: m.Secret,
+		BackupCodes: m.BackupCodes, Verified: m.Verified, Failures: m.Failures,
+		LockedUntil: m.LockedUntil, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}, err
 }
 
-func (r *GormAuthRepository) Create(ctx context.Context, tf *twofactor.TwoFactor) error {
-	model := TwoFactorModel{
-		ID:          uuid.New().String(),
-		UserID:      tf.UserID,
-		Secret:      tf.Secret,
-		BackupCodes: tf.BackupCodes,
-		Verified:    tf.Verified,
-		Failures:    tf.Failures,
-		LockedUntil: tf.LockedUntil,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+func (r *GormAuthRepository) Save(ctx context.Context, tf *twofactor.TwoFactor) error {
+	var existing TwoFactorModel
+	err := r.db.WithContext(ctx).Where("user_id = ?", tf.UserID).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		m := TwoFactorModel{
+			ID: uuid.New().String(), UserID: tf.UserID, Secret: tf.Secret,
+			BackupCodes: tf.BackupCodes, Verified: tf.Verified, Failures: tf.Failures,
+			LockedUntil: tf.LockedUntil, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+		}
+		return r.db.WithContext(ctx).Create(&m).Error
 	}
-	return r.db.WithContext(ctx).Create(&model).Error
+	return r.db.WithContext(ctx).Model(&TwoFactorModel{}).Where("user_id = ?", tf.UserID).Updates(map[string]any{
+		"secret": tf.Secret, "backup_codes": tf.BackupCodes, "verified": tf.Verified,
+		"failures": tf.Failures, "locked_until": tf.LockedUntil, "updated_at": time.Now(),
+	}).Error
 }
 
 func (r *GormAuthRepository) Update(ctx context.Context, tf *twofactor.TwoFactor) error {
-	return r.db.WithContext(ctx).Model(&TwoFactorModel{}).Where("user_id = ?", tf.UserID).Updates(map[string]any{
-		"secret":       tf.Secret,
-		"backup_codes": tf.BackupCodes,
-		"verified":     tf.Verified,
-		"failures":     tf.Failures,
-		"locked_until": tf.LockedUntil,
-		"updated_at":   time.Now(),
-	}).Error
+	return r.Save(ctx, tf)
 }
 
 func (r *GormAuthRepository) DeleteByUserID(ctx context.Context, userID string) error {
 	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&TwoFactorModel{}).Error
 }
 
-func (r *GormAuthRepository) SaveOTPChallenge(ctx context.Context, challenge *twofactor.OTPChallenge) error {
-	model := OTPChallengeModel{
-		Key:       challenge.Key,
-		UserID:    challenge.UserID,
-		CodeHash:  challenge.CodeHash,
-		Attempts:  challenge.Attempts,
-		ExpiresAt: challenge.ExpiresAt,
+func (r *GormAuthRepository) SaveChallenge(ctx context.Context, ch *twofactor.ChallengeRecord) error {
+	m := ChallengeModel{
+		Token: ch.Token, ID: ch.ID, UserID: ch.UserID,
+		FactorRequired: ch.FactorRequired, Signature: ch.Signature,
+		ExpiresAt: ch.ExpiresAt, CreatedAt: ch.CreatedAt,
 	}
-	return r.db.WithContext(ctx).Save(&model).Error
+	return r.db.WithContext(ctx).Save(&m).Error
 }
 
-func (r *GormAuthRepository) GetOTPChallenge(ctx context.Context, key string) (*twofactor.OTPChallenge, error) {
-	var model OTPChallengeModel
-	err := r.db.WithContext(ctx).Where("key = ?", key).First(&model).Error
+func (r *GormAuthRepository) GetChallenge(ctx context.Context, token string) (*twofactor.ChallengeRecord, error) {
+	var m ChallengeModel
+	err := r.db.WithContext(ctx).Where("token = ?", token).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, twofactor.ErrOTPExpired
+		return nil, nil
 	}
-	return &twofactor.OTPChallenge{
-		Key:       model.Key,
-		UserID:    model.UserID,
-		CodeHash:  model.CodeHash,
-		Attempts:  model.Attempts,
-		ExpiresAt: model.ExpiresAt,
+	return &twofactor.ChallengeRecord{
+		Token: m.Token, ID: m.ID, UserID: m.UserID,
+		FactorRequired: m.FactorRequired, Signature: m.Signature,
+		ExpiresAt: m.ExpiresAt, CreatedAt: m.CreatedAt,
 	}, err
 }
 
-func (r *GormAuthRepository) DeleteOTPChallenge(ctx context.Context, key string) error {
-	return r.db.WithContext(ctx).Where("key = ?", key).Delete(&OTPChallengeModel{}).Error
+func (r *GormAuthRepository) DeleteChallenge(ctx context.Context, token string) error {
+	return r.db.WithContext(ctx).Where("token = ?", token).Delete(&ChallengeModel{}).Error
 }
 
-// Entity mapping helpers
-func toUserEntity(m *UserModel) *entity.User {
-	return &entity.User{
-		ID:            m.ID,
-		Name:          m.Name,
-		Email:         m.Email,
-		PasswordHash:  m.PasswordHash,
-		EmailVerified: m.EmailVerified,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
+func (r *GormAuthRepository) SaveTrustDevice(ctx context.Context, rec *twofactor.TrustDeviceRecord) error {
+	m := TrustDeviceModel{
+		ID: rec.ID, UserID: rec.UserID, DeviceID: rec.DeviceID,
+		TokenHash: rec.TokenHash, ExpiresAt: rec.ExpiresAt, CreatedAt: rec.CreatedAt,
 	}
+	return r.db.WithContext(ctx).Save(&m).Error
 }
 
-func toSessionEntity(m *SessionModel) *entity.Session {
-	return &entity.Session{
-		ID:        m.ID,
-		UserID:    m.UserID,
-		Token:     m.Token,
-		ExpiresAt: m.ExpiresAt,
-		CreatedAt: m.CreatedAt,
-		IPAddress: m.IPAddress,
-		UserAgent: m.UserAgent,
+func (r *GormAuthRepository) FindTrustDevice(ctx context.Context, userID, deviceID string) (*twofactor.TrustDeviceRecord, error) {
+	var m TrustDeviceModel
+	err := r.db.WithContext(ctx).Where("user_id = ? AND device_id = ?", userID, deviceID).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
 	}
+	return &twofactor.TrustDeviceRecord{
+		ID: m.ID, UserID: m.UserID, DeviceID: m.DeviceID,
+		TokenHash: m.TokenHash, ExpiresAt: m.ExpiresAt, CreatedAt: m.CreatedAt,
+	}, err
+}
+
+func (r *GormAuthRepository) DeleteTrustDevice(ctx context.Context, userID, deviceID string) error {
+	return r.db.WithContext(ctx).Where("user_id = ? AND device_id = ?", userID, deviceID).Delete(&TrustDeviceModel{}).Error
+}
+
+func (r *GormAuthRepository) DeleteTrustDevicesByUserID(ctx context.Context, userID string) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&TrustDeviceModel{}).Error
 }
 ```
 
 ---
 
-## 📢 Interceptor Pipeline and Reactive Hooks Patterns
+## 📢 Synchronous Pipeline & Reactive Lifecycle Hooks
 
-`go-modular-auth` replaces arbitrary event buses with a dual-system architecture:
-1. **Synchronous Interceptor Pipeline (`app.Pipeline()`)**: For in-flight parameter mutation, stage guards, and synchronous validation.
-2. **Reactive Hooks & Pub/Sub (`app.Hooks()`)**: For asynchronous side-effects, audit logging, analytics, and notification dispatching.
+`go-modular-auth` provides a dual architecture that eliminates external message queues for local execution:
 
-### 1. Synchronous Registration Interception (`Pipeline().AddInterceptor`)
+```
+[In-Flight Request]
+       │
+       ▼
+┌────────────────────────────────────────────────────────┐
+│  app.Pipeline() [Synchronous Interceptor Chain]        │
+│  - StageBeforeSignIn / StageBeforeSignUp               │
+│  - In-flight mutation: input.Set("tenant_id", ...)     │
+│  - Immediate abort: ErrUserBanned, ErrTenantInactive   │
+└────────────────────────────────────────────────────────┘
+       │
+       ▼
+[Database Persistence & Session Generation]
+       │
+       ▼
+┌────────────────────────────────────────────────────────┐
+│  app.Hooks() [Reactive Lifecycle Dispatcher]           │
+│  - OnUserSignedUp / OnUserSignedIn                     │
+│  - Typed subscriptions: EventSignInAfter, etc.         │
+│  - Audit logs, metrics, notifications, welcome emails  │
+└────────────────────────────────────────────────────────┘
+```
+
+### 1. Synchronous Guard Interceptors (`Pipeline().AddBeforeSignIn`)
 ```go
-app.Pipeline().AddInterceptor(func(ctx context.Context, stage plugin.PipelineStage, payload any) error {
-    if stage == plugin.StageBeforeSignUp {
-        if params, ok := payload.(*dto.CreateUserParams); ok {
-            // Enrich or mutate registration params before database persistence
-            params.Set("organization_id", "org_987")
-            params.Set("role", "member")
-        }
+app.Pipeline().AddBeforeSignIn(func(ctx context.Context, input *dto.SignInParams) error {
+    if isIPBlocked(ctx) {
+        return domain.ErrUserBanned // Aborts execution immediately before touching database!
     }
+    input.Set("audit_timestamp", time.Now().Unix())
     return nil
 })
 ```
 
-### 2. Typed Lifecycle Hooks (`Hooks().On*`)
+### 2. Typed Lifecycle Notifications (`Hooks().On*`)
 ```go
 app.Hooks().OnUserSignedUp(func(ctx context.Context, user *entity.User) {
-    // Fire-and-forget or async notification
-    go func() {
-        mailer.SendWelcomeEmail(user.Email, user.Name)
-    }()
-})
-```
-
-### 3. Topic-Based Audit Logging (`Hooks().Subscribe`)
-```go
-app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload *emailpassword.SignInEventPayload) {
-    securityLogger.Info("Successful sign-in", "userID", payload.User.ID, "email", payload.User.Email)
+    go mailer.SendWelcomeEmail(user.Email, user.Name)
 })
 ```
 
 ---
 
-## 🔌 Complete Plugin Reference
+## 🔌 Available Plugins Directory
 
-### 📧 Plugin `emailpassword`
-Handles credential-based registration, authentication, password management, and password resets.
-
-- **Constructor**: `plugins.EmailPassword(repo, opts...)`
-- **Configuration Options**:
-  - `emailpassword.WithMinPasswordLength(minLen int)` (default: `8`)
-  - `emailpassword.WithRequireEmailVerification(require bool)` (default: `false`)
-  - `emailpassword.WithResetTokenExpiry(duration time.Duration)` (default: `1 hour`)
-- **Published Events**:
-  - `emailpassword.EventSignUpBefore` → `(ctx context.Context, payload *emailpassword.SignUpEventPayload)` (contains `Params *dto.CreateUserParams`)
-  - `emailpassword.EventSignUpAfter` → `(ctx context.Context, payload *emailpassword.SignUpEventPayload)` (contains `Params` and `User *entity.User`)
-  - `emailpassword.EventSignInBefore` → `(ctx context.Context, payload *emailpassword.SignInEventPayload)` (contains `User *entity.User`)
-  - `emailpassword.EventSignInAfter` → `(ctx context.Context, payload *emailpassword.SignInEventPayload)` (contains `User *entity.User`)
-  - `emailpassword.EventPasswordChangeBefore` / `After` → `(ctx context.Context, payload *emailpassword.PasswordChangeEventPayload)`
-  - `emailpassword.EventPasswordResetRequested` → `(ctx context.Context, payload *emailpassword.PasswordResetRequestedEventPayload)`
-  - `emailpassword.EventPasswordResetCompleted` → `(ctx context.Context, payload *emailpassword.PasswordResetCompletedEventPayload)`
-
----
-
-### 🔐 Plugin `twofactor`
-Handles Two-Factor Authentication via Time-based One-Time Passwords (TOTP RFC 6238).
-
-- **Constructor**: `plugins.TwoFactor(repo, opts...)`
-- **Configuration Options**:
-  - `twofactor.WithIssuer(issuer string)` (default: `"Auth"`)
-- **Published Events**:
-  - `twofactor.EventTOTPGenerated` → `(ctx context.Context, payload *twofactor.TOTPGeneratedEventPayload)`
+| Plugin | Factory Constructor | Category | Description |
+| :--- | :--- | :--- | :--- |
+| **`emailpassword`** | `plugins.EmailPassword(repo, opts...)` | Credentials | Traditional email/password sign-up, login, verification, and reset flows. |
+| **`username`** | `plugins.Username(repo, opts...)` | Credentials | Username-based sign-in, username validation, and normalization. |
+| **`phonenumber`** | `plugins.PhoneNumber(repo, opts...)` | Credentials | SMS OTP passwordless login, phone verification, and phone credential sign-in. |
+| **`emailotp`** | `plugins.EmailOTP(repo, opts...)` | Passwordless | Email one-time password sign-in and verification. |
+| **`magiclink`** | `plugins.MagicLink(repo, opts...)` | Passwordless | Passwordless magic link email generation, signing, and verification. |
+| **`anonymous`** | `plugins.Anonymous(repo, opts...)` | Credentials | Guest and anonymous temporary account creation and conversion. |
+| **`twofactor`** | `plugins.TwoFactor(repo, opts...)` | Multi-Factor | RFC 6238 TOTP, single-use backup codes, out-of-band OTPs, and trusted devices. |
+| **`passkey`** | `plugins.Passkey(repo, opts...)` | Hardware / FIDO | WebAuthn FIDO2 biometric authentication and hardware security keys. |
+| **`deviceauth`** | `plugins.DeviceAuth(repo, opts...)` | Hardware / IoT | RFC 8628 OAuth 2.0 device authorization grant for smart TVs and CLI tools. |
+| **`bearer`** | `plugins.Bearer(opts...)` | Tokens | RFC 7235 Bearer token extraction, HMAC signing, and CORS headers. |
+| **`jwt`** | `plugins.JWT(repo, opts...)` | Tokens | RFC 7519 JSON Web Token signing, verification, and RFC 7517 JWKS discovery. |
+| **`customsession`** | `plugins.CustomSession(opts...)` | Sessions | Dynamic session metadata enrichment and custom context claims. |
+| **`multisession`** | `plugins.MultiSession(repo, opts...)` | Sessions | Concurrent device session tracking, device limits, and selective logout. |
+| **`ott`** | `plugins.OTT(repo, opts...)` | Tokens | Single-use One-Time Tokens for secure cross-service handoffs. |
+| **`oauth2`** | `plugins.OAuth2(opts...)` | Federated | OAuth 2.0 authorization code flow with PKCE and state protection. |
+| **`genericoauth`** | `plugins.GenericOAuth(opts...)` | Federated | Pre-configured social login providers (GitHub, Google, Discord, Microsoft, etc.). |
+| **`oidcprovider`** | `plugins.OIDCProvider(repo, opts...)` | Enterprise | Full OpenID Connect identity provider implementation for federated auth. |
+| **`oauthproxy`** | `plugins.OAuthProxy(opts...)` | Enterprise | Secure reverse proxy for centralized enterprise identity gateways. |
+| **`admin`** | `plugins.Admin(repo, opts...)` | Enterprise | User impersonation, user ban/unban, and administrative management. |
+| **`organization`** | `plugins.Organization(repo, opts...)` | Multi-Tenant | Multi-tenant organization accounts, team invitations, and role assignments. |
+| **`access`** | `plugins.Access(repo, opts...)` | Authorization | Fine-grained Role-Based (RBAC) and Attribute-Based (ABAC) access control. |
+| **`apikey`** | `plugins.APIKey(repo, opts...)` | API Security | Secret API keys for automated machines, service-to-service, and rate budgets. |
+| **`captcha`** | `plugins.Captcha(opts...)` | Bot Defense | Turnstile, reCAPTCHA v2/v3, and hCaptcha bot protection. |
+| **`lastloginmethod`**| `plugins.LastLoginMethod(repo, opts...)`| Intelligence | Remembers and recommends the user's preferred login mechanism. |
+| **`stripe`** | `plugins.Stripe(opts...)` | Monetization | Webhook synchronization and subscription entitlement gating for Stripe. |
+| **`polar`** | `plugins.Polar(opts...)` | Monetization | Webhook synchronization and customer tier entitlements for Polar.sh. |
 
 ---
 
