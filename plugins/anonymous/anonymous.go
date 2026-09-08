@@ -209,9 +209,9 @@ func (p *Plugin) LinkAccount(ctx context.Context, data *OnLinkAccountData) error
 	return nil
 }
 
-// publishEvent dispatches lifecycle events on the shared EventBus if present.
+// publishEvent dispatches lifecycle events on the shared Hooks dispatcher if present.
 func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(eventName, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}
 }

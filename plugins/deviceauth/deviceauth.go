@@ -123,8 +123,8 @@ func (p *Plugin) RequestDeviceCode(ctx context.Context, params RequestDeviceCode
 
 	uri, uriComplete := BuildVerificationURIs(p.config.VerificationURI, p.config.CustomURI, rawUserCode)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDeviceCodeRequested, ctx, &DeviceCodeRequestedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDeviceCodeRequested, ctx, &DeviceCodeRequestedPayload{
 			DeviceCode: deviceCode,
 			UserCode:   rawUserCode,
 			ClientID:   clientIDPtr,
@@ -223,8 +223,8 @@ func (p *Plugin) ExchangeDeviceToken(ctx context.Context, params ExchangeDeviceT
 			scopeStr = *consumed.Scope
 		}
 
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventDeviceTokenExchanged, ctx, &DeviceTokenExchangedPayload{
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventDeviceTokenExchanged, ctx, &DeviceTokenExchangedPayload{
 				DeviceCode:   record.DeviceCode,
 				UserID:       user.ID,
 				SessionToken: createdSession.Token,
@@ -291,8 +291,8 @@ func (p *Plugin) ApproveDeviceCode(ctx context.Context, params ApproveDeviceCode
 		return err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDeviceCodeApproved, ctx, &DeviceCodeApprovedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDeviceCodeApproved, ctx, &DeviceCodeApprovedPayload{
 			UserCode: params.UserCode,
 			UserID:   params.UserID,
 		})
@@ -321,8 +321,8 @@ func (p *Plugin) DenyDeviceCode(ctx context.Context, params DenyDeviceCodeParams
 		return err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDeviceCodeDenied, ctx, &DeviceCodeDeniedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDeviceCodeDenied, ctx, &DeviceCodeDeniedPayload{
 			UserCode: params.UserCode,
 		})
 	}

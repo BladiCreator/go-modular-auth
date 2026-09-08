@@ -9,8 +9,8 @@ import (
 type contextKey string
 
 const (
-	ReferenceIDContextKey    contextKey = "polar:reference_id"
-	SubscriptionContextKey   contextKey = "polar:subscription"
+	ReferenceIDContextKey   contextKey = "polar:reference_id"
+	SubscriptionContextKey  contextKey = "polar:subscription"
 	CustomerStateContextKey contextKey = "polar:customer_state"
 )
 

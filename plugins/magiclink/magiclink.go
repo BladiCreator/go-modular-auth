@@ -66,10 +66,10 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	return nil
 }
 
-// publishEvent safely emits an event to the shared event bus if available.
+// publishEvent safely emits an event via Hooks if available.
 func (p *Plugin) publishEvent(topic string, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, payload)
 	}
 }
 

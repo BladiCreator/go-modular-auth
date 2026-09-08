@@ -48,14 +48,14 @@ func (p *Plugin) AccessControl() *AccessControl {
 	return p.ac
 }
 
-// PublishAuthorized emits an EventAccessAuthorized event on the shared EventBus if initialized.
+// PublishAuthorized emits an EventAccessAuthorized event on the shared Hooks dispatcher if initialized.
 func (p *Plugin) PublishAuthorized(roles []string, req AuthorizeRequest, extra map[string]any) {
 	p.mu.RLock()
 	ctx := p.ctx
 	p.mu.RUnlock()
 
-	if ctx != nil && ctx.Events() != nil {
-		ctx.Events().Publish(EventAccessAuthorized, &AccessAuthorizedEventPayload{
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().Publish(EventAccessAuthorized, &AccessAuthorizedEventPayload{
 			Roles:   roles,
 			Request: req,
 			Extra:   extra,
@@ -63,14 +63,14 @@ func (p *Plugin) PublishAuthorized(roles []string, req AuthorizeRequest, extra m
 	}
 }
 
-// PublishDenied emits an EventAccessDenied event on the shared EventBus if initialized.
+// PublishDenied emits an EventAccessDenied event on the shared Hooks dispatcher if initialized.
 func (p *Plugin) PublishDenied(roles []string, req AuthorizeRequest, reason string, extra map[string]any) {
 	p.mu.RLock()
 	ctx := p.ctx
 	p.mu.RUnlock()
 
-	if ctx != nil && ctx.Events() != nil {
-		ctx.Events().Publish(EventAccessDenied, &AccessDeniedEventPayload{
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().Publish(EventAccessDenied, &AccessDeniedEventPayload{
 			Roles:   roles,
 			Request: req,
 			Reason:  reason,
@@ -79,27 +79,27 @@ func (p *Plugin) PublishDenied(roles []string, req AuthorizeRequest, reason stri
 	}
 }
 
-// PublishRoleCreated emits an EventRoleCreated event on the shared EventBus if initialized.
+// PublishRoleCreated emits an EventRoleCreated event on the shared Hooks dispatcher if initialized.
 func (p *Plugin) PublishRoleCreated(role *Role) {
 	p.mu.RLock()
 	ctx := p.ctx
 	p.mu.RUnlock()
 
-	if ctx != nil && ctx.Events() != nil {
-		ctx.Events().Publish(EventRoleCreated, &RoleCreatedEventPayload{
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().Publish(EventRoleCreated, &RoleCreatedEventPayload{
 			Role: role,
 		})
 	}
 }
 
-// PublishRoleDeleted emits an EventRoleDeleted event on the shared EventBus if initialized.
+// PublishRoleDeleted emits an EventRoleDeleted event on the shared Hooks dispatcher if initialized.
 func (p *Plugin) PublishRoleDeleted(roleName string) {
 	p.mu.RLock()
 	ctx := p.ctx
 	p.mu.RUnlock()
 
-	if ctx != nil && ctx.Events() != nil {
-		ctx.Events().Publish(EventRoleDeleted, &RoleDeletedEventPayload{
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().Publish(EventRoleDeleted, &RoleDeletedEventPayload{
 			RoleName: roleName,
 		})
 	}

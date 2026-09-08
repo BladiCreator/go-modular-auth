@@ -116,7 +116,7 @@ func TestOAuthProxy_StatePackage(t *testing.T) {
 func TestOAuthProxy_PassthroughPayload(t *testing.T) {
 	p := oauthproxy.New(
 		oauthproxy.WithSecret(testSecret),
-		oauthproxy.WithMaxAge(2 * time.Second),
+		oauthproxy.WithMaxAge(2*time.Second),
 	)
 
 	payload := &oauthproxy.PassthroughPayload{

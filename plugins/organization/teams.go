@@ -79,7 +79,7 @@ func (p *Plugin) CreateTeam(ctx context.Context, params CreateTeamParams) (*Crea
 
 	// 6. Emit After Event
 	p.publishEvent(EventTeamCreateAfter, &TeamCreateAfterEventPayload{
-		Team:  team,
+		Team:           team,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -132,8 +132,8 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 	}
 
 	p.publishEvent(EventTeamUpdateBefore, &TeamUpdateBeforeEventPayload{
-		TeamID: team.ID,
-		Name:   params.Name,
+		TeamID:         team.ID,
+		Name:           params.Name,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -146,7 +146,7 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 	}
 
 	p.publishEvent(EventTeamUpdateAfter, &TeamUpdateAfterEventPayload{
-		Team:  team,
+		Team:           team,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -193,7 +193,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 	}
 
 	p.publishEvent(EventTeamDeleteBefore, &TeamDeleteBeforeEventPayload{
-		TeamID: team.ID,
+		TeamID:         team.ID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -202,7 +202,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 	}
 
 	p.publishEvent(EventTeamDeleteAfter, &TeamDeleteAfterEventPayload{
-		TeamID: team.ID,
+		TeamID:         team.ID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -292,8 +292,8 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 	}
 
 	p.publishEvent(EventTeamMemberAddBefore, &TeamMemberAddBeforeEventPayload{
-		TeamID: params.TeamID,
-		UserID: params.UserID,
+		TeamID:         params.TeamID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -309,7 +309,7 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 	}
 
 	p.publishEvent(EventTeamMemberAddAfter, &TeamMemberAddAfterEventPayload{
-		TeamMember: teamMember,
+		TeamMember:     teamMember,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -351,8 +351,8 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	}
 
 	p.publishEvent(EventTeamMemberRemoveBefore, &TeamMemberRemoveBeforeEventPayload{
-		TeamID: params.TeamID,
-		UserID: params.UserID,
+		TeamID:         params.TeamID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -361,8 +361,8 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	}
 
 	p.publishEvent(EventTeamMemberRemoveAfter, &TeamMemberRemoveAfterEventPayload{
-		TeamID: params.TeamID,
-		UserID: params.UserID,
+		TeamID:         params.TeamID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -406,8 +406,8 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 	}
 
 	p.publishEvent(EventTeamSetActiveBefore, &TeamSetActiveBeforeEventPayload{
-		UserID: params.UserID,
-		TeamID: params.TeamID,
+		UserID:         params.UserID,
+		TeamID:         params.TeamID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -416,9 +416,9 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 	}
 
 	p.publishEvent(EventTeamSetActiveAfter, &TeamSetActiveAfterEventPayload{
-		UserID: params.UserID,
-		TeamID: params.TeamID,
-		Team:   team,
+		UserID:         params.UserID,
+		TeamID:         params.TeamID,
+		Team:           team,
 		ExtraContainer: params.ExtraContainer,
 	})
 

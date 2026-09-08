@@ -8,7 +8,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
-	"github.com/asaskevich/EventBus"
 )
 
 func BenchmarkOAuth2_ComputeCodeChallenge(b *testing.B) {
@@ -56,8 +55,7 @@ func BenchmarkOAuth2_AES_EncryptDecrypt(b *testing.B) {
 
 func BenchmarkOAuth2_TokenIssuance_JWT(b *testing.B) {
 	store := memory.New()
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(&mockCrypto{}, bus)
+	pCtx := plugin.NewContext(&mockCrypto{})
 
 	p := oauth2.New(store,
 		oauth2.WithIssuer("https://auth.example.com"),

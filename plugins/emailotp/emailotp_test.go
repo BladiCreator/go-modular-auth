@@ -13,7 +13,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
-	"github.com/asaskevich/EventBus"
 	"github.com/google/uuid"
 )
 
@@ -201,13 +200,12 @@ func (r *testRepo) DeleteCredentialAccount(ctx context.Context, userID string) e
 	return nil
 }
 
-func setupTestPlugin(t *testing.T, opts ...emailotp.Option) (*emailotp.Plugin, *testRepo, *[]emailotp.SendEmailData, EventBus.Bus) {
+func setupTestPlugin(t *testing.T, opts ...emailotp.Option) (*emailotp.Plugin, *testRepo, *[]emailotp.SendEmailData, *plugin.Hooks) {
 	repo := newTestRepo()
 	var sentEmails []emailotp.SendEmailData
 	var mu sync.Mutex
 
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(nil, bus)
+	pCtx := plugin.NewContext(nil)
 
 	defaultOpts := []emailotp.Option{
 		emailotp.WithSendVerificationOTP(func(ctx context.Context, data emailotp.SendEmailData) error {
@@ -221,10 +219,10 @@ func setupTestPlugin(t *testing.T, opts ...emailotp.Option) (*emailotp.Plugin, *
 
 	p := emailotp.New(repo, defaultOpts...)
 	if err := p.Init(pCtx); err != nil {
-		t.Fatalf("failed to init plugin: %v", err)
+		t.Fatalf("failed to initialize emailotp plugin: %v", err)
 	}
 
-	return p, repo, &sentEmails, bus
+	return p, repo, &sentEmails, pCtx.Hooks()
 }
 
 func TestSendVerificationOTP(t *testing.T) {
@@ -696,15 +694,15 @@ func TestConcurrentAtomicVerification(t *testing.T) {
 	}
 }
 
-func TestEventBusPublishing(t *testing.T) {
+func TestHooksPublishing(t *testing.T) {
 	ctx := context.Background()
-	p, repo, sent, bus := setupTestPlugin(t)
+	p, repo, sent, hooks := setupTestPlugin(t)
 
 	var receivedSentEvent bool
 	var receivedVerifiedEvent bool
 	var mu sync.Mutex
 
-	_ = bus.Subscribe(emailotp.EventEmailOTPSent, func(payload *emailotp.OTPSentPayload) {
+	_ = hooks.Subscribe(emailotp.EventEmailOTPSent, func(payload *emailotp.OTPSentPayload) {
 		mu.Lock()
 		defer mu.Unlock()
 		if payload.Email == "events@example.com" {
@@ -712,7 +710,7 @@ func TestEventBusPublishing(t *testing.T) {
 		}
 	})
 
-	_ = bus.Subscribe(emailotp.EventEmailOTPVerified, func(payload *emailotp.OTPVerifiedPayload) {
+	_ = hooks.Subscribe(emailotp.EventEmailOTPVerified, func(payload *emailotp.OTPVerifiedPayload) {
 		mu.Lock()
 		defer mu.Unlock()
 		if payload.Email == "events@example.com" {
@@ -738,6 +736,6 @@ func TestEventBusPublishing(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	if !receivedSentEvent || !receivedVerifiedEvent {
-		t.Fatalf("expected events published to EventBus, got sent=%v, verified=%v", receivedSentEvent, receivedVerifiedEvent)
+		t.Fatalf("expected events published to Hooks, got sent=%v, verified=%v", receivedSentEvent, receivedVerifiedEvent)
 	}
 }

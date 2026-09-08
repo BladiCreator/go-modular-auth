@@ -110,8 +110,8 @@ func (p *Plugin) RegisterClient(ctx context.Context, params RegisterClientParams
 		return nil, fmt.Errorf("oauth2: failed to save client: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventClientCreated, &ClientEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventClientCreated, &ClientEventPayload{
 			Client:    client,
 			Timestamp: now,
 		})
@@ -191,8 +191,8 @@ func (p *Plugin) UpdateClient(ctx context.Context, params UpdateClientParams) (*
 		return nil, fmt.Errorf("oauth2: failed to update client: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventClientUpdated, &ClientEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventClientUpdated, &ClientEventPayload{
 			Client:    client,
 			Timestamp: client.UpdatedAt,
 		})
@@ -216,8 +216,8 @@ func (p *Plugin) DeleteClient(ctx context.Context, params DeleteClientParams) (*
 		return nil, fmt.Errorf("oauth2: failed to delete client: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventClientDeleted, &ClientEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventClientDeleted, &ClientEventPayload{
 			Client:    client,
 			Timestamp: time.Now().UTC(),
 		})

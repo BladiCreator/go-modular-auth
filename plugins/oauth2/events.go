@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Event topic constants dispatched on the shared plugin.Context EventBus.
+// Event topic constants dispatched on the shared plugin.Context Hooks dispatcher.
 const (
 	// EventClientCreated is dispatched when a new OAuth client is registered.
 	EventClientCreated = "oauth2:client:created"

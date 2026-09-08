@@ -15,7 +15,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
-	"github.com/asaskevich/EventBus"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -205,16 +204,15 @@ func (c *MockCryptoUtils) GenerateRandomToken(length int) (string, error) {
 }
 
 func setupTestContext(t *testing.T, repos ...repository.SessionRepository) *plugin.Context {
-	bus := EventBus.New()
 	crypto := &MockCryptoUtils{}
-	ctx := plugin.NewContext(crypto, bus)
+	ctx := plugin.NewContext(crypto)
 	var sessRepo repository.SessionRepository
 	if len(repos) > 0 && repos[0] != nil {
 		sessRepo = repos[0]
 	} else {
 		sessRepo = repository.NewMemorySessionRepository()
 	}
-	sm := auth.NewSessionManager(sessRepo, auth.DefaultSessionConfig(), crypto, bus)
+	sm := auth.NewSessionManager(sessRepo, auth.DefaultSessionConfig(), crypto, ctx.Pipeline(), ctx.Hooks())
 	ctx.SetSessionManager(sm)
 	return ctx
 }

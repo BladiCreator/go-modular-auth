@@ -100,8 +100,8 @@ func (p *Plugin) SignIn(ctx context.Context, providerID string, callbackURL stri
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOAuthSignInStart, providerID, state)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOAuthSignInStart, providerID, state)
 	}
 
 	return &SignInData{
@@ -154,8 +154,8 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 
 	tokens, err := ExchangeCode(ctx, p.config.HTTPClient, provider, req)
 	if err != nil {
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventOAuthSignInFailure, providerID, err.Error())
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventOAuthSignInFailure, providerID, err.Error())
 		}
 		return nil, nil, nil, err
 	}
@@ -163,8 +163,8 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 	// Fetch user info from userinfo endpoint or id_token
 	userInfo, err := FetchUserInfo(ctx, p.config.HTTPClient, provider, tokens)
 	if err != nil {
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventOAuthSignInFailure, providerID, err.Error())
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventOAuthSignInFailure, providerID, err.Error())
 		}
 		return nil, nil, nil, err
 	}
@@ -268,8 +268,8 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 		return nil, nil, nil, fmt.Errorf("failed to create user session: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOAuthSignInSuccess, user.ID, providerID)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOAuthSignInSuccess, user.ID, providerID)
 	}
 
 	return user, createdSession, tokens, nil
@@ -335,8 +335,8 @@ func (p *Plugin) LinkAccount(ctx context.Context, userID string, providerID stri
 		return nil, fmt.Errorf("failed to save linked account: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOAuthAccountLinked, userID, providerID)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOAuthAccountLinked, userID, providerID)
 	}
 
 	return createdAccount, nil

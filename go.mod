@@ -3,15 +3,12 @@ module github.com/BladiCreator/go-modular-auth
 go 1.25.5
 
 require (
-	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef
+	github.com/polarsource/polar-go v0.16.0
+	github.com/stripe/stripe-go/v76 v76.25.0
 	golang.org/x/crypto v0.54.0
 )
 
-require (
-	github.com/polarsource/polar-go v0.16.0 // indirect
-	github.com/spyzhov/ajson v0.8.0 // indirect
-	github.com/stripe/stripe-go/v76 v76.25.0 // indirect
-)
+require github.com/spyzhov/ajson v0.8.0 // indirect
 
 require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect

@@ -12,6 +12,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
@@ -323,21 +324,31 @@ func TestSessionEvents_CreatedAndRevoked(t *testing.T) {
 	a, _ := setupAuth(t)
 
 	var (
-		createdWg sync.WaitGroup
-		revokedWg sync.WaitGroup
+		createdWg  sync.WaitGroup
+		revokedWg  sync.WaitGroup
 		gotCreated *auth.SessionCreatedPayload
 		gotRevoked *auth.SessionRevokedPayload
 	)
 
 	createdWg.Add(1)
-	_ = a.Events().Subscribe(auth.EventSessionCreated, func(c context.Context, p *auth.SessionCreatedPayload) {
-		gotCreated = p
+	a.Hooks().OnSessionCreated(func(c context.Context, s *entity.Session) {
+		gotCreated = &auth.SessionCreatedPayload{
+			Session: s,
+			Extra:   s.Extra,
+		}
 		createdWg.Done()
 	})
 
 	revokedWg.Add(1)
-	_ = a.Events().Subscribe(auth.EventSessionRevoked, func(c context.Context, p *auth.SessionRevokedPayload) {
-		gotRevoked = p
+	a.Hooks().OnSessionRevoked(func(c context.Context, token string, s *entity.Session) {
+		gotRevoked = &auth.SessionRevokedPayload{
+			Token: token,
+		}
+		if s != nil {
+			gotRevoked.SessionID = s.ID
+			gotRevoked.UserID = s.UserID
+			gotRevoked.Extra = s.Extra
+		}
 		revokedWg.Done()
 	})
 
@@ -424,12 +435,12 @@ func TestPluginCoordination_MultiSession(t *testing.T) {
 	}
 
 	var (
-		wg sync.WaitGroup
+		wg                sync.WaitGroup
 		capturedSessionID string
 	)
 	wg.Add(1)
 
-	_ = a.Events().Subscribe(multisession.EventSessionCreated, func(payload *multisession.SessionCreatedEventPayload) {
+	_ = a.Hooks().Subscribe(multisession.EventSessionCreated, func(payload *multisession.SessionCreatedEventPayload) {
 		if payload != nil && payload.Session != nil {
 			capturedSessionID = payload.Session.ID
 		}

@@ -107,7 +107,7 @@ func (p *Plugin) CreateInvitation(ctx context.Context, params CreateInvitationPa
 
 	// 8. Emit After Event
 	p.publishEvent(EventInvitationCreateAfter, &InvitationCreateAfterEventPayload{
-		Invitation: invitation,
+		Invitation:     invitation,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -179,8 +179,8 @@ func (p *Plugin) AcceptInvitation(ctx context.Context, params AcceptInvitationPa
 
 	// 5. Emit Before Event
 	p.publishEvent(EventInvitationAcceptBefore, &InvitationAcceptBeforeEventPayload{
-		InvitationID: params.InvitationID,
-		UserID:       params.UserID,
+		InvitationID:   params.InvitationID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -215,9 +215,9 @@ func (p *Plugin) AcceptInvitation(ctx context.Context, params AcceptInvitationPa
 
 	// 9. Emit After Event
 	p.publishEvent(EventInvitationAcceptAfter, &InvitationAcceptAfterEventPayload{
-		Invitation:   invitation,
-		Member:       member,
-		Organization: org,
+		Invitation:     invitation,
+		Member:         member,
+		Organization:   org,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -244,8 +244,8 @@ func (p *Plugin) RejectInvitation(ctx context.Context, params RejectInvitationPa
 	}
 
 	p.publishEvent(EventInvitationRejectBefore, &InvitationRejectBeforeEventPayload{
-		InvitationID: params.InvitationID,
-		UserID:       params.UserID,
+		InvitationID:   params.InvitationID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -255,7 +255,7 @@ func (p *Plugin) RejectInvitation(ctx context.Context, params RejectInvitationPa
 	}
 
 	p.publishEvent(EventInvitationRejectAfter, &InvitationRejectAfterEventPayload{
-		Invitation: invitation,
+		Invitation:     invitation,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -292,8 +292,8 @@ func (p *Plugin) CancelInvitation(ctx context.Context, params CancelInvitationPa
 	}
 
 	p.publishEvent(EventInvitationCancelBefore, &InvitationCancelBeforeEventPayload{
-		InvitationID: params.InvitationID,
-		UserID:       params.UserID,
+		InvitationID:   params.InvitationID,
+		UserID:         params.UserID,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -303,7 +303,7 @@ func (p *Plugin) CancelInvitation(ctx context.Context, params CancelInvitationPa
 	}
 
 	p.publishEvent(EventInvitationCancelAfter, &InvitationCancelAfterEventPayload{
-		Invitation: invitation,
+		Invitation:     invitation,
 		ExtraContainer: params.ExtraContainer,
 	})
 

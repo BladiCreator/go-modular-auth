@@ -27,8 +27,8 @@
 
 - 🧩 **100% Modular Plugin-Based Architecture**: Add or remove authentication capabilities based on project requirements.
 - ⚡ **Strong Typing with Generics (Go 1.18+)**: Safe access to individual plugin APIs with full IDE autocomplete and no manual casting via `auth.Plugin[emailpassword.Plugin](app)`.
-- 📦 **Mutable Parameters Pattern (`Params.Extra`)**: Allows plugins and EventBus interceptors to dynamically enrich request parameters (`Set`/`Get`) before database persistence.
-- 📢 **Integrated Reactive EventBus**: Subscribe to lifecycle hooks (`emailpassword.EventSignUpBefore`, `emailpassword.EventSignUpAfter`, etc.) to mutate payloads in-flight, send asynchronous emails, or audit user access.
+- 📦 **Mutable Parameters Pattern (`Params.Extra`)**: Allows plugins and interceptors to dynamically enrich request parameters (`Set`/`Get`) before database persistence.
+- 📢 **Native Pipeline & Reactive Lifecycle Hooks**: Zero external dependencies! Synchronous interceptor pipeline (`Pipeline()`) for in-flight parameter mutation/validation and typed reactive hooks (`Hooks()`) for asynchronous notifications, metrics, and audit logging.
 - 🔐 **Production-Grade Security**: Strong password hashing using `bcrypt`, cryptographically secure token generation via `crypto/rand`, and 2FA TOTP (RFC 6238).
 - 🗄️ **Decoupled Storage**: Connect any database (**PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**, **Redis**, **GORM**) through clean repository interfaces. Includes a built-in thread-safe in-memory store.
 
@@ -44,7 +44,7 @@ go get github.com/BladiCreator/go-modular-auth
 
 ## 💡 Production Example
 
-The following complete example demonstrates user registration with dynamic parameter interception, lifecycle audit event subscription, user sign-in, 2FA TOTP secret generation, and TOTP code verification:
+The following complete example demonstrates user registration with synchronous parameter interception, typed lifecycle hooks, user sign-in, 2FA TOTP secret generation, and TOTP code verification:
 
 ```go
 package main
@@ -58,6 +58,8 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -81,19 +83,23 @@ func main() {
 		log.Fatalf("Failed to initialize Auth: %v", err)
 	}
 
-	// 2. Intercept registration to attach dynamic metadata (e.g. Roles, Organizations)
-	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
-		payload.Params.Set("role", "admin")
-		payload.Params.Set("org_id", "org_123")
+	// 2. Intercept registration via synchronous pipeline to attach dynamic metadata
+	app.Pipeline().AddInterceptor(func(ctx context.Context, stage plugin.PipelineStage, payload any) error {
+		if stage == plugin.StageBeforeSignUp {
+			if params, ok := payload.(*dto.CreateUserParams); ok {
+				params.Set("role", "admin")
+				params.Set("org_id", "org_123")
+			}
+		}
+		return nil
 	})
 
-	// 3. Subscribe to post-action EventBus notifications
-	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
-		role, _ := payload.Params.Get("role")
-		log.Printf("📧 [EVENT] Sending welcome email to: %s (Role: %v)", payload.User.Email, role)
+	// 3. Subscribe to post-action notifications via typed Hooks or pub/sub
+	app.Hooks().OnUserSignedUp(func(c context.Context, user *entity.User) {
+		log.Printf("📧 [HOOK] Sending welcome email to: %s", user.Email)
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
+	app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
 		log.Printf("🛡️ [AUDIT] Successful sign-in - User ID: %s | Email: %s", payload.User.ID, payload.User.Email)
 	})
 
@@ -386,32 +392,39 @@ func toSessionEntity(m *SessionModel) *entity.Session {
 
 ---
 
-## 📢 Advanced EventBus and Mutable Parameters Patterns
+## 📢 Interceptor Pipeline and Reactive Hooks Patterns
 
-The decoupled EventBus allows intercepting and modifying in-flight parameters during registration or reacting asynchronously after actions complete.
+`go-modular-auth` replaces arbitrary event buses with a dual-system architecture:
+1. **Synchronous Interceptor Pipeline (`app.Pipeline()`)**: For in-flight parameter mutation, stage guards, and synchronous validation.
+2. **Reactive Hooks & Pub/Sub (`app.Hooks()`)**: For asynchronous side-effects, audit logging, analytics, and notification dispatching.
 
-### 1. Registration Parameter Interception (`Params.Set`)
+### 1. Synchronous Registration Interception (`Pipeline().AddInterceptor`)
 ```go
-app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload *emailpassword.SignUpEventPayload) {
-    // Attach dynamic plugin metadata (e.g. initial Organization ID or Role)
-    payload.Params.Set("organization_id", "org_987")
-    payload.Params.Set("role", "member")
+app.Pipeline().AddInterceptor(func(ctx context.Context, stage plugin.PipelineStage, payload any) error {
+    if stage == plugin.StageBeforeSignUp {
+        if params, ok := payload.(*dto.CreateUserParams); ok {
+            // Enrich or mutate registration params before database persistence
+            params.Set("organization_id", "org_987")
+            params.Set("role", "member")
+        }
+    }
+    return nil
 })
 ```
 
-### 2. Asynchronous Welcome Emails
+### 2. Typed Lifecycle Hooks (`Hooks().On*`)
 ```go
-app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload *emailpassword.SignUpEventPayload) {
-    // Execute inside a goroutine to avoid blocking the HTTP response
-    go func(user *entity.User) {
+app.Hooks().OnUserSignedUp(func(ctx context.Context, user *entity.User) {
+    // Fire-and-forget or async notification
+    go func() {
         mailer.SendWelcomeEmail(user.Email, user.Name)
-    }(payload.User)
+    }()
 })
 ```
 
-### 3. Security Audit Logging on Sign-In
+### 3. Topic-Based Audit Logging (`Hooks().Subscribe`)
 ```go
-app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload *emailpassword.SignInEventPayload) {
+app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload *emailpassword.SignInEventPayload) {
     securityLogger.Info("Successful sign-in", "userID", payload.User.ID, "email", payload.User.Email)
 })
 ```

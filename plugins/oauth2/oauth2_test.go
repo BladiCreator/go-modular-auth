@@ -14,21 +14,19 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
-	"github.com/asaskevich/EventBus"
 )
 
 type mockCrypto struct{}
 
-func (m *mockCrypto) HashPassword(p string) (string, error)   { return "hash:" + p, nil }
-func (m *mockCrypto) ComparePassword(h, p string) bool        { return h == "hash:"+p }
+func (m *mockCrypto) HashPassword(p string) (string, error) { return "hash:" + p, nil }
+func (m *mockCrypto) ComparePassword(h, p string) bool      { return h == "hash:"+p }
 func (m *mockCrypto) GenerateRandomToken(l int) (string, error) {
 	return oauth2.GenerateRandomString(l)
 }
 
 func setupOAuth2Test(t *testing.T, opts ...oauth2.Option) (*oauth2.Plugin, *memory.Store, *entity.User, *oauth2.OAuthClient) {
 	store := memory.New()
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(&mockCrypto{}, bus)
+	pCtx := plugin.NewContext(&mockCrypto{})
 
 	defaultOpts := []oauth2.Option{
 		oauth2.WithIssuer("https://auth.example.com"),

@@ -42,17 +42,10 @@ func (p *Plugin) ID() string {
 // Init initializes the plugin with the shared execution context and registers lifecycle event handlers.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
-	if ctx != nil && ctx.Events() != nil {
-		_ = ctx.Events().Subscribe("auth:session:created", func(c context.Context, payload any) {
-			if scp, ok := payload.(interface {
-				GetSession() *entity.Session
-				GetExtra() map[string]any
-			}); ok {
-				sess := scp.GetSession()
-				extra := scp.GetExtra()
-				if sess != nil && len(extra) > 0 && p.repo != nil {
-					_ = p.repo.SaveCustomSessionFields(c, sess.ID, extra)
-				}
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().OnSessionCreated(func(c context.Context, sess *entity.Session) {
+			if sess != nil && len(sess.Extra) > 0 && p.repo != nil {
+				_ = p.repo.SaveCustomSessionFields(c, sess.ID, sess.Extra)
 			}
 		})
 	}
@@ -69,7 +62,7 @@ func (p *Plugin) Config() Config {
 	return p.config
 }
 
-// TransformSession executes the dynamic session payload transformation logic, emitting lifecycle events across EventBus.
+// TransformSession executes the dynamic session payload transformation logic, emitting lifecycle events across Hooks.
 func (p *Plugin) TransformSession(ctx context.Context, sessionData *dto.SessionData, req *http.Request) (any, error) {
 	if sessionData == nil {
 		return nil, ErrSessionNotFound
@@ -165,7 +158,7 @@ func (p *Plugin) enrichWithRepositoryFields(ctx context.Context, sessionData *dt
 }
 
 func (p *Plugin) publishEvent(topic string, payload *TransformEventPayload) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, payload)
 	}
 }

@@ -106,8 +106,8 @@ type Config struct {
 // DefaultConfig returns baseline production-ready defaults for the Organization plugin.
 func DefaultConfig() Config {
 	return Config{
-		CreatorRole:         RoleOwner,
-		InvitationExpiresIn: 48 * time.Hour,
+		CreatorRole:           RoleOwner,
+		InvitationExpiresIn:   48 * time.Hour,
 		AllowRemovingAllTeams: true,
 		OrganizationLimit: func(ctx context.Context, userID string) (int, error) {
 			return 10, nil

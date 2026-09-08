@@ -57,10 +57,10 @@ func (p *Plugin) Repository() Repository {
 	return p.repo
 }
 
-// publishEvent safely publishes an event to the EventBus if initialized.
+// publishEvent safely publishes an event to Hooks if initialized.
 func (p *Plugin) publishEvent(topic string, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, payload)
 	}
 }
 

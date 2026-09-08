@@ -13,7 +13,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/ott"
-	"github.com/asaskevich/EventBus"
 )
 
 type mockRepository struct {
@@ -316,10 +315,9 @@ func TestOTT_AttachHeader(t *testing.T) {
 	}
 }
 
-func TestOTT_EventBus(t *testing.T) {
+func TestOTT_Hooks(t *testing.T) {
 	repo, _, session := setupTest(t)
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(nil, bus)
+	pCtx := plugin.NewContext(nil)
 
 	p := ott.New(repo)
 	if err := p.Init(pCtx); err != nil {
@@ -329,10 +327,10 @@ func TestOTT_EventBus(t *testing.T) {
 	var generatedEvent *ott.OTTGeneratedPayload
 	var verifiedEvent *ott.OTTVerifiedPayload
 
-	bus.Subscribe(ott.EventOTTGenerated, func(ctx context.Context, payload *ott.OTTGeneratedPayload) {
+	pCtx.Hooks().Subscribe(ott.EventOTTGenerated, func(ctx context.Context, payload *ott.OTTGeneratedPayload) {
 		generatedEvent = payload
 	})
-	bus.Subscribe(ott.EventOTTVerified, func(ctx context.Context, payload *ott.OTTVerifiedPayload) {
+	pCtx.Hooks().Subscribe(ott.EventOTTVerified, func(ctx context.Context, payload *ott.OTTVerifiedPayload) {
 		verifiedEvent = payload
 	})
 

@@ -12,7 +12,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/asaskevich/EventBus"
 )
 
 const (
@@ -118,14 +117,15 @@ type SessionManager struct {
 	repo         repository.SessionRepository
 	cfg          config.SessionConfig
 	crypto       plugin.CryptoUtils
-	events       EventBus.Bus
+	pipeline     *plugin.Pipeline
+	hooks        *plugin.Hooks
 	userResolver UserResolver
 }
 
 var _ plugin.SessionManager = (*SessionManager)(nil)
 
 // NewSessionManager creates a new central SessionManager instance.
-func NewSessionManager(repo repository.SessionRepository, cfg config.SessionConfig, crypto plugin.CryptoUtils, events EventBus.Bus, userResolver ...UserResolver) *SessionManager {
+func NewSessionManager(repo repository.SessionRepository, cfg config.SessionConfig, crypto plugin.CryptoUtils, pipeline *plugin.Pipeline, hooks *plugin.Hooks, userResolver ...UserResolver) *SessionManager {
 	var ur UserResolver
 	if len(userResolver) > 0 {
 		ur = userResolver[0]
@@ -134,12 +134,14 @@ func NewSessionManager(repo repository.SessionRepository, cfg config.SessionConf
 		repo:         repo,
 		cfg:          cfg,
 		crypto:       crypto,
-		events:       events,
+		pipeline:     pipeline,
+		hooks:        hooks,
 		userResolver: ur,
 	}
 }
 
-// CreateSession creates and persists a new authenticated user session with cryptographic token generation and event emission.
+// CreateSession creates and persists a new authenticated user session with cryptographic token generation,
+// pipeline interceptor execution (with immediate abort and rollback capability), and typed lifecycle hook dispatching.
 func (sm *SessionManager) CreateSession(ctx context.Context, userID string, opts ...SessionOption) (*entity.Session, error) {
 	if sm == nil || sm.repo == nil {
 		return nil, ErrSessionRepositoryRequired
@@ -189,6 +191,13 @@ func (sm *SessionManager) CreateSession(ctx context.Context, userID string, opts
 		params.Extra = optsData.Extra
 	}
 
+	// 1. Run BeforeCreateSession interceptors (global + per-call options)
+	if sm.pipeline != nil {
+		if err := sm.pipeline.ExecuteBeforeCreateSession(ctx, params, optsData.Interceptors...); err != nil {
+			return nil, err // Abort immediately without persisting
+		}
+	}
+
 	sess, err := sm.repo.CreateSession(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("auth: failed to persist session: %w", err)
@@ -197,11 +206,18 @@ func (sm *SessionManager) CreateSession(ctx context.Context, userID string, opts
 		sess.Extra = optsData.Extra
 	}
 
-	if sm.events != nil {
-		sm.events.Publish(EventSessionCreated, ctx, &SessionCreatedPayload{
-			Session: sess,
-			Extra:   optsData.Extra,
-		})
+	// 2. Run AfterCreateSession interceptors (global + per-call options)
+	if sm.pipeline != nil {
+		if err := sm.pipeline.ExecuteAfterCreateSession(ctx, sess, optsData.Interceptors...); err != nil {
+			// Rollback session from repository to prevent orphaned database records
+			_ = sm.repo.DeleteSession(ctx, sess.Token)
+			return nil, err
+		}
+	}
+
+	// 3. Dispatch typed lifecycle hooks
+	if sm.hooks != nil {
+		sm.hooks.DispatchSessionCreated(ctx, sess)
 	}
 
 	return sess, nil
@@ -214,6 +230,12 @@ func (sm *SessionManager) ValidateSession(ctx context.Context, token string) (*d
 	}
 	if token == "" {
 		return nil, repository.ErrInvalidSessionToken
+	}
+
+	if sm.pipeline != nil {
+		if err := sm.pipeline.ExecuteBeforeValidateSession(ctx, token); err != nil {
+			return nil, err
+		}
 	}
 
 	sess, err := sm.repo.GetSessionByToken(ctx, token)
@@ -257,8 +279,14 @@ func (sm *SessionManager) ValidateSession(ctx context.Context, token string) (*d
 		}
 	}
 
-	if sm.events != nil {
-		sm.events.Publish(EventSessionValidated, ctx, sessionData)
+	if sm.pipeline != nil {
+		if err := sm.pipeline.ExecuteAfterValidateSession(ctx, sessionData); err != nil {
+			return nil, err
+		}
+	}
+
+	if sm.hooks != nil {
+		sm.hooks.DispatchSessionValidated(ctx, sessionData)
 	}
 
 	return sessionData, nil
@@ -279,16 +307,8 @@ func (sm *SessionManager) RevokeSession(ctx context.Context, token string) error
 		return fmt.Errorf("auth: failed to revoke session: %w", err)
 	}
 
-	if sm.events != nil {
-		payload := &SessionRevokedPayload{
-			Token: token,
-		}
-		if sess != nil {
-			payload.SessionID = sess.ID
-			payload.UserID = sess.UserID
-			payload.Extra = sess.Extra
-		}
-		sm.events.Publish(EventSessionRevoked, ctx, payload)
+	if sm.hooks != nil {
+		sm.hooks.DispatchSessionRevoked(ctx, token, sess)
 	}
 
 	return nil

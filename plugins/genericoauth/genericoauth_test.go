@@ -460,8 +460,8 @@ func TestErrorHandling(t *testing.T) {
 	repo := newMockRepository()
 	plugin := genericoauth.New(repo,
 		genericoauth.WithProvider(&genericoauth.ProviderConfig{
-			ProviderID:          "disabled-signup",
-			ClientID:            "client",
+			ProviderID:            "disabled-signup",
+			ClientID:              "client",
 			DisableImplicitSignUp: true,
 			GetToken: func(ctx context.Context, req genericoauth.ExchangeRequest) (*genericoauth.Tokens, error) {
 				return &genericoauth.Tokens{AccessToken: "token"}, nil
@@ -486,4 +486,3 @@ func TestErrorHandling(t *testing.T) {
 		t.Errorf("Expected ErrSignUpDisabled, got %v", err)
 	}
 }
-

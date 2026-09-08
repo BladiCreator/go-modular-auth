@@ -75,10 +75,10 @@ func slugify(input string) string {
 	return s
 }
 
-// Helper: publishEvent safely publishes an event to the EventBus if initialized.
+// Helper: publishEvent safely publishes an event via Hooks if initialized.
 func (p *Plugin) publishEvent(topic string, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, payload)
 	}
 }
 
@@ -134,11 +134,11 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 
 	// 4. Emit Before Event
 	p.publishEvent(EventOrgCreateBefore, &OrgCreateBeforeEventPayload{
-		UserID:   params.UserID,
-		Name:     params.Name,
-		Slug:     slug,
-		Logo:     params.Logo,
-		Metadata: params.Metadata,
+		UserID:         params.UserID,
+		Name:           params.Name,
+		Slug:           slug,
+		Logo:           params.Logo,
+		Metadata:       params.Metadata,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -199,8 +199,8 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 
 	// 9. Emit After Event
 	p.publishEvent(EventOrgCreateAfter, &OrgCreateAfterEventPayload{
-		Organization: org,
-		Member:       member,
+		Organization:   org,
+		Member:         member,
 		ExtraContainer: params.ExtraContainer,
 	})
 

@@ -12,7 +12,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/access"
-	"github.com/asaskevich/EventBus"
 )
 
 // Master statement schema matching standard access control test fixture
@@ -533,8 +532,7 @@ func TestAccessGuards_ContextIntegration(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestPlugin_LifecycleAndEvents(t *testing.T) {
-	bus := EventBus.New()
-	ctx := plugin.NewContext(nil, bus)
+	ctx := plugin.NewContext(nil)
 
 	accessPlugin := plugins.Access(
 		testMasterStatements,
@@ -564,7 +562,7 @@ func TestPlugin_LifecycleAndEvents(t *testing.T) {
 
 	// Test Event subscriptions
 	var authorizedEventReceived bool
-	_ = bus.Subscribe(access.EventAccessAuthorized, func(p *access.AccessAuthorizedEventPayload) {
+	_ = ctx.Hooks().Subscribe(access.EventAccessAuthorized, func(p *access.AccessAuthorizedEventPayload) {
 		authorizedEventReceived = true
 		if len(p.Roles) == 0 || p.Roles[0] != "admin" {
 			t.Errorf("unexpected roles in event payload: %v", p.Roles)

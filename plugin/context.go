@@ -2,8 +2,6 @@ package plugin
 
 import (
 	"sync"
-
-	"github.com/asaskevich/EventBus"
 )
 
 // CryptoUtils defines cryptographic utility operations provided to plugins (hashing, comparison, random tokens).
@@ -13,27 +11,74 @@ type CryptoUtils interface {
 	GenerateRandomToken(length int) (string, error)
 }
 
-// Context represents the shared environment provided to plugins upon initialization, containing cryptographic tools, event buses, a session manager, and a key-value store.
+// ContextOption allows configuring optional dependencies into the shared plugin Context.
+type ContextOption func(*Context)
+
+// WithPipeline configures a custom Pipeline into the plugin Context.
+func WithPipeline(p *Pipeline) ContextOption {
+	return func(c *Context) {
+		if p != nil {
+			c.pipeline = p
+		}
+	}
+}
+
+// WithHooks configures a custom Hooks dispatcher into the plugin Context.
+func WithHooks(h *Hooks) ContextOption {
+	return func(c *Context) {
+		if h != nil {
+			c.hooks = h
+		}
+	}
+}
+
+// WithContextSessionManager configures a SessionManager into the plugin Context.
+func WithContextSessionManager(sm SessionManager) ContextOption {
+	return func(c *Context) {
+		c.sessionManager = sm
+	}
+}
+
+// Context represents the shared environment provided to plugins upon initialization,
+// containing cryptographic tools, synchronous execution pipelines, typed lifecycle hooks,
+// central session management, and a thread-safe key-value store.
 type Context struct {
 	crypto         CryptoUtils
-	events         EventBus.Bus
+	pipeline       *Pipeline
+	hooks          *Hooks
 	sessionManager SessionManager
 	store          sync.Map
 }
 
-// NewContext creates a new Context with the specified cryptographic utilities and event bus.
-func NewContext(crypto CryptoUtils, bus EventBus.Bus) *Context {
-	return &Context{
-		crypto: crypto,
-		events: bus,
+// NewContext creates a new Context with the specified cryptographic utilities and optional pipeline/hooks.
+func NewContext(crypto CryptoUtils, opts ...ContextOption) *Context {
+	c := &Context{
+		crypto:   crypto,
+		pipeline: NewPipeline(),
+		hooks:    NewHooks(),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
+	}
+	return c
 }
 
 // Crypto returns the cryptographic utilities instance.
 func (c *Context) Crypto() CryptoUtils { return c.crypto }
 
-// Events returns the shared EventBus instance for subscribing or publishing plugin lifecycle events.
-func (c *Context) Events() EventBus.Bus { return c.events }
+// Pipeline returns the synchronous interceptor pipeline for authentication operations.
+func (c *Context) Pipeline() *Pipeline { return c.pipeline }
+
+// SetPipeline updates the synchronous interceptor pipeline in the shared context.
+func (c *Context) SetPipeline(p *Pipeline) { c.pipeline = p }
+
+// Hooks returns the typed lifecycle hooks and event dispatcher.
+func (c *Context) Hooks() *Hooks { return c.hooks }
+
+// SetHooks updates the lifecycle hooks instance in the shared context.
+func (c *Context) SetHooks(h *Hooks) { c.hooks = h }
 
 // Session returns the central SessionManager instance available in the execution environment.
 func (c *Context) Session() SessionManager { return c.sessionManager }

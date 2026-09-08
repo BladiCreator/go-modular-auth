@@ -165,8 +165,8 @@ func (p *Plugin) CreateKey(ctx context.Context, params CreateApiKeyParams) (*Cre
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventApiKeyCreated, ctx, &ApiKeyCreatedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventApiKeyCreated, ctx, &ApiKeyCreatedPayload{
 			ApiKey: apiKey,
 			RawKey: rawKey,
 		})
@@ -211,8 +211,8 @@ func (p *Plugin) VerifyKey(ctx context.Context, params VerifyApiKeyParams) (*Ver
 
 	now := time.Now()
 	if apiKey.ExpiresAt != nil && now.After(*apiKey.ExpiresAt) {
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventApiKeyExpired, ctx, &ApiKeyExpiredPayload{KeyID: apiKey.ID})
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventApiKeyExpired, ctx, &ApiKeyExpiredPayload{KeyID: apiKey.ID})
 		}
 		p.publishVerifyEvent(ctx, apiKey, false, ErrKeyExpired.Error())
 		return &VerifyApiKeyResult{Valid: false, ApiKey: apiKey, Error: ErrKeyExpired.Error()}, nil
@@ -325,8 +325,8 @@ func (p *Plugin) UpdateKey(ctx context.Context, params UpdateApiKeyParams) (*Api
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventApiKeyUpdated, ctx, &ApiKeyUpdatedPayload{ApiKey: apiKey})
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventApiKeyUpdated, ctx, &ApiKeyUpdatedPayload{ApiKey: apiKey})
 	}
 
 	return apiKey, nil
@@ -341,8 +341,8 @@ func (p *Plugin) DeleteKey(ctx context.Context, params DeleteApiKeyParams) error
 		return err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventApiKeyDeleted, ctx, &ApiKeyDeletedPayload{KeyID: params.ID})
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventApiKeyDeleted, ctx, &ApiKeyDeletedPayload{KeyID: params.ID})
 	}
 
 	return nil
@@ -376,8 +376,8 @@ func (p *Plugin) DeleteAllExpiredKeys(ctx context.Context) (int64, error) {
 }
 
 func (p *Plugin) publishVerifyEvent(ctx context.Context, key *ApiKey, valid bool, errStr string) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventApiKeyVerified, ctx, &ApiKeyVerifiedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventApiKeyVerified, ctx, &ApiKeyVerifiedPayload{
 			ApiKey: key,
 			Valid:  valid,
 			Error:  errStr,

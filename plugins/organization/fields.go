@@ -50,8 +50,6 @@ const (
 	ActionCancel = "cancel"
 )
 
-
-
 // Standard Extra metadata keys that can be set or consumed in organization operations and events.
 const (
 	// ExtraKeyOrgID stores the organization identifier in dynamic Extra metadata.

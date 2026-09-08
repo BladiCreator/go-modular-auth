@@ -209,9 +209,9 @@ type Repository interface {
 // MemoryRepository provides a thread-safe, in-memory implementation of Repository for testing and lightweight usage.
 type MemoryRepository struct {
 	mu            sync.RWMutex
-	subscriptions map[string]*Subscription       // keyed by ID
-	stripeSubMap  map[string]string              // stripeSubID -> subID
-	customers     map[string]string              // "entityType:entityID" -> stripeCustomerID
+	subscriptions map[string]*Subscription // keyed by ID
+	stripeSubMap  map[string]string        // stripeSubID -> subID
+	customers     map[string]string        // "entityType:entityID" -> stripeCustomerID
 }
 
 // NewMemoryRepository initializes a fresh MemoryRepository instance.

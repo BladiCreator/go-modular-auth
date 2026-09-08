@@ -1,6 +1,5 @@
 package stripe
 
-
 // Config holds operational settings and options for the Stripe plugin.
 type Config struct {
 	// StripeAPIKey is the secret API key used to initialize the Stripe API client (e.g. "sk_test_...").
@@ -21,17 +20,17 @@ type Config struct {
 
 // SubscriptionOptions holds detailed configuration rules for plans, authorization, and lifecycle callbacks.
 type SubscriptionOptions struct {
-	Plans                      []StripePlan
-	PlansFunc                  PlansFunc
-	RequireEmailVerification   bool
-	AuthorizeReference         AuthorizeReferenceFunc
-	OnSubscriptionCompleted    SubscriptionCallbackFunc
-	OnSubscriptionCreated      SubscriptionCallbackFunc
-	OnSubscriptionUpdated      SubscriptionCallbackFunc
-	OnSubscriptionCanceled     SubscriptionCallbackFunc
-	OnSubscriptionDeleted      SubscriptionCallbackFunc
+	Plans                     []StripePlan
+	PlansFunc                 PlansFunc
+	RequireEmailVerification  bool
+	AuthorizeReference        AuthorizeReferenceFunc
+	OnSubscriptionCompleted   SubscriptionCallbackFunc
+	OnSubscriptionCreated     SubscriptionCallbackFunc
+	OnSubscriptionUpdated     SubscriptionCallbackFunc
+	OnSubscriptionCanceled    SubscriptionCallbackFunc
+	OnSubscriptionDeleted     SubscriptionCallbackFunc
 	OnInvoicePaymentSucceeded InvoiceCallbackFunc
-	OnInvoicePaymentFailed     InvoiceCallbackFunc
+	OnInvoicePaymentFailed    InvoiceCallbackFunc
 }
 
 // OrganizationOptions holds options for organization-level seat-based billing.

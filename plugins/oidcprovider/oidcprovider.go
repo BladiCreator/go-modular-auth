@@ -108,8 +108,8 @@ func (p *Plugin) RegisterClient(ctx context.Context, params RegisterClientParams
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOIDCClientRegistered, ctx, &OIDCClientRegisteredPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOIDCClientRegistered, ctx, &OIDCClientRegisteredPayload{
 			Client: client,
 		})
 	}
@@ -220,8 +220,8 @@ func (p *Plugin) Authorize(ctx context.Context, params AuthorizeParams) (*Author
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOIDCAuthCodeIssued, ctx, &OIDCAuthCodeIssuedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOIDCAuthCodeIssued, ctx, &OIDCAuthCodeIssuedPayload{
 			Code:     codeStr,
 			ClientID: client.ClientID,
 			UserID:   params.UserID,
@@ -275,8 +275,8 @@ func (p *Plugin) GrantConsent(ctx context.Context, params GrantConsentParams) (*
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOIDCConsentGranted, ctx, &OIDCConsentGrantedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOIDCConsentGranted, ctx, &OIDCConsentGrantedPayload{
 			ClientID: params.ClientID,
 			UserID:   params.UserID,
 			Scopes:   params.Scopes,
@@ -392,8 +392,8 @@ func (p *Plugin) ExchangeToken(ctx context.Context, params ExchangeTokenParams) 
 			}
 		}
 
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventOIDCTokenIssued, ctx, &OIDCTokenIssuedPayload{
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventOIDCTokenIssued, ctx, &OIDCTokenIssuedPayload{
 				AccessToken:  accessTokenStr,
 				RefreshToken: refreshTokenStr,
 				IDToken:      idTokenStr,
@@ -470,8 +470,8 @@ func (p *Plugin) ExchangeToken(ctx context.Context, params ExchangeTokenParams) 
 			}
 		}
 
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventOIDCTokenRefreshed, ctx, &OIDCTokenRefreshedPayload{
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventOIDCTokenRefreshed, ctx, &OIDCTokenRefreshedPayload{
 				NewAccessToken:  newAccessTokenStr,
 				NewRefreshToken: newRefreshTokenStr,
 				ClientID:        client.ClientID,

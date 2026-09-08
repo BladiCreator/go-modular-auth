@@ -14,6 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
@@ -47,21 +48,19 @@ func main() {
 		panic(err)
 	}
 
-	// 2. Subscribe to EventBus lifecycle events
-	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
-		if payload != nil && payload.Params != nil {
-			payload.Params.Set(emailpassword.ExtraKeyRole, "admin")
-			payload.Params.Set(emailpassword.ExtraKeyOrgID, "org_enterprise")
-		}
+	// 2. Register interceptors and subscribe to native lifecycle hooks
+	app.Pipeline().AddInterceptor(auth.BeforeSignUpFunc(func(ctx context.Context, input *dto.SignUpParams) error {
+		input.Set(emailpassword.ExtraKeyRole, "admin")
+		input.Set(emailpassword.ExtraKeyOrgID, "org_enterprise")
+		return nil
+	}))
+
+	app.Hooks().OnUserSignedUp(func(c context.Context, u *entity.User) {
+		fmt.Printf("📢 [Native Hooks] New user registered: %s (ID: %s, Role: %s)\n", u.Email, u.ID, u.Role)
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(c context.Context, payload *emailpassword.SignUpEventPayload) {
-		role, _ := payload.Params.Get(emailpassword.ExtraKeyRole)
-		fmt.Printf("📢 [Global EventBus] New user registered: %s (ID: %s, Role: %v)\n", payload.User.Email, payload.User.ID, role)
-	})
-
-	app.Events().Subscribe(twofactor.EventEnableAfter, func(c context.Context, payload *twofactor.EnableAfterEventPayload) {
-		fmt.Printf("📢 [Global EventBus] User %s enabled 2FA with %d backup codes\n", payload.UserID, payload.BackupCodesCount)
+	app.Hooks().Subscribe(twofactor.EventEnableAfter, func(c context.Context, payload *twofactor.EnableAfterEventPayload) {
+		fmt.Printf("📢 [Native Hooks] User %s enabled 2FA with %d backup codes\n", payload.UserID, payload.BackupCodesCount)
 	})
 
 	// 3. User registration via EmailPassword plugin

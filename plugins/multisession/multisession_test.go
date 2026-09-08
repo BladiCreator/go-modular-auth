@@ -13,15 +13,13 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
-	"github.com/asaskevich/EventBus"
 )
 
-func setupTestPlugin(t *testing.T, opts ...multisession.Option) (*multisession.Plugin, *memory.Store, EventBus.Bus) {
+func setupTestPlugin(t *testing.T, opts ...multisession.Option) (*multisession.Plugin, *memory.Store, *plugin.Hooks) {
 	t.Helper()
 	store := memory.New()
-	bus := EventBus.New()
 	cryptoMock := &mockCrypto{}
-	pCtx := plugin.NewContext(cryptoMock, bus)
+	pCtx := plugin.NewContext(cryptoMock)
 
 	defaultOpts := []multisession.Option{
 		multisession.WithSecret("test-hmac-secret-12345"),
@@ -33,8 +31,7 @@ func setupTestPlugin(t *testing.T, opts ...multisession.Option) (*multisession.P
 	if err := p.Init(pCtx); err != nil {
 		t.Fatalf("failed to init plugin context: %v", err)
 	}
-
-	return p, store, bus
+	return p, store, pCtx.Hooks()
 }
 
 type mockCrypto struct{}
@@ -108,12 +105,12 @@ func TestMultiSession(t *testing.T) {
 	})
 
 	t.Run("ListDeviceSessionsWithIsActive", func(t *testing.T) {
-		p, store, bus := setupTestPlugin(t)
+		p, store, hooks := setupTestPlugin(t)
 		u1, s1 := createTestUserAndSession(t, store, "Alice", "alice@example.com")
 		u2, s2 := createTestUserAndSession(t, store, "Bob", "bob@example.com")
 
 		eventFired := false
-		_ = bus.Subscribe(multisession.EventListDeviceSessionsAfter, func(payload *multisession.ListDeviceSessionsEventPayload) {
+		_ = hooks.Subscribe(multisession.EventListDeviceSessionsAfter, func(payload *multisession.ListDeviceSessionsEventPayload) {
 			eventFired = true
 		})
 
@@ -152,12 +149,12 @@ func TestMultiSession(t *testing.T) {
 	})
 
 	t.Run("SetActiveSession", func(t *testing.T) {
-		p, store, bus := setupTestPlugin(t)
+		p, store, hooks := setupTestPlugin(t)
 		_, s1 := createTestUserAndSession(t, store, "Alice", "alice@example.com")
 		u2, s2 := createTestUserAndSession(t, store, "Bob", "bob@example.com")
 
 		eventFired := false
-		_ = bus.Subscribe(multisession.EventSetActiveSessionAfter, func(payload *multisession.SetActiveSessionEventPayload) {
+		_ = hooks.Subscribe(multisession.EventSetActiveSessionAfter, func(payload *multisession.SetActiveSessionEventPayload) {
 			eventFired = true
 		})
 
@@ -216,12 +213,12 @@ func TestMultiSession(t *testing.T) {
 	})
 
 	t.Run("RevokeAndSwitchActive", func(t *testing.T) {
-		p, store, bus := setupTestPlugin(t)
+		p, store, hooks := setupTestPlugin(t)
 		_, s1 := createTestUserAndSession(t, store, "Alice", "alice@example.com")
 		_, s2 := createTestUserAndSession(t, store, "Bob", "bob@example.com")
 
 		eventFired := false
-		_ = bus.Subscribe(multisession.EventRevokeDeviceSessionAfter, func(payload *multisession.RevokeDeviceSessionEventPayload) {
+		_ = hooks.Subscribe(multisession.EventRevokeDeviceSessionAfter, func(payload *multisession.RevokeDeviceSessionEventPayload) {
 			eventFired = true
 		})
 
@@ -308,12 +305,12 @@ func TestMultiSession(t *testing.T) {
 	})
 
 	t.Run("SignOutAll", func(t *testing.T) {
-		p, store, bus := setupTestPlugin(t)
+		p, store, hooks := setupTestPlugin(t)
 		_, s1 := createTestUserAndSession(t, store, "Alice", "alice@example.com")
 		_, s2 := createTestUserAndSession(t, store, "Bob", "bob@example.com")
 
 		eventFired := false
-		_ = bus.Subscribe(multisession.EventSignOut, func(payload *multisession.SignOutEventPayload) {
+		_ = hooks.Subscribe(multisession.EventSignOut, func(payload *multisession.SignOutEventPayload) {
 			eventFired = true
 		})
 

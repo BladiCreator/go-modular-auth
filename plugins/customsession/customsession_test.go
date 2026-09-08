@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/asaskevich/EventBus"
-
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
@@ -21,9 +19,9 @@ import (
 func TestCustomSession_BasicTransformation(t *testing.T) {
 	transformFn := func(ctx context.Context, sData *dto.SessionData, req *http.Request) (any, error) {
 		type EnrichedResponse struct {
-			User        *entity.User `json:"user"`
+			User        *entity.User    `json:"user"`
 			Session     *entity.Session `json:"session"`
-			Permissions []string     `json:"permissions"`
+			Permissions []string        `json:"permissions"`
 		}
 		return EnrichedResponse{
 			User:        sData.User,
@@ -86,20 +84,19 @@ func TestCustomSession_MemoryRepository(t *testing.T) {
 	}
 }
 
-func TestCustomSession_EventBusEmission(t *testing.T) {
-	bus := EventBus.New()
-	ctx := plugin.NewContext(nil, bus)
+func TestCustomSession_HooksEmission(t *testing.T) {
+	ctx := plugin.NewContext(nil)
 
 	beforeFired := false
 	afterFired := false
 
-	_ = bus.SubscribeAsync(customsession.EventTransformBefore, func(payload *customsession.TransformEventPayload) {
+	_ = ctx.Hooks().Subscribe(customsession.EventTransformBefore, func(payload *customsession.TransformEventPayload) {
 		beforeFired = true
-	}, false)
+	})
 
-	_ = bus.SubscribeAsync(customsession.EventTransformAfter, func(payload *customsession.TransformEventPayload) {
+	_ = ctx.Hooks().Subscribe(customsession.EventTransformAfter, func(payload *customsession.TransformEventPayload) {
 		afterFired = true
-	}, false)
+	})
 
 	p := customsession.New(nil)
 	if err := p.Init(ctx); err != nil {

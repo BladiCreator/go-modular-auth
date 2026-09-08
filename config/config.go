@@ -34,6 +34,9 @@ type Config struct {
 	Plugins           []plugin.Plugin
 	SessionRepository repository.SessionRepository
 	SessionConfig     SessionConfig
+	Interceptors      []any
+	Hooks             *plugin.Hooks
+	AsyncHooks        bool
 }
 
 // DefaultConfig returns a Config initialized with sensible default values.
@@ -42,6 +45,7 @@ func DefaultConfig() Config {
 		BcryptCost:    bcrypt.DefaultCost,
 		Plugins:       []plugin.Plugin{},
 		SessionConfig: DefaultSessionConfig(),
+		Interceptors:  []any{},
 	}
 }
 

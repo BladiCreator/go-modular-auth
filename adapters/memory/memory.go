@@ -43,40 +43,40 @@ var (
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
 type Store struct {
-	mu             sync.RWMutex
-	users          map[string]*entity.User
-	accounts       map[string]*entity.Account            // key: accountID
-	userAccounts   map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens              map[string]*entity.VerificationToken // key: token string
-	sessions            map[string]*entity.Session           // key: token string
-	sessionsByID        map[string]*entity.Session           // key: session.ID
-	customSessionFields map[string]map[string]any            // key: session.ID -> fields
+	mu                  sync.RWMutex
+	users               map[string]*entity.User
+	accounts            map[string]*entity.Account            // key: accountID
+	userAccounts        map[string]map[string]*entity.Account // key: userID -> provider -> Account
+	tokens              map[string]*entity.VerificationToken  // key: token string
+	sessions            map[string]*entity.Session            // key: token string
+	sessionsByID        map[string]*entity.Session            // key: session.ID
+	customSessionFields map[string]map[string]any             // key: session.ID -> fields
 	totpSecrets         map[string]string
-	twoFactors     map[string]*twofactor.TwoFactor    // key: userID
-	otpChallenges  map[string]*twofactor.OTPChallenge // key: challenge key
-	trustedDevices map[string]*twofactor.TrustDeviceRecord
-	challenges     map[string]*twofactor.ChallengeRecord
-	jwks           map[string]*jwt.JWKRecord // key: kid
-	orgs           map[string]*organization.Organization
-	orgsBySlug     map[string]string
-	members        map[string]*organization.Member // key: orgID + ":" + userID
-	membersByID    map[string]*organization.Member // key: memberID
-	invitations    map[string]*organization.Invitation
-	teams          map[string]*organization.Team
-	teamMembers    map[string]*organization.TeamMember // key: teamID + ":" + userID
-	orgRoles       map[string]*organization.OrganizationRole
+	twoFactors          map[string]*twofactor.TwoFactor    // key: userID
+	otpChallenges       map[string]*twofactor.OTPChallenge // key: challenge key
+	trustedDevices      map[string]*twofactor.TrustDeviceRecord
+	challenges          map[string]*twofactor.ChallengeRecord
+	jwks                map[string]*jwt.JWKRecord // key: kid
+	orgs                map[string]*organization.Organization
+	orgsBySlug          map[string]string
+	members             map[string]*organization.Member // key: orgID + ":" + userID
+	membersByID         map[string]*organization.Member // key: memberID
+	invitations         map[string]*organization.Invitation
+	teams               map[string]*organization.Team
+	teamMembers         map[string]*organization.TeamMember // key: teamID + ":" + userID
+	orgRoles            map[string]*organization.OrganizationRole
 
-	passkeys               map[string]*entity.Passkey          // key: id
-	passkeysByCredentialID map[string]*entity.Passkey          // key: credentialID
+	passkeys               map[string]*entity.Passkey           // key: id
+	passkeysByCredentialID map[string]*entity.Passkey           // key: credentialID
 	passkeyChallenges      map[string]*passkey.PasskeyChallenge // key: token
 
-	oauthClients        map[string]*oauth2.OAuthClient            // key: client_id
-	oauthClientsByID    map[string]*oauth2.OAuthClient            // key: id
-	oauthCodes          map[string]*oauth2.OAuthAuthorizationCode // key: code
-	oauthAccessTokens   map[string]*oauth2.OAuthAccessToken       // key: tokenHash
-	oauthRefreshTokens  map[string]*oauth2.OAuthRefreshToken      // key: tokenHash
-	oauthConsents       map[string]*oauth2.OAuthConsent           // key: client_id + ":" + user_id
-	oauthConsentsByID   map[string]*oauth2.OAuthConsent           // key: id
+	oauthClients       map[string]*oauth2.OAuthClient            // key: client_id
+	oauthClientsByID   map[string]*oauth2.OAuthClient            // key: id
+	oauthCodes         map[string]*oauth2.OAuthAuthorizationCode // key: code
+	oauthAccessTokens  map[string]*oauth2.OAuthAccessToken       // key: tokenHash
+	oauthRefreshTokens map[string]*oauth2.OAuthRefreshToken      // key: tokenHash
+	oauthConsents      map[string]*oauth2.OAuthConsent           // key: client_id + ":" + user_id
+	oauthConsentsByID  map[string]*oauth2.OAuthConsent           // key: id
 }
 
 // New instantiates a new thread-safe in-memory Store.
@@ -1862,7 +1862,3 @@ func (s *Store) SaveSession(session *entity.Session) {
 
 	s.sessions[session.ID] = session
 }
-
-
-
-

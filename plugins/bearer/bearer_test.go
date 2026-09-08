@@ -358,11 +358,11 @@ func TestPlugin_FullIntegration(t *testing.T) {
 		t.Fatalf("failed to initialize auth engine: %v", err)
 	}
 
-	app.Events().Subscribe(bearer.EventBearerTokenCreated, func(c context.Context, payload *bearer.BearerTokenCreatedEventPayload) {
+	app.Hooks().Subscribe(bearer.EventBearerTokenCreated, func(c context.Context, payload *bearer.BearerTokenCreatedEventPayload) {
 		eventTokenCreated = payload.SignedToken
 	})
 
-	app.Events().Subscribe(bearer.EventBearerVerifyAfter, func(c context.Context, payload *bearer.BearerVerifyAfterEventPayload) {
+	app.Hooks().Subscribe(bearer.EventBearerVerifyAfter, func(c context.Context, payload *bearer.BearerVerifyAfterEventPayload) {
 		eventVerifySuccess = payload.Valid
 	})
 

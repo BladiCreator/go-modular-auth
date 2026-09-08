@@ -22,7 +22,7 @@ func (p *Plugin) ProcessWebhook(ctx context.Context, payload []byte, signature s
 		return fmt.Errorf("%w: %v", ErrInvalidWebhookSignature, err)
 	}
 
-	// Publish EventStripeWebhookReceived on EventBus
+	// Publish EventStripeWebhookReceived on Hooks dispatcher
 	p.publishEvent(EventStripeWebhookReceived, ctx, &WebhookReceivedPayload{
 		StripeEventID: event.ID,
 		EventType:     string(event.Type),

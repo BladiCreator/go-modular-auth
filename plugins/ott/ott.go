@@ -116,8 +116,8 @@ func (p *Plugin) GenerateToken(ctx context.Context, params GenerateTokenParams) 
 	}
 
 	// Dispatch event notification if bus is initialized
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOTTGenerated, ctx, &OTTGeneratedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOTTGenerated, ctx, &OTTGeneratedPayload{
 			SessionToken: params.SessionToken,
 			Token:        rawToken,
 			ExpiresAt:    expiresAt,
@@ -184,8 +184,8 @@ func (p *Plugin) VerifyToken(ctx context.Context, params VerifyTokenParams) (*Ve
 	}
 
 	// Dispatch event notification if bus is initialized
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventOTTVerified, ctx, &OTTVerifiedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventOTTVerified, ctx, &OTTVerifiedPayload{
 			SessionID: session.ID,
 			UserID:    user.ID,
 			Token:     params.Token,

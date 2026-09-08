@@ -26,7 +26,7 @@ const (
 	EventStripeWebhookReceived = "stripe:webhook:received"
 )
 
-// CustomerCreatedPayload represents the EventBus payload for EventStripeCustomerCreated.
+// CustomerCreatedPayload represents the payload dispatched across Hooks for EventStripeCustomerCreated.
 type CustomerCreatedPayload struct {
 	EntityType       string `json:"entity_type"` // "user" or "organization"
 	EntityID         string `json:"entity_id"`
@@ -34,21 +34,21 @@ type CustomerCreatedPayload struct {
 	Email            string `json:"email,omitempty"`
 }
 
-// SubscriptionEventPayload represents the EventBus payload for subscription events.
+// SubscriptionEventPayload represents the payload dispatched across Hooks for subscription events.
 type SubscriptionEventPayload struct {
 	Subscription  *Subscription `json:"subscription"`
 	StripeEventID string        `json:"stripe_event_id,omitempty"`
 	EventType     string        `json:"event_type"`
 }
 
-// InvoiceEventPayload represents the EventBus payload for invoice payment events.
+// InvoiceEventPayload represents the payload dispatched across Hooks for invoice payment events.
 type InvoiceEventPayload struct {
 	Invoice       *InvoiceData `json:"invoice"`
 	StripeEventID string       `json:"stripe_event_id,omitempty"`
 	EventType     string       `json:"event_type"`
 }
 
-// WebhookReceivedPayload represents the EventBus payload for incoming validated Stripe webhooks.
+// WebhookReceivedPayload represents the payload dispatched across Hooks for incoming validated Stripe webhooks.
 type WebhookReceivedPayload struct {
 	StripeEventID string `json:"stripe_event_id"`
 	EventType     string `json:"event_type"`

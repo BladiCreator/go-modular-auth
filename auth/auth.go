@@ -12,14 +12,14 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/asaskevich/EventBus"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Auth is the central authentication engine holding initialized plugins, session orchestrators, and event dispatchers.
+// Auth is the central authentication engine holding initialized plugins, session orchestrators, execution pipelines, and lifecycle hooks.
 type Auth struct {
 	ctx            *plugin.Context
-	bus            EventBus.Bus
+	pipeline       *plugin.Pipeline
+	hooks          *plugin.Hooks
 	sessionManager *SessionManager
 	plugins        map[reflect.Type]plugin.Plugin
 }
@@ -49,18 +49,30 @@ func New(opts ...config.Option) (*Auth, error) {
 		opt(&cfg)
 	}
 
-	bus := EventBus.New()
+	pipeline := plugin.NewPipeline()
+	if len(cfg.Interceptors) > 0 {
+		pipeline.AddInterceptor(cfg.Interceptors...)
+	}
+
+	hooks := cfg.Hooks
+	if hooks == nil {
+		hooks = plugin.NewHooks(cfg.AsyncHooks)
+	} else if cfg.AsyncHooks {
+		hooks.SetAsync(true)
+	}
+
 	crypto := &defaultCrypto{bcryptCost: cfg.BcryptCost}
 
 	a := &Auth{
-		bus:     bus,
-		plugins: make(map[reflect.Type]plugin.Plugin),
+		pipeline: pipeline,
+		hooks:    hooks,
+		plugins:  make(map[reflect.Type]plugin.Plugin),
 	}
 
-	a.ctx = plugin.NewContext(crypto, bus)
+	a.ctx = plugin.NewContext(crypto, plugin.WithPipeline(pipeline), plugin.WithHooks(hooks))
 
 	if cfg.SessionRepository != nil {
-		a.sessionManager = NewSessionManager(cfg.SessionRepository, cfg.SessionConfig, crypto, bus)
+		a.sessionManager = NewSessionManager(cfg.SessionRepository, cfg.SessionConfig, crypto, pipeline, hooks)
 		a.ctx.SetSessionManager(a.sessionManager)
 	}
 
@@ -74,9 +86,14 @@ func New(opts ...config.Option) (*Auth, error) {
 	return a, nil
 }
 
-// Events returns the global EventBus instance for subscribing to or publishing authentication lifecycle events.
-func (a *Auth) Events() EventBus.Bus {
-	return a.bus
+// Pipeline returns the synchronous execution pipeline for intercepting and mutating authentication operations.
+func (a *Auth) Pipeline() *plugin.Pipeline {
+	return a.pipeline
+}
+
+// Hooks returns the typed lifecycle hooks and native event dispatcher.
+func (a *Auth) Hooks() *plugin.Hooks {
+	return a.hooks
 }
 
 // SessionManager returns the central SessionManager orchestrator, or nil if no SessionRepository was configured.

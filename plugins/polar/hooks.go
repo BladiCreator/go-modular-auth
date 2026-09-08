@@ -7,9 +7,9 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 )
 
-// setupHooks registers application lifecycle event listeners on the shared EventBus.
+// setupHooks registers application lifecycle event listeners on the shared Hooks dispatcher.
 func (p *Plugin) setupHooks() {
-	if p.ctx == nil || p.ctx.Events() == nil {
+	if p.ctx == nil || p.ctx.Hooks() == nil {
 		return
 	}
 
@@ -34,8 +34,13 @@ func (p *Plugin) setupHooks() {
 	}
 
 	// Listen for user registration events to automatically provision customer records in Polar
-	p.ctx.Events().Subscribe(EventUserCreated, handler)
-	p.ctx.Events().Subscribe(emailpassword.EventSignUpAfter, handler)
+	p.ctx.Hooks().Subscribe(EventUserCreated, handler)
+	p.ctx.Hooks().Subscribe(emailpassword.EventSignUpAfter, handler)
+	p.ctx.Hooks().OnUserSignedUp(func(ctx context.Context, user *entity.User) {
+		if p.config.CreateCustomerOnSignUp && user != nil && user.ID != "" {
+			_ = p.OnUserCreated(ctx, user)
+		}
+	})
 }
 
 // OnUserCreated triggers customer creation in Polar for a newly registered user and persists the polarCustomerID.
@@ -61,7 +66,7 @@ func (p *Plugin) OnUserCreated(ctx context.Context, user *entity.User) error {
 		return err
 	}
 
-	// Publish EventPolarCustomerCreated to EventBus
+	// Publish EventPolarCustomerCreated to Hooks dispatcher
 	p.publishEvent(EventPolarCustomerCreated, ctx, &CustomerCreatedPayload{
 		EntityType:      "user",
 		EntityID:        user.ID,

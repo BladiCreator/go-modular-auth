@@ -500,25 +500,25 @@ func TestPlugin_AuthEngineIntegrationAndEvents(t *testing.T) {
 	var eventsCaptured []string
 	var mu sync.Mutex
 
-	app.Events().Subscribe(jwt.EventJWTSignBefore, func(ctx context.Context, p *jwt.JWTSignBeforeEventPayload) {
+	app.Hooks().Subscribe(jwt.EventJWTSignBefore, func(ctx context.Context, p *jwt.JWTSignBeforeEventPayload) {
 		mu.Lock()
 		eventsCaptured = append(eventsCaptured, jwt.EventJWTSignBefore)
 		mu.Unlock()
 	})
 
-	app.Events().Subscribe(jwt.EventJWTSignAfter, func(ctx context.Context, p *jwt.JWTSignAfterEventPayload) {
+	app.Hooks().Subscribe(jwt.EventJWTSignAfter, func(ctx context.Context, p *jwt.JWTSignAfterEventPayload) {
 		mu.Lock()
 		eventsCaptured = append(eventsCaptured, jwt.EventJWTSignAfter)
 		mu.Unlock()
 	})
 
-	app.Events().Subscribe(jwt.EventJWTVerifyAfter, func(ctx context.Context, p *jwt.JWTVerifyAfterEventPayload) {
+	app.Hooks().Subscribe(jwt.EventJWTVerifyAfter, func(ctx context.Context, p *jwt.JWTVerifyAfterEventPayload) {
 		mu.Lock()
 		eventsCaptured = append(eventsCaptured, jwt.EventJWTVerifyAfter)
 		mu.Unlock()
 	})
 
-	app.Events().Subscribe(jwt.EventJWTIssued, func(ctx context.Context, p *jwt.JWTIssuedEventPayload) {
+	app.Hooks().Subscribe(jwt.EventJWTIssued, func(ctx context.Context, p *jwt.JWTIssuedEventPayload) {
 		mu.Lock()
 		eventsCaptured = append(eventsCaptured, jwt.EventJWTIssued)
 		mu.Unlock()

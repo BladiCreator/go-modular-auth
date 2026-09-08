@@ -306,9 +306,9 @@ func (p *Plugin) ExposedHeaders() string {
 	return p.config.AuthTokenHeader
 }
 
-// publishEvent dispatches a typed event payload through the shared EventBus if initialized.
+// publishEvent dispatches a typed event payload through the shared Hooks dispatcher if initialized.
 func (p *Plugin) publishEvent(topic string, ctx context.Context, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, ctx, payload)
 	}
 }

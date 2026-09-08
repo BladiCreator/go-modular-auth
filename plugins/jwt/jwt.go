@@ -780,8 +780,8 @@ func (p *Plugin) decryptAndParsePrivateKey(record *JWKRecord) (crypto.PrivateKey
 }
 
 func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(eventName, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}
 }
 

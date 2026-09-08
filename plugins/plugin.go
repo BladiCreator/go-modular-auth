@@ -270,56 +270,98 @@ func JWT(repo jwt.Repository, opts ...jwt.Option) *jwt.Plugin {
 // # Available Methods
 //
 //   - Organization Lifecycle:
-//     - CreateOrganization(ctx context.Context, params CreateOrganizationParams) (*CreateOrganizationResult, error): Create a new organization entity and assign creator role.
-//     - GetOrganization(ctx context.Context, params GetOrganizationParams) (*GetOrganizationResult, error): Retrieve organization details by ID.
-//     - GetOrganizationBySlug(ctx context.Context, params GetOrganizationBySlugParams) (*GetOrganizationBySlugResult, error): Retrieve organization details by URL slug.
-//     - GetFullOrganization(ctx context.Context, params GetFullOrganizationParams) (*GetFullOrganizationResult, error): Fetch organization alongside its members, teams, and invitations.
-//     - UpdateOrganization(ctx context.Context, params UpdateOrganizationParams) (*UpdateOrganizationResult, error): Update organization metadata (name, slug, logo, metadata).
-//     - DeleteOrganization(ctx context.Context, params DeleteOrganizationParams) (*DeleteOrganizationResult, error): Permanently delete an organization and cascade delete child records.
-//     - ListOrganizations(ctx context.Context, params ListOrganizationsParams) (*ListOrganizationsResult, error): List all organizations where a user is an active member.
-//     - CheckSlug(ctx context.Context, params CheckSlugParams) (*CheckSlugResult, error): Validate slug availability and format.
-//     - SetActiveOrganization(ctx context.Context, params SetActiveOrganizationParams) (*SetActiveOrganizationResult, error): Switch the active organization context on a session.
-//     - GetActiveOrganization(ctx context.Context, params GetActiveOrganizationParams) (*GetActiveOrganizationResult, error): Retrieve the currently active organization for a session.
+//
+//   - CreateOrganization(ctx context.Context, params CreateOrganizationParams) (*CreateOrganizationResult, error): Create a new organization entity and assign creator role.
+//
+//   - GetOrganization(ctx context.Context, params GetOrganizationParams) (*GetOrganizationResult, error): Retrieve organization details by ID.
+//
+//   - GetOrganizationBySlug(ctx context.Context, params GetOrganizationBySlugParams) (*GetOrganizationBySlugResult, error): Retrieve organization details by URL slug.
+//
+//   - GetFullOrganization(ctx context.Context, params GetFullOrganizationParams) (*GetFullOrganizationResult, error): Fetch organization alongside its members, teams, and invitations.
+//
+//   - UpdateOrganization(ctx context.Context, params UpdateOrganizationParams) (*UpdateOrganizationResult, error): Update organization metadata (name, slug, logo, metadata).
+//
+//   - DeleteOrganization(ctx context.Context, params DeleteOrganizationParams) (*DeleteOrganizationResult, error): Permanently delete an organization and cascade delete child records.
+//
+//   - ListOrganizations(ctx context.Context, params ListOrganizationsParams) (*ListOrganizationsResult, error): List all organizations where a user is an active member.
+//
+//   - CheckSlug(ctx context.Context, params CheckSlugParams) (*CheckSlugResult, error): Validate slug availability and format.
+//
+//   - SetActiveOrganization(ctx context.Context, params SetActiveOrganizationParams) (*SetActiveOrganizationResult, error): Switch the active organization context on a session.
+//
+//   - GetActiveOrganization(ctx context.Context, params GetActiveOrganizationParams) (*GetActiveOrganizationResult, error): Retrieve the currently active organization for a session.
 //
 //   - Member Management:
-//     - AddMember(ctx context.Context, params AddMemberParams) (*AddMemberResult, error): Directly add a user to an organization with a specific role.
-//     - GetMember(ctx context.Context, params GetMemberParams) (*GetMemberResult, error): Retrieve membership record for a user in an organization.
-//     - GetActiveMember(ctx context.Context, params GetActiveMemberParams) (*GetActiveMemberResult, error): Retrieve active membership details from the current session.
-//     - GetActiveMemberRole(ctx context.Context, params GetActiveMemberRoleParams) (*GetActiveMemberRoleResult, error): Retrieve active member's assigned role.
-//     - UpdateMemberRole(ctx context.Context, params UpdateMemberRoleParams) (*UpdateMemberRoleResult, error): Modify a member's role within an organization.
-//     - RemoveMember(ctx context.Context, params RemoveMemberParams) (*RemoveMemberResult, error): Remove a user from an organization.
-//     - LeaveOrganization(ctx context.Context, params LeaveOrganizationParams) (*LeaveOrganizationResult, error): Allow a member to voluntarily depart an organization.
-//     - ListMembers(ctx context.Context, params ListMembersParams) (*ListMembersResult, error): List all members with pagination.
+//
+//   - AddMember(ctx context.Context, params AddMemberParams) (*AddMemberResult, error): Directly add a user to an organization with a specific role.
+//
+//   - GetMember(ctx context.Context, params GetMemberParams) (*GetMemberResult, error): Retrieve membership record for a user in an organization.
+//
+//   - GetActiveMember(ctx context.Context, params GetActiveMemberParams) (*GetActiveMemberResult, error): Retrieve active membership details from the current session.
+//
+//   - GetActiveMemberRole(ctx context.Context, params GetActiveMemberRoleParams) (*GetActiveMemberRoleResult, error): Retrieve active member's assigned role.
+//
+//   - UpdateMemberRole(ctx context.Context, params UpdateMemberRoleParams) (*UpdateMemberRoleResult, error): Modify a member's role within an organization.
+//
+//   - RemoveMember(ctx context.Context, params RemoveMemberParams) (*RemoveMemberResult, error): Remove a user from an organization.
+//
+//   - LeaveOrganization(ctx context.Context, params LeaveOrganizationParams) (*LeaveOrganizationResult, error): Allow a member to voluntarily depart an organization.
+//
+//   - ListMembers(ctx context.Context, params ListMembersParams) (*ListMembersResult, error): List all members with pagination.
 //
 //   - Invitation Workflows:
-//     - CreateInvitation(ctx context.Context, params CreateInvitationParams) (*CreateInvitationResult, error): Issue an email invitation with secure token.
-//     - GetInvitation(ctx context.Context, params GetInvitationParams) (*GetInvitationResult, error): Retrieve invitation details by ID or token.
-//     - AcceptInvitation(ctx context.Context, params AcceptInvitationParams) (*AcceptInvitationResult, error): Accept an invitation and join organization.
-//     - RejectInvitation(ctx context.Context, params RejectInvitationParams) (*RejectInvitationResult, error): Decline an incoming organization invitation.
-//     - CancelInvitation(ctx context.Context, params CancelInvitationParams) (*CancelInvitationResult, error): Revoke a pending invitation.
-//     - ListInvitations(ctx context.Context, params ListInvitationsParams) (*ListInvitationsResult, error): List pending invitations for an organization.
-//     - ListUserInvitations(ctx context.Context, params ListUserInvitationsParams) (*ListUserInvitationsResult, error): List all pending invitations addressed to a user.
+//
+//   - CreateInvitation(ctx context.Context, params CreateInvitationParams) (*CreateInvitationResult, error): Issue an email invitation with secure token.
+//
+//   - GetInvitation(ctx context.Context, params GetInvitationParams) (*GetInvitationResult, error): Retrieve invitation details by ID or token.
+//
+//   - AcceptInvitation(ctx context.Context, params AcceptInvitationParams) (*AcceptInvitationResult, error): Accept an invitation and join organization.
+//
+//   - RejectInvitation(ctx context.Context, params RejectInvitationParams) (*RejectInvitationResult, error): Decline an incoming organization invitation.
+//
+//   - CancelInvitation(ctx context.Context, params CancelInvitationParams) (*CancelInvitationResult, error): Revoke a pending invitation.
+//
+//   - ListInvitations(ctx context.Context, params ListInvitationsParams) (*ListInvitationsResult, error): List pending invitations for an organization.
+//
+//   - ListUserInvitations(ctx context.Context, params ListUserInvitationsParams) (*ListUserInvitationsResult, error): List all pending invitations addressed to a user.
 //
 //   - Teams:
-//     - CreateTeam(ctx context.Context, params CreateTeamParams) (*CreateTeamResult, error): Create a team sub-unit within an organization.
-//     - GetTeam(ctx context.Context, params GetTeamParams) (*GetTeamResult, error): Retrieve team details.
-//     - UpdateTeam(ctx context.Context, params UpdateTeamParams) (*UpdateTeamResult, error): Modify team name or metadata.
-//     - DeleteTeam(ctx context.Context, params DeleteTeamParams) (*DeleteTeamResult, error): Delete a team.
-//     - ListTeams(ctx context.Context, params ListTeamsParams) (*ListTeamsResult, error): List all teams in an organization.
-//     - AddTeamMember(ctx context.Context, params AddTeamMemberParams) (*AddTeamMemberResult, error): Assign an organization member to a team.
-//     - RemoveTeamMember(ctx context.Context, params RemoveTeamMemberParams) (*RemoveTeamMemberResult, error): Remove a member from a team.
-//     - ListTeamMembers(ctx context.Context, params ListTeamMembersParams) (*ListTeamMembersResult, error): List all members assigned to a team.
-//     - SetActiveTeam(ctx context.Context, params SetActiveTeamParams) (*SetActiveTeamResult, error): Set active team on session.
-//     - GetActiveTeam(ctx context.Context, params GetActiveTeamParams) (*GetActiveTeamResult, error): Get active team from session.
+//
+//   - CreateTeam(ctx context.Context, params CreateTeamParams) (*CreateTeamResult, error): Create a team sub-unit within an organization.
+//
+//   - GetTeam(ctx context.Context, params GetTeamParams) (*GetTeamResult, error): Retrieve team details.
+//
+//   - UpdateTeam(ctx context.Context, params UpdateTeamParams) (*UpdateTeamResult, error): Modify team name or metadata.
+//
+//   - DeleteTeam(ctx context.Context, params DeleteTeamParams) (*DeleteTeamResult, error): Delete a team.
+//
+//   - ListTeams(ctx context.Context, params ListTeamsParams) (*ListTeamsResult, error): List all teams in an organization.
+//
+//   - AddTeamMember(ctx context.Context, params AddTeamMemberParams) (*AddTeamMemberResult, error): Assign an organization member to a team.
+//
+//   - RemoveTeamMember(ctx context.Context, params RemoveTeamMemberParams) (*RemoveTeamMemberResult, error): Remove a member from a team.
+//
+//   - ListTeamMembers(ctx context.Context, params ListTeamMembersParams) (*ListTeamMembersResult, error): List all members assigned to a team.
+//
+//   - SetActiveTeam(ctx context.Context, params SetActiveTeamParams) (*SetActiveTeamResult, error): Set active team on session.
+//
+//   - GetActiveTeam(ctx context.Context, params GetActiveTeamParams) (*GetActiveTeamResult, error): Get active team from session.
 //
 //   - Dynamic Roles & RBAC:
-//     - CreateRole(ctx context.Context, params CreateRoleParams) (*CreateRoleResult, error): Provision a dynamic database-persisted custom role.
-//     - GetRole(ctx context.Context, params GetRoleParams) (*GetRoleResult, error): Retrieve dynamic role permissions.
-//     - UpdateRole(ctx context.Context, params UpdateRoleParams) (*UpdateRoleResult, error): Modify dynamic role permissions.
-//     - DeleteRole(ctx context.Context, params DeleteRoleParams) (*DeleteRoleResult, error): Delete a dynamic role.
-//     - ListRoles(ctx context.Context, params ListRolesParams) (*ListRolesResult, error): List all dynamic and static roles for an organization.
-//     - HasPermission(ctx context.Context, params HasPermissionParams) (*HasPermissionResult, error): Check if a role satisfies specific permissions.
-//     - CheckPermission(ctx context.Context, orgID, userRole string, required Permissions) (bool, error): Evaluate RBAC permissions.
+//
+//   - CreateRole(ctx context.Context, params CreateRoleParams) (*CreateRoleResult, error): Provision a dynamic database-persisted custom role.
+//
+//   - GetRole(ctx context.Context, params GetRoleParams) (*GetRoleResult, error): Retrieve dynamic role permissions.
+//
+//   - UpdateRole(ctx context.Context, params UpdateRoleParams) (*UpdateRoleResult, error): Modify dynamic role permissions.
+//
+//   - DeleteRole(ctx context.Context, params DeleteRoleParams) (*DeleteRoleResult, error): Delete a dynamic role.
+//
+//   - ListRoles(ctx context.Context, params ListRolesParams) (*ListRolesResult, error): List all dynamic and static roles for an organization.
+//
+//   - HasPermission(ctx context.Context, params HasPermissionParams) (*HasPermissionResult, error): Check if a role satisfies specific permissions.
+//
+//   - CheckPermission(ctx context.Context, orgID, userRole string, required Permissions) (bool, error): Evaluate RBAC permissions.
 //
 // # Configuration Options
 //
@@ -370,30 +412,46 @@ func Organization(repo organization.Repository, opts ...organization.Option) *or
 // # Available Methods
 //
 //   - User Administration:
-//     - CreateUser(ctx context.Context, params CreateUserParams) (*entity.User, error): Provision a new user account with assigned role and credentials.
-//     - GetUser(ctx context.Context, params GetUserParams) (*entity.User, error): Retrieve comprehensive user profile details.
-//     - ListUsers(ctx context.Context, params ListUsersParams) (*ListUsersResult, error): Paginated search and filtering of users by role, ban status, email, or creation date.
-//     - UpdateUser(ctx context.Context, params UpdateUserParams) (*entity.User, error): Update user profile, email, name, image, or metadata.
-//     - RemoveUser(ctx context.Context, params RemoveUserParams) error: Permanently delete a user account and associated credentials.
-//     - SetRole(ctx context.Context, params SetRoleParams) (*entity.User, error): Update administrative RBAC role assigned to a user.
-//     - SetUserPassword(ctx context.Context, params SetUserPasswordParams) error: Directly set/override a user's password.
+//
+//   - CreateUser(ctx context.Context, params CreateUserParams) (*entity.User, error): Provision a new user account with assigned role and credentials.
+//
+//   - GetUser(ctx context.Context, params GetUserParams) (*entity.User, error): Retrieve comprehensive user profile details.
+//
+//   - ListUsers(ctx context.Context, params ListUsersParams) (*ListUsersResult, error): Paginated search and filtering of users by role, ban status, email, or creation date.
+//
+//   - UpdateUser(ctx context.Context, params UpdateUserParams) (*entity.User, error): Update user profile, email, name, image, or metadata.
+//
+//   - RemoveUser(ctx context.Context, params RemoveUserParams) error: Permanently delete a user account and associated credentials.
+//
+//   - SetRole(ctx context.Context, params SetRoleParams) (*entity.User, error): Update administrative RBAC role assigned to a user.
+//
+//   - SetUserPassword(ctx context.Context, params SetUserPasswordParams) error: Directly set/override a user's password.
 //
 //   - Moderation & Ban:
-//     - BanUser(ctx context.Context, params BanUserParams) (*entity.User, error): Suspend a user account with optional reason and expiry duration.
-//     - UnbanUser(ctx context.Context, params UnbanUserParams) (*entity.User, error): Reinstate a suspended user account.
-//     - CheckUserBanStatus(ctx context.Context, user *entity.User) error: Validate if user account is currently banned or expired.
+//
+//   - BanUser(ctx context.Context, params BanUserParams) (*entity.User, error): Suspend a user account with optional reason and expiry duration.
+//
+//   - UnbanUser(ctx context.Context, params UnbanUserParams) (*entity.User, error): Reinstate a suspended user account.
+//
+//   - CheckUserBanStatus(ctx context.Context, user *entity.User) error: Validate if user account is currently banned or expired.
 //
 //   - Impersonation:
-//     - ImpersonateUser(ctx context.Context, params ImpersonateUserParams) (*ImpersonateResult, error): Issue a masquerade session to act on behalf of another user.
-//     - StopImpersonating(ctx context.Context, params StopImpersonatingParams) (*StopImpersonatingResult, error): Terminate masquerade session and restore original admin session.
+//
+//   - ImpersonateUser(ctx context.Context, params ImpersonateUserParams) (*ImpersonateResult, error): Issue a masquerade session to act on behalf of another user.
+//
+//   - StopImpersonating(ctx context.Context, params StopImpersonatingParams) (*StopImpersonatingResult, error): Terminate masquerade session and restore original admin session.
 //
 //   - Session Governance:
-//     - ListUserSessions(ctx context.Context, params ListUserSessionsParams) ([]*entity.Session, error): Retrieve all active sessions for a user.
-//     - RevokeUserSession(ctx context.Context, params RevokeUserSessionParams) error: Terminate a specific user session.
-//     - RevokeUserSessions(ctx context.Context, params RevokeUserSessionsParams) error: Invalidate all active sessions for a user.
+//
+//   - ListUserSessions(ctx context.Context, params ListUserSessionsParams) ([]*entity.Session, error): Retrieve all active sessions for a user.
+//
+//   - RevokeUserSession(ctx context.Context, params RevokeUserSessionParams) error: Terminate a specific user session.
+//
+//   - RevokeUserSessions(ctx context.Context, params RevokeUserSessionsParams) error: Invalidate all active sessions for a user.
 //
 //   - RBAC Evaluation:
-//     - CheckPermission(ctx context.Context, params CheckPermissionParams) (bool, error): Evaluate whether caller role possesses required administrative permissions.
+//
+//   - CheckPermission(ctx context.Context, params CheckPermissionParams) (bool, error): Evaluate whether caller role possesses required administrative permissions.
 //
 // # Configuration Options
 //
@@ -642,33 +700,50 @@ func PhoneNumber(repo phonenumber.Repository, opts ...phonenumber.Option) *phone
 // # Available Methods
 //
 //   - Authorization Flow:
-//     - Authorize(ctx context.Context, params AuthorizeParams) (*AuthorizeResult, error): Initiate OAuth 2.1 authorization request with PKCE and scope negotiation.
-//     - ContinueAuthorize(ctx context.Context, params ContinueAuthorizeParams) (*AuthorizeResult, error): Resume authorization after user login and scope consent approval.
+//
+//   - Authorize(ctx context.Context, params AuthorizeParams) (*AuthorizeResult, error): Initiate OAuth 2.1 authorization request with PKCE and scope negotiation.
+//
+//   - ContinueAuthorize(ctx context.Context, params ContinueAuthorizeParams) (*AuthorizeResult, error): Resume authorization after user login and scope consent approval.
 //
 //   - Token Exchange & Management:
-//     - Token(ctx context.Context, params TokenParams) (*TokenResult, error): Exchange authorization code or refresh token for Access Token and OIDC ID Token.
-//     - Introspect(ctx context.Context, params IntrospectParams) (*IntrospectResult, error): RFC 7662 token introspection to query token status and claims.
-//     - Revoke(ctx context.Context, params RevokeParams) (*RevokeResult, error): RFC 7009 token revocation for access and refresh tokens.
+//
+//   - Token(ctx context.Context, params TokenParams) (*TokenResult, error): Exchange authorization code or refresh token for Access Token and OIDC ID Token.
+//
+//   - Introspect(ctx context.Context, params IntrospectParams) (*IntrospectResult, error): RFC 7662 token introspection to query token status and claims.
+//
+//   - Revoke(ctx context.Context, params RevokeParams) (*RevokeResult, error): RFC 7009 token revocation for access and refresh tokens.
 //
 //   - OIDC UserInfo & Session Termination:
-//     - UserInfo(ctx context.Context, params UserInfoParams) (*UserInfoResult, error): Serve OIDC UserInfo endpoint returning verified subject claims.
-//     - EndSession(ctx context.Context, params EndSessionParams) (*EndSessionResult, error): RP-Initiated Logout to terminate user sessions.
+//
+//   - UserInfo(ctx context.Context, params UserInfoParams) (*UserInfoResult, error): Serve OIDC UserInfo endpoint returning verified subject claims.
+//
+//   - EndSession(ctx context.Context, params EndSessionParams) (*EndSessionResult, error): RP-Initiated Logout to terminate user sessions.
 //
 //   - Client Registration (RFC 7591):
-//     - RegisterClient(ctx context.Context, params RegisterClientParams) (*RegisterClientResult, error): Dynamically register an OAuth 2.1 client application.
-//     - GetClient(ctx context.Context, params GetClientParams) (*GetClientResult, error): Retrieve registered client details.
-//     - UpdateClient(ctx context.Context, params UpdateClientParams) (*UpdateClientResult, error): Modify client configuration (redirect URIs, scopes, grant types).
-//     - DeleteClient(ctx context.Context, params DeleteClientParams) (*DeleteClientResult, error): Delete a registered client application.
-//     - RotateClientSecret(ctx context.Context, params RotateClientSecretParams) (*RotateClientSecretResult, error): Rotate client secret credentials.
+//
+//   - RegisterClient(ctx context.Context, params RegisterClientParams) (*RegisterClientResult, error): Dynamically register an OAuth 2.1 client application.
+//
+//   - GetClient(ctx context.Context, params GetClientParams) (*GetClientResult, error): Retrieve registered client details.
+//
+//   - UpdateClient(ctx context.Context, params UpdateClientParams) (*UpdateClientResult, error): Modify client configuration (redirect URIs, scopes, grant types).
+//
+//   - DeleteClient(ctx context.Context, params DeleteClientParams) (*DeleteClientResult, error): Delete a registered client application.
+//
+//   - RotateClientSecret(ctx context.Context, params RotateClientSecretParams) (*RotateClientSecretResult, error): Rotate client secret credentials.
 //
 //   - User Consent Management:
-//     - Consent(ctx context.Context, params ConsentParams) (*ConsentResult, error): Record user consent for authorized client scopes.
-//     - RevokeConsent(ctx context.Context, params RevokeConsentParams) (*RevokeConsentResult, error): Revoke client access to user data.
-//     - ListConsents(ctx context.Context, params ListConsentsParams) (*ListConsentsResult, error): List all active third-party application authorizations for a user.
+//
+//   - Consent(ctx context.Context, params ConsentParams) (*ConsentResult, error): Record user consent for authorized client scopes.
+//
+//   - RevokeConsent(ctx context.Context, params RevokeConsentParams) (*RevokeConsentResult, error): Revoke client access to user data.
+//
+//   - ListConsents(ctx context.Context, params ListConsentsParams) (*ListConsentsResult, error): List all active third-party application authorizations for a user.
 //
 //   - Discovery & Metadata:
-//     - GetOpenIDConfiguration(ctx context.Context, params OpenIDConfigurationParams) (*OpenIDConfigurationResult, error): Serve .well-known/openid-configuration metadata.
-//     - GetOAuthAuthorizationServerMetadata(ctx context.Context, params OAuthMetadataParams) (*OAuthMetadataResult, error): Serve RFC 8414 OAuth 2.0 authorization server metadata.
+//
+//   - GetOpenIDConfiguration(ctx context.Context, params OpenIDConfigurationParams) (*OpenIDConfigurationResult, error): Serve .well-known/openid-configuration metadata.
+//
+//   - GetOAuthAuthorizationServerMetadata(ctx context.Context, params OAuthMetadataParams) (*OAuthMetadataResult, error): Serve RFC 8414 OAuth 2.0 authorization server metadata.
 //
 // # Configuration Options
 //
@@ -787,31 +862,52 @@ func GenericOAuth(repo genericoauth.Repository, opts ...genericoauth.Option) *ge
 // # Available Methods
 //
 //   - Plugin Methods:
-//     - AccessControl() *AccessControl: Returns the underlying central AccessControl manager instance.
-//     - PublishAuthorized(roles []string, req AuthorizeRequest, extra map[string]any): Dispatch access:authorized security event.
-//     - PublishDenied(roles []string, req AuthorizeRequest, reason string, extra map[string]any): Dispatch access:denied security event.
-//     - PublishRoleCreated(role *Role): Dispatch access:role:created lifecycle event.
-//     - PublishRoleDeleted(roleName string): Dispatch access:role:deleted lifecycle event.
+//
+//   - AccessControl() *AccessControl: Returns the underlying central AccessControl manager instance.
+//
+//   - PublishAuthorized(roles []string, req AuthorizeRequest, extra map[string]any): Dispatch access:authorized security event.
+//
+//   - PublishDenied(roles []string, req AuthorizeRequest, reason string, extra map[string]any): Dispatch access:denied security event.
+//
+//   - PublishRoleCreated(role *Role): Dispatch access:role:created lifecycle event.
+//
+//   - PublishRoleDeleted(roleName string): Dispatch access:role:deleted lifecycle event.
 //
 //   - AccessControl Manager Methods (via plugin.AccessControl()):
-//     - NewRole(name string, roleStatements Statements) (*Role, error): Create and register a named role in the registry.
-//     - MustNewRole(name string, roleStatements Statements) *Role: Create a role, panicking on validation error.
-//     - NewAnonymousRole(roleStatements Statements) (*Role, error): Instantiate an unregistered ephemeral role.
-//     - GetRole(name string) (*Role, bool): Retrieve a registered role by identifier.
-//     - GetAllRoles() map[string]*Role: Return snapshot of all registered roles.
-//     - DeleteRole(name string) bool: Remove a role from the registry.
-//     - AuthorizeRoles(roleNames []string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Atomic multi-role evaluation combining statements with union semantics.
-//     - AuthorizeRoleString(roleString string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate comma-separated role string ("admin,editor").
-//     - MergeRoles(roleNames ...string) (*Role, error): Consolidate multiple registered roles into a combined Role instance.
-//     - MasterStatements() Statements: Retrieve schema master statements.
+//
+//   - NewRole(name string, roleStatements Statements) (*Role, error): Create and register a named role in the registry.
+//
+//   - MustNewRole(name string, roleStatements Statements) *Role: Create a role, panicking on validation error.
+//
+//   - NewAnonymousRole(roleStatements Statements) (*Role, error): Instantiate an unregistered ephemeral role.
+//
+//   - GetRole(name string) (*Role, bool): Retrieve a registered role by identifier.
+//
+//   - GetAllRoles() map[string]*Role: Return snapshot of all registered roles.
+//
+//   - DeleteRole(name string) bool: Remove a role from the registry.
+//
+//   - AuthorizeRoles(roleNames []string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Atomic multi-role evaluation combining statements with union semantics.
+//
+//   - AuthorizeRoleString(roleString string, request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate comma-separated role string ("admin,editor").
+//
+//   - MergeRoles(roleNames ...string) (*Role, error): Consolidate multiple registered roles into a combined Role instance.
+//
+//   - MasterStatements() Statements: Retrieve schema master statements.
 //
 //   - Role Instance Methods (via role):
-//     - Authorize(request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate granular permission request with short-circuit evaluation.
-//     - HasPermission(resource string, action string) bool: Check single resource and action permission in sub-microsecond time.
-//     - Extend(newName string, additionalStatements Statements) *Role: Derive a new role inheriting base statements without mutating parent.
-//     - Clone(newName ...string) *Role: Create a deep copy of the role.
-//     - Statements() Statements: Return copy of role permission statements.
-//     - Name() string: Return role name.
+//
+//   - Authorize(request AuthorizeRequest, connector ...Connector) AuthorizeResult: Evaluate granular permission request with short-circuit evaluation.
+//
+//   - HasPermission(resource string, action string) bool: Check single resource and action permission in sub-microsecond time.
+//
+//   - Extend(newName string, additionalStatements Statements) *Role: Derive a new role inheriting base statements without mutating parent.
+//
+//   - Clone(newName ...string) *Role: Create a deep copy of the role.
+//
+//   - Statements() Statements: Return copy of role permission statements.
+//
+//   - Name() string: Return role name.
 //
 // # Configuration Options
 //
@@ -1631,7 +1727,3 @@ func Anonymous(repo anonymous.Repository, opts ...anonymous.Option) *anonymous.P
 func CustomSession(repo customsession.Repository, opts ...customsession.Option) *customsession.Plugin {
 	return customsession.New(repo, opts...)
 }
-
-
-
-

@@ -15,7 +15,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
-	"github.com/asaskevich/EventBus"
 	"github.com/google/uuid"
 )
 
@@ -335,16 +334,16 @@ func TestMagicLink_HTTPHandlers(t *testing.T) {
 
 func TestMagicLink_Events(t *testing.T) {
 	repo := newMockRepository()
-	bus := EventBus.New()
+	pCtx := plugin.NewContext(nil)
 
 	var sentBefore, sentAfter, verifySuccess bool
-	bus.Subscribe(magiclink.EventMagicLinkSendBefore, func(payload *magiclink.SendMagicLinkPendingPayload) {
+	pCtx.Hooks().Subscribe(magiclink.EventMagicLinkSendBefore, func(payload *magiclink.SendMagicLinkPendingPayload) {
 		sentBefore = true
 	})
-	bus.Subscribe(magiclink.EventMagicLinkSent, func(payload *magiclink.MagicLinkSentPayload) {
+	pCtx.Hooks().Subscribe(magiclink.EventMagicLinkSent, func(payload *magiclink.MagicLinkSentPayload) {
 		sentAfter = true
 	})
-	bus.Subscribe(magiclink.EventMagicLinkSignInSuccess, func(payload *magiclink.SignInSuccessPayload) {
+	pCtx.Hooks().Subscribe(magiclink.EventMagicLinkSignInSuccess, func(payload *magiclink.SignInSuccessPayload) {
 		verifySuccess = true
 	})
 
@@ -356,7 +355,6 @@ func TestMagicLink_Events(t *testing.T) {
 		}),
 	)
 
-	pCtx := plugin.NewContext(nil, bus)
 	if err := p.Init(pCtx); err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}

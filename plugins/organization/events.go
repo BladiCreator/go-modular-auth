@@ -1,4 +1,4 @@
-// Package organization defines event names and typed event payloads published by the Organization plugin on the global EventBus.
+// Package organization defines event names and typed event payloads published by the Organization plugin on the shared Hooks dispatcher.
 package organization
 
 import (

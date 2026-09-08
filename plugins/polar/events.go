@@ -32,7 +32,7 @@ const (
 	EventPolarWebhookReceived = "polar:webhook:received"
 )
 
-// CustomerCreatedPayload represents the EventBus payload for EventPolarCustomerCreated.
+// CustomerCreatedPayload represents the payload dispatched across Hooks for EventPolarCustomerCreated.
 type CustomerCreatedPayload struct {
 	EntityType      string `json:"entity_type"` // "user" or "organization"
 	EntityID        string `json:"entity_id"`
@@ -40,35 +40,35 @@ type CustomerCreatedPayload struct {
 	Email           string `json:"email,omitempty"`
 }
 
-// SubscriptionEventPayload represents the EventBus payload for Polar subscription events.
+// SubscriptionEventPayload represents the payload dispatched across Hooks for Polar subscription events.
 type SubscriptionEventPayload struct {
 	Subscription *Subscription `json:"subscription"`
 	PolarEventID string        `json:"polar_event_id,omitempty"`
 	EventType    string        `json:"event_type"`
 }
 
-// CustomerStateEventPayload represents the EventBus payload for EventPolarCustomerStateChanged.
+// CustomerStateEventPayload represents the payload dispatched across Hooks for EventPolarCustomerStateChanged.
 type CustomerStateEventPayload struct {
 	CustomerState *CustomerState `json:"customer_state"`
 	PolarEventID  string         `json:"polar_event_id,omitempty"`
 	EventType     string         `json:"event_type"`
 }
 
-// OrderEventPayload represents the EventBus payload for order payment events in Polar.
+// OrderEventPayload represents the payload dispatched across Hooks for order payment events in Polar.
 type OrderEventPayload struct {
 	Order        *CustomerOrder `json:"order"`
 	PolarEventID string         `json:"polar_event_id,omitempty"`
 	EventType    string         `json:"event_type"`
 }
 
-// BenefitEventPayload represents the EventBus payload for benefit entitlement events in Polar.
+// BenefitEventPayload represents the payload dispatched across Hooks for benefit entitlement events in Polar.
 type BenefitEventPayload struct {
 	Benefit      *CustomerBenefit `json:"benefit"`
 	PolarEventID string           `json:"polar_event_id,omitempty"`
 	EventType    string           `json:"event_type"`
 }
 
-// WebhookReceivedPayload represents the EventBus payload for incoming validated Polar webhooks.
+// WebhookReceivedPayload represents the payload dispatched across Hooks for incoming validated Polar webhooks.
 type WebhookReceivedPayload struct {
 	PolarEventID string `json:"polar_event_id"`
 	EventType    string `json:"event_type"`

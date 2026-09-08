@@ -10,7 +10,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/adapters/memory"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
-	"github.com/asaskevich/EventBus"
 )
 
 func TestPasskeyHTTPHandlers(t *testing.T) {
@@ -21,7 +20,7 @@ func TestPasskeyHTTPHandlers(t *testing.T) {
 		passkey.WithRPOrigins("http://localhost"),
 		passkey.WithRequireSessionOnRegistration(false),
 	)
-	_ = p.Init(plugin.NewContext(nil, EventBus.New()))
+	_ = p.Init(plugin.NewContext(nil))
 
 	t.Run("HandleRegistrationOptions method not allowed", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/passkey/register/options", nil)

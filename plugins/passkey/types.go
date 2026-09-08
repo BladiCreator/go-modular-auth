@@ -12,12 +12,12 @@ import (
 type (
 	// GenerateRegistrationOptionsParams holds inputs for creating a WebAuthn credential registration ceremony challenge.
 	GenerateRegistrationOptionsParams struct {
-		UserID                  string                             `json:"userId,omitempty"`
-		UserName                string                             `json:"userName,omitempty"`
-		UserDisplayName         string                             `json:"userDisplayName,omitempty"`
+		UserID                  string                            `json:"userId,omitempty"`
+		UserName                string                            `json:"userName,omitempty"`
+		UserDisplayName         string                            `json:"userDisplayName,omitempty"`
 		AuthenticatorAttachment *protocol.AuthenticatorAttachment `json:"authenticatorAttachment,omitempty"`
-		Context                 *string                            `json:"context,omitempty"`
-		CustomName              *string                            `json:"customName,omitempty"`
+		Context                 *string                           `json:"context,omitempty"`
+		CustomName              *string                           `json:"customName,omitempty"`
 		plugin.ExtraContainer
 	}
 

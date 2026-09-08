@@ -413,61 +413,61 @@ func TestTwoFactor_EventEmissions(t *testing.T) {
 	var verifySuccessEmitted, verifyFailedEmitted, sendOTPBeforeEmitted, sendOTPAfterEmitted bool
 	var challengeCreatedEmitted, disableBeforeEmitted, disableAfterEmitted bool
 
-	app.Events().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.EnableBeforeEventPayload); ok && req.UserID == userID {
 			enableBeforeEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventEnableAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventEnableAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.EnableAfterEventPayload); ok && req.UserID == userID {
 			enableAfterEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventTOTPGenerated, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventTOTPGenerated, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.TOTPGeneratedEventPayload); ok && req.UserID == userID {
 			totpGeneratedEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventVerifyFailed, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventVerifyFailed, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.VerifyFailedEventPayload); ok && req.UserID == userID {
 			verifyFailedEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventVerifySuccess, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventVerifySuccess, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.VerifySuccessEventPayload); ok && req.UserID == userID {
 			verifySuccessEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventSendOTPBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventSendOTPBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.SendOTPBeforeEventPayload); ok && req.UserID == userID {
 			sendOTPBeforeEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventSendOTPAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventSendOTPAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.SendOTPAfterEventPayload); ok && req.UserID == userID {
 			sendOTPAfterEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventChallengeCreated, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventChallengeCreated, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.ChallengeCreatedEventPayload); ok && req.UserID == userID {
 			challengeCreatedEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventDisableBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventDisableBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.DisableBeforeEventPayload); ok && req.UserID == userID {
 			disableBeforeEmitted = true
 		}
 	})
 
-	app.Events().Subscribe(twofactor.EventDisableAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventDisableAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.DisableAfterEventPayload); ok && req.UserID == userID {
 			disableAfterEmitted = true
 		}
@@ -536,7 +536,7 @@ func TestTwoFactor_ExtraMetadataAndContextKeys(t *testing.T) {
 	var interceptedMethod string
 	var extraCaptured bool
 
-	app.Events().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.EnableBeforeEventPayload); ok && req.Params != nil {
 			req.Params.Set(twofactor.ExtraKeyTwoFactorMethod, twofactor.MethodTOTP)
 			if m, ok := req.Params.Get(twofactor.ExtraKeyTwoFactorMethod); ok {

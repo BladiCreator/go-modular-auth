@@ -1,4 +1,4 @@
-// Package twofactor defines event names and typed event payloads published by the TwoFactor plugin on the global EventBus.
+// Package twofactor defines event names and typed event payloads published by the TwoFactor plugin on the shared Hooks dispatcher.
 package twofactor
 
 import (

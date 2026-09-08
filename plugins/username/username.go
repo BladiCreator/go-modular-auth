@@ -171,8 +171,8 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams, opts .
 
 	normalized := p.Normalize(rawUsername)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInBefore, ctx, &params)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignInBefore, ctx, &params)
 	}
 
 	user, err := p.repo.GetUserByUsername(ctx, normalized)
@@ -223,8 +223,8 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams, opts .
 		sessionData.Extra = sess.Extra
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInAfter, ctx, sessionData)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignInAfter, ctx, sessionData)
 	}
 
 	return sessionData, nil
@@ -263,8 +263,8 @@ func (p *Plugin) UpdateUsername(ctx context.Context, params UpdateUsernameParams
 		displayUsername = params.Username
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventUpdateBefore, ctx, &params)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventUpdateBefore, ctx, &params)
 	}
 
 	if err := p.repo.UpdateUsername(ctx, params.UserID, normalized, displayUsername); err != nil {
@@ -281,8 +281,8 @@ func (p *Plugin) UpdateUsername(ctx context.Context, params UpdateUsernameParams
 		User:    updatedUser,
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventUpdateAfter, ctx, result)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventUpdateAfter, ctx, result)
 	}
 
 	return result, nil

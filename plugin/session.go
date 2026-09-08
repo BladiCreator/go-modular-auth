@@ -40,6 +40,8 @@ type SessionOptions struct {
 	DeviceID string
 	// ExtraContainer provides dynamic key-value metadata for the session.
 	ExtraContainer
+	// Interceptors contains optional per-call interceptors executed during authentication and session creation.
+	Interceptors []any
 }
 
 // SessionOption represents a functional option for configuring session creation.
@@ -92,6 +94,17 @@ func WithExtraMap(m map[string]any) SessionOption {
 	return func(o *SessionOptions) {
 		for k, v := range m {
 			o.Set(k, v)
+		}
+	}
+}
+
+// WithCallInterceptor adds per-call interceptors executed during authentication operations.
+func WithCallInterceptor(interceptors ...any) SessionOption {
+	return func(o *SessionOptions) {
+		for _, it := range interceptors {
+			if it != nil {
+				o.Interceptors = append(o.Interceptors, it)
+			}
 		}
 	}
 }

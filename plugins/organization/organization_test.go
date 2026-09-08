@@ -13,13 +13,11 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
-	"github.com/asaskevich/EventBus"
 )
 
 func setupTestEnvironment(opts ...organization.Option) (*organization.Plugin, *memory.Store, *plugin.Context) {
 	store := memory.New()
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(nil, bus)
+	pCtx := plugin.NewContext(nil)
 
 	p := organization.New(store, opts...)
 	_ = p.Init(pCtx)
@@ -622,7 +620,7 @@ func TestOrganization_EventEmissionsAndExtra(t *testing.T) {
 	ctx := context.Background()
 
 	var eventOrgCreatedAfter bool
-	pCtx.Events().Subscribe(organization.EventOrgCreateAfter, func(payload *organization.OrgCreateAfterEventPayload) {
+	pCtx.Hooks().Subscribe(organization.EventOrgCreateAfter, func(payload *organization.OrgCreateAfterEventPayload) {
 		eventOrgCreatedAfter = true
 		if payload.Extra["source"] != "mobile_app" {
 			t.Errorf("expected Extra[source] = mobile_app, got %v", payload.Extra["source"])
@@ -891,4 +889,3 @@ func TestOrganization_AllowOrgCreationCallback(t *testing.T) {
 		t.Fatalf("CreateOrganization for admin_user failed: %v", err)
 	}
 }
-

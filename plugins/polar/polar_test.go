@@ -38,7 +38,7 @@ func TestPolarPlugin_Initialization(t *testing.T) {
 func TestPolarPlugin_UserCreatedHook(t *testing.T) {
 	repo := polar.NewMemoryRepository()
 	p := polar.New(repo, polar.WithAccessToken("test_token"))
-	
+
 	ctx := context.Background()
 	user := &entity.User{
 		ID:    "user_123",
@@ -109,7 +109,6 @@ func TestPolarPlugin_Webhooks(t *testing.T) {
 		}),
 	)
 
-
 	rawPayload := []byte(`{
 		"id": "evt_123",
 		"type": "subscription.created",
@@ -156,7 +155,6 @@ func TestPolarPlugin_Webhooks(t *testing.T) {
 func TestPolarPlugin_Middleware(t *testing.T) {
 	repo := polar.NewMemoryRepository()
 	p := polar.New(repo)
-
 
 	ctx := context.Background()
 	_ = repo.CreateSubscription(ctx, &polar.Subscription{

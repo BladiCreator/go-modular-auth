@@ -1,6 +1,6 @@
 package access
 
-// Event topics dispatched by the Access Control plugin over the shared EventBus.
+// Event topics dispatched by the Access Control plugin over the shared Hooks dispatcher.
 const (
 	// EventAccessAuthorized is emitted when an authorization check succeeds.
 	// Payload: *AccessAuthorizedEventPayload

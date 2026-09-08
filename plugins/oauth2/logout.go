@@ -58,8 +58,8 @@ func (p *Plugin) EndSession(ctx context.Context, params EndSessionParams) (*EndS
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSessionEnded, &SessionEndedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSessionEnded, &SessionEndedEventPayload{
 			UserID:                userID,
 			ClientID:              clientID,
 			PostLogoutRedirectURI: targetRedirect,

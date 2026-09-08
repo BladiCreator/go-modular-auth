@@ -18,7 +18,7 @@ const (
 	EventTransformError = "customsession:transform:error"
 )
 
-// TransformEventPayload holds event metadata dispatched across EventBus during transformation execution.
+// TransformEventPayload holds event metadata dispatched across Hooks during transformation execution.
 type TransformEventPayload struct {
 	// SessionData is the initial session and user payload before transformation.
 	SessionData *dto.SessionData `json:"sessionData"`

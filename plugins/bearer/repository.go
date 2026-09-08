@@ -33,4 +33,3 @@ var (
 type Repository interface {
 	repository.SessionRepository
 }
-

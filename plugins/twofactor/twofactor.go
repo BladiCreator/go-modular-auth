@@ -43,7 +43,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
 
 	// Automatic reaction following a successful email/password sign-in
-	p.ctx.Events().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
+	p.ctx.Hooks().Subscribe(emailpassword.EventSignInAfter, func(c context.Context, payload *emailpassword.SignInEventPayload) {
 		if payload != nil && payload.User != nil {
 			p.ctx.Set(TwoFactorPendingKey(payload.User.ID), true)
 		}
@@ -54,8 +54,8 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 
 // Enable initializes 2FA enrollment for a user, generating a secure Base32 TOTP secret and recovery backup codes.
 func (p *Plugin) Enable(ctx context.Context, params EnableParams) (*EnableResult, error) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventEnableBefore, ctx, &EnableBeforeEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventEnableBefore, ctx, &EnableBeforeEventPayload{
 			UserID: params.UserID,
 			Params: &params,
 		})
@@ -105,12 +105,12 @@ func (p *Plugin) Enable(ctx context.Context, params EnableParams) (*EnableResult
 
 	totpURI := BuildTOTPURI(issuer, params.UserID, secret, p.config.TotpDigits, p.config.TotpPeriod, p.config.Algorithm)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventEnableAfter, ctx, &EnableAfterEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventEnableAfter, ctx, &EnableAfterEventPayload{
 			UserID:           params.UserID,
 			BackupCodesCount: len(rawBackupCodes),
 		})
-		p.ctx.Events().Publish(EventTOTPGenerated, ctx, &TOTPGeneratedEventPayload{
+		p.ctx.Hooks().Publish(EventTOTPGenerated, ctx, &TOTPGeneratedEventPayload{
 			UserID: params.UserID,
 			Secret: secret,
 		})
@@ -125,8 +125,8 @@ func (p *Plugin) Enable(ctx context.Context, params EnableParams) (*EnableResult
 
 // Disable removes 2FA configuration for the given user, revokes all trusted devices, and deactivates 2FA.
 func (p *Plugin) Disable(ctx context.Context, params DisableParams) error {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDisableBefore, ctx, &DisableBeforeEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDisableBefore, ctx, &DisableBeforeEventPayload{
 			UserID: params.UserID,
 			Params: &params,
 		})
@@ -138,8 +138,8 @@ func (p *Plugin) Disable(ctx context.Context, params DisableParams) error {
 
 	_ = p.repo.DeleteTrustDevicesByUserID(ctx, params.UserID)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDisableAfter, ctx, &DisableAfterEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDisableAfter, ctx, &DisableAfterEventPayload{
 			UserID: params.UserID,
 		})
 	}
@@ -189,8 +189,8 @@ func (p *Plugin) VerifyTOTP(ctx context.Context, params VerifyTOTPParams) (*Veri
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
 			UserID:      params.UserID,
 			Method:      MethodTOTP,
 			TrustDevice: params.TrustDevice,
@@ -235,8 +235,8 @@ func (p *Plugin) VerifyBackupCode(ctx context.Context, params VerifyBackupCodePa
 	p.resetFailures(ctx, tf)
 	_ = p.repo.Update(ctx, tf)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
 			UserID: params.UserID,
 			Method: MethodBackupCode,
 		})
@@ -274,8 +274,8 @@ func (p *Plugin) GenerateBackupCodes(ctx context.Context, params GenerateBackupC
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventBackupCodesRegenerated, ctx, &BackupCodesRegeneratedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventBackupCodesRegenerated, ctx, &BackupCodesRegeneratedEventPayload{
 			UserID: params.UserID,
 			Amount: len(codes),
 		})
@@ -298,14 +298,14 @@ func (p *Plugin) ViewBackupCodes(ctx context.Context, params ViewBackupCodesPara
 	return &BackupCodesResult{BackupCodes: codes}, nil
 }
 
-// SendOTP generates a short-lived numeric challenge and triggers the registered SendOTP callback and EventBus.
+// SendOTP generates a short-lived numeric challenge and triggers the registered SendOTP callback and Hooks dispatcher.
 func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPResult, error) {
 	if p.config.SendOTP == nil {
 		return nil, ErrOTPNotConfigured
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSendOTPBefore, ctx, &SendOTPBeforeEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSendOTPBefore, ctx, &SendOTPBeforeEventPayload{
 			UserID: params.UserID,
 			Params: &params,
 		})
@@ -335,8 +335,8 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPRes
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSendOTPAfter, ctx, &SendOTPAfterEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSendOTPAfter, ctx, &SendOTPAfterEventPayload{
 			UserID:    params.UserID,
 			OTPCode:   code,
 			ExpiresAt: expiresAt,
@@ -362,8 +362,8 @@ func (p *Plugin) VerifyOTP(ctx context.Context, params VerifyOTPParams) (*Verify
 	if challenge.CodeHash != params.Code {
 		challenge.Attempts++
 		_ = p.repo.SaveOTPChallenge(ctx, challenge)
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventVerifyFailed, ctx, &VerifyFailedEventPayload{
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventVerifyFailed, ctx, &VerifyFailedEventPayload{
 				UserID:   params.UserID,
 				Method:   MethodOTP,
 				Failures: challenge.Attempts,
@@ -375,8 +375,8 @@ func (p *Plugin) VerifyOTP(ctx context.Context, params VerifyOTPParams) (*Verify
 	// Single use: delete on successful verification
 	_ = p.repo.DeleteOTPChallenge(ctx, key)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventVerifySuccess, ctx, &VerifySuccessEventPayload{
 			UserID: params.UserID,
 			Method: MethodOTP,
 		})
@@ -408,8 +408,8 @@ func (p *Plugin) CreateChallenge(ctx context.Context, params CreateChallengePara
 		return nil, err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventChallengeCreated, ctx, &ChallengeCreatedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventChallengeCreated, ctx, &ChallengeCreatedEventPayload{
 			Token:     token,
 			UserID:    params.UserID,
 			ExpiresAt: expiresAt,
@@ -561,8 +561,8 @@ func (p *Plugin) recordFailure(ctx context.Context, tf *TwoFactor, method string
 		lockedUntil := time.Now().Add(p.config.Lockout.Duration)
 		tf.LockedUntil = &lockedUntil
 
-		if p.ctx != nil && p.ctx.Events() != nil {
-			p.ctx.Events().Publish(EventAccountLocked, ctx, &AccountLockedEventPayload{
+		if p.ctx != nil && p.ctx.Hooks() != nil {
+			p.ctx.Hooks().Publish(EventAccountLocked, ctx, &AccountLockedEventPayload{
 				UserID:      tf.UserID,
 				Failures:    tf.Failures,
 				LockedUntil: lockedUntil,
@@ -572,8 +572,8 @@ func (p *Plugin) recordFailure(ctx context.Context, tf *TwoFactor, method string
 	tf.UpdatedAt = time.Now()
 	_ = p.repo.Update(ctx, tf)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventVerifyFailed, ctx, &VerifyFailedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventVerifyFailed, ctx, &VerifyFailedEventPayload{
 			UserID:   tf.UserID,
 			Method:   method,
 			Failures: tf.Failures,
@@ -615,8 +615,8 @@ func (p *Plugin) issueTrustDevice(ctx context.Context, userID, deviceID string) 
 		return "", err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventDeviceTrusted, ctx, &DeviceTrustedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventDeviceTrusted, ctx, &DeviceTrustedEventPayload{
 			UserID:    userID,
 			DeviceID:  deviceID,
 			ExpiresAt: expiresAt,

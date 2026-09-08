@@ -12,7 +12,7 @@ const (
 	EventOTTVerified = "ott:verified"
 )
 
-// OTTGeneratedPayload defines the EventBus event payload dispatched when an OTT is created.
+// OTTGeneratedPayload defines the event payload dispatched across Hooks when an OTT is created.
 type OTTGeneratedPayload struct {
 	// SessionToken is the target session token bound to the generated OTT.
 	SessionToken string `json:"session_token"`
@@ -24,7 +24,7 @@ type OTTGeneratedPayload struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// OTTVerifiedPayload defines the EventBus event payload dispatched when an OTT is consumed.
+// OTTVerifiedPayload defines the event payload dispatched across Hooks when an OTT is consumed.
 type OTTVerifiedPayload struct {
 	// SessionID is the unique identifier of the active session retrieved upon verification.
 	SessionID string `json:"session_id"`

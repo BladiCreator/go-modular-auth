@@ -40,8 +40,8 @@ func (p *Plugin) Revoke(ctx context.Context, params RevokeParams) (*RevokeResult
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventTokenRevoked, &TokenRevokedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventTokenRevoked, &TokenRevokedEventPayload{
 			TokenHash: tokenHash,
 			TokenType: params.TokenTypeHint,
 			ClientID:  params.ClientID,

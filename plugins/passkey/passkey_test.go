@@ -13,15 +13,13 @@ import (
 	"github.com/BladiCreator/go-modular-auth/internal/mock"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
-	"github.com/asaskevich/EventBus"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 
 func setupTestPlugin(t *testing.T, opts ...passkey.Option) (*passkey.Plugin, *mock.MockRepo, *plugin.Context) {
 	t.Helper()
 	repo := mock.NewMockRepo()
-	bus := EventBus.New()
-	pCtx := plugin.NewContext(nil, bus)
+	pCtx := plugin.NewContext(nil)
 
 	p := passkey.New(repo, opts...)
 	if err := p.Init(pCtx); err != nil {
@@ -148,7 +146,7 @@ func TestPlugin_GenerateRegistrationOptions_WithSession(t *testing.T) {
 
 	var eventReceived bool
 	var mu sync.Mutex
-	_ = pCtx.Events().Subscribe(passkey.EventRegistrationOptionsCreated, func(payload passkey.RegistrationOptionsCreatedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventRegistrationOptionsCreated, func(payload passkey.RegistrationOptionsCreatedPayload) {
 		mu.Lock()
 		defer mu.Unlock()
 		if payload.UserID == u.ID {
@@ -286,7 +284,7 @@ func TestPlugin_VerifyRegistration_ValidationErrors(t *testing.T) {
 	})
 
 	var failedEventReceived bool
-	_ = pCtx.Events().Subscribe(passkey.EventRegistrationFailed, func(payload passkey.RegistrationFailedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventRegistrationFailed, func(payload passkey.RegistrationFailedPayload) {
 		if payload.ChallengeToken == expiredToken {
 			failedEventReceived = true
 		}
@@ -348,7 +346,7 @@ func TestPlugin_GenerateAuthenticationOptions(t *testing.T) {
 
 	// 1. Discoverable login (nil UserID)
 	var eventFired bool
-	_ = pCtx.Events().Subscribe(passkey.EventAuthenticationOptionsCreated, func(payload passkey.AuthenticationOptionsCreatedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventAuthenticationOptionsCreated, func(payload passkey.AuthenticationOptionsCreatedPayload) {
 		if payload.UserID == nil {
 			eventFired = true
 		}
@@ -429,7 +427,7 @@ func TestPlugin_VerifyAuthentication_ValidationErrors(t *testing.T) {
 	})
 
 	var authFailedEvent bool
-	_ = pCtx.Events().Subscribe(passkey.EventAuthenticationFailed, func(payload passkey.AuthenticationFailedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventAuthenticationFailed, func(payload passkey.AuthenticationFailedPayload) {
 		if payload.ChallengeToken == expToken {
 			authFailedEvent = true
 		}
@@ -525,7 +523,7 @@ func TestPlugin_PasskeyManagement_CRUD(t *testing.T) {
 
 	// 3. UpdatePasskey
 	var updateEventReceived bool
-	_ = pCtx.Events().Subscribe(passkey.EventPasskeyUpdated, func(payload passkey.PasskeyUpdatedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventPasskeyUpdated, func(payload passkey.PasskeyUpdatedPayload) {
 		if payload.Passkey.ID == "pk_101" && payload.NewName == "Personal YubiKey 5" {
 			updateEventReceived = true
 		}
@@ -559,7 +557,7 @@ func TestPlugin_PasskeyManagement_CRUD(t *testing.T) {
 
 	// 4. DeletePasskey
 	var deleteEventReceived bool
-	_ = pCtx.Events().Subscribe(passkey.EventPasskeyDeleted, func(payload passkey.PasskeyDeletedPayload) {
+	_ = pCtx.Hooks().Subscribe(passkey.EventPasskeyDeleted, func(payload passkey.PasskeyDeletedPayload) {
 		if payload.PasskeyID == "pk_102" && payload.UserID == u1.ID {
 			deleteEventReceived = true
 		}

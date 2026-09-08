@@ -1,7 +1,6 @@
 package genericoauth
 
 import (
-	"maps"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"

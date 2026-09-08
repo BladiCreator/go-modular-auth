@@ -18,4 +18,3 @@ type Session struct {
 	Extra                map[string]any `json:"extra,omitempty"`
 	UpdatedAt            *time.Time     `json:"updatedAt,omitempty"`
 }
-

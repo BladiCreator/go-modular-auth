@@ -8,4 +8,3 @@ const (
 	ExtraKeyUsername        = "username"
 	ExtraKeyDisplayUsername = "display_username"
 )
-

@@ -128,7 +128,7 @@ func (p *Plugin) exchangeAuthorizationCode(ctx context.Context, params TokenPara
 	}
 
 	// 11. Dispatch TokenIssued event
-	if p.ctx != nil && p.ctx.Events() != nil {
+	if p.ctx != nil && p.ctx.Hooks() != nil {
 		var refTokenPtr *string
 		if rawRefreshToken != "" {
 			refTokenPtr = &rawRefreshToken
@@ -138,7 +138,7 @@ func (p *Plugin) exchangeAuthorizationCode(ctx context.Context, params TokenPara
 			idTokenPtr = &idTokenString
 		}
 
-		p.ctx.Events().Publish(EventTokenIssued, &TokenIssuedEventPayload{
+		p.ctx.Hooks().Publish(EventTokenIssued, &TokenIssuedEventPayload{
 			ClientID:     client.ClientID,
 			UserID:       &authCode.UserID,
 			GrantType:    GrantTypeAuthorizationCode,
@@ -228,8 +228,8 @@ func (p *Plugin) exchangeRefreshToken(ctx context.Context, params TokenParams) (
 		idTokenString, _ = p.mintIDToken(ctx, client, user, sub, newAccessToken, "", "", existingToken.Scopes)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventTokenRefreshed, &TokenRefreshedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventTokenRefreshed, &TokenRefreshedEventPayload{
 			ClientID:        client.ClientID,
 			UserID:          existingToken.UserID,
 			FamilyID:        existingToken.FamilyID,
@@ -285,8 +285,8 @@ func (p *Plugin) exchangeClientCredentials(ctx context.Context, params TokenPara
 		return nil, fmt.Errorf("oauth2: failed to mint client_credentials access token: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventTokenIssued, &TokenIssuedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventTokenIssued, &TokenIssuedEventPayload{
 			ClientID:    client.ClientID,
 			GrantType:   GrantTypeClientCredentials,
 			Scopes:      requestedScopes,

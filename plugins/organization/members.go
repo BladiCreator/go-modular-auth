@@ -79,7 +79,7 @@ func (p *Plugin) AddMember(ctx context.Context, params AddMemberParams) (*AddMem
 
 	// 6. Emit After Event
 	p.publishEvent(EventMemberAddAfter, &MemberAddAfterEventPayload{
-		Member: member,
+		Member:         member,
 		ExtraContainer: params.ExtraContainer,
 	})
 
@@ -203,7 +203,7 @@ func (p *Plugin) UpdateMemberRole(ctx context.Context, params UpdateMemberRolePa
 
 	// 6. Emit After Event
 	p.publishEvent(EventMemberRoleUpdateAfter, &MemberRoleUpdateAfterEventPayload{
-		Member: member,
+		Member:         member,
 		ExtraContainer: params.ExtraContainer,
 	})
 

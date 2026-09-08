@@ -685,20 +685,20 @@ func TestEventEmissions(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		mu                           sync.Mutex
-		signUpBeforeEmitted          bool
-		signUpAfterEmitted           bool
-		signInBeforeEmitted          bool
-		signInAfterEmitted           bool
-		passChangeBeforeEmitted      bool
-		passChangeAfterEmitted       bool
-		resetRequestedEmitted        bool
-		resetCompletedEmitted        bool
-		emailVerifRequestedEmitted   bool
-		emailVerifiedEmitted         bool
+		mu                         sync.Mutex
+		signUpBeforeEmitted        bool
+		signUpAfterEmitted         bool
+		signInBeforeEmitted        bool
+		signInAfterEmitted         bool
+		passChangeBeforeEmitted    bool
+		passChangeAfterEmitted     bool
+		resetRequestedEmitted      bool
+		resetCompletedEmitted      bool
+		emailVerifRequestedEmitted bool
+		emailVerifiedEmitted       bool
 	)
 
-	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
@@ -706,7 +706,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.User != nil {
@@ -714,7 +714,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignInBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignInBefore, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil {
@@ -722,7 +722,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignInAfter, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.SignInEventPayload); ok && req.User != nil && req.Session != nil {
@@ -730,7 +730,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventPasswordChangeBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventPasswordChangeBefore, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.PasswordChangeEventPayload); ok && req.UserID != "" {
@@ -738,7 +738,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventPasswordChangeAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventPasswordChangeAfter, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.PasswordChangeEventPayload); ok && req.UserID != "" {
@@ -746,7 +746,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventPasswordResetRequested, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventPasswordResetRequested, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.PasswordResetRequestedEventPayload); ok && req.Token != "" {
@@ -754,7 +754,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventPasswordResetCompleted, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventPasswordResetCompleted, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.PasswordResetCompletedEventPayload); ok && req.UserID != "" {
@@ -762,7 +762,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventEmailVerificationRequested, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventEmailVerificationRequested, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.EmailVerificationRequestedEventPayload); ok && req.Token != "" {
@@ -770,7 +770,7 @@ func TestEventEmissions(t *testing.T) {
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventEmailVerified, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventEmailVerified, func(ctx context.Context, payload any) {
 		mu.Lock()
 		defer mu.Unlock()
 		if req, ok := payload.(*emailpassword.EmailVerifiedEventPayload); ok && req.User != nil {
@@ -872,14 +872,14 @@ func TestSignUp_WithCreateUserParamsExtra(t *testing.T) {
 	var interceptedRole string
 	var extraFound bool
 
-	app.Events().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
 			req.Params.Set(emailpassword.ExtraKeyRole, "admin")
 			req.Params.Set(emailpassword.ExtraKeyOrgID, "org_999")
 		}
 	})
 
-	app.Events().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
+	app.Hooks().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
 			if val, ok := req.Params.Get(emailpassword.ExtraKeyRole); ok {
 				interceptedRole, _ = val.(string)

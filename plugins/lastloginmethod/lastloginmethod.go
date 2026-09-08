@@ -87,9 +87,9 @@ func (p *Plugin) ClearLastLoginMethod(ctx context.Context, w http.ResponseWriter
 	p.publishEvent(EventLastLoginMethodCleared, ctx, &LastLoginMethodEventPayload{})
 }
 
-// publishEvent safely dispatches an event on the shared EventBus.
+// publishEvent safely dispatches an event on the shared Hooks dispatcher.
 func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload *LastLoginMethodEventPayload) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(eventName, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}
 }

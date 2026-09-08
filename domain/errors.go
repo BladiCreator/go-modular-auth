@@ -19,4 +19,9 @@ var (
 	ErrTOTPAlreadyEnabled = errors.New("AuthService: totp already enabled")
 	ErrTOTPNotEnabled     = errors.New("AuthService: totp not enabled")
 	ErrInvalidTOTP        = errors.New("AuthService: invalid totp code")
+
+	// Interceptor and pipeline domain errors
+	ErrUserBanned         = errors.New("AuthService: user is banned")
+	ErrTenantInactive     = errors.New("AuthService: tenant is inactive")
+	ErrOperationCancelled = errors.New("AuthService: operation cancelled by interceptor")
 )

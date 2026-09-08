@@ -6,7 +6,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 )
 
-// Event topic names for Passkey lifecycle events published to the EventBus.
+// Event topic names for Passkey lifecycle events published to the Hooks dispatcher.
 const (
 	EventRegistrationOptionsCreated   = "passkey:registration_options:created"
 	EventRegistrationVerified         = "passkey:registration:verified"

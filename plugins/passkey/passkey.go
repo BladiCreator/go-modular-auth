@@ -203,8 +203,8 @@ func (p *Plugin) GenerateRegistrationOptions(ctx context.Context, params *Genera
 		return nil, fmt.Errorf("passkey: failed to save registration challenge: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventRegistrationOptionsCreated, RegistrationOptionsCreatedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventRegistrationOptionsCreated, RegistrationOptionsCreatedPayload{
 			UserID:         userID,
 			UserName:       userName,
 			ChallengeToken: token,
@@ -364,8 +364,8 @@ func (p *Plugin) VerifyRegistration(ctx context.Context, params *VerifyRegistrat
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventRegistrationVerified, RegistrationVerifiedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventRegistrationVerified, RegistrationVerifiedPayload{
 			Passkey:   newPasskey,
 			User:      userEntity,
 			Extra:     params.Extra,
@@ -438,8 +438,8 @@ func (p *Plugin) GenerateAuthenticationOptions(ctx context.Context, params *Gene
 		return nil, fmt.Errorf("passkey: failed to save authentication challenge: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventAuthenticationOptionsCreated, AuthenticationOptionsCreatedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventAuthenticationOptionsCreated, AuthenticationOptionsCreatedPayload{
 			UserID:         targetUserID,
 			ChallengeToken: token,
 			ExpiresAt:      expiresAt,
@@ -612,11 +612,11 @@ func (p *Plugin) VerifyAuthentication(ctx context.Context, params *VerifyAuthent
 
 	now := time.Now()
 	sessionParams := &dto.CreateSessionParams{
-		UserID:    userEntity.ID,
-		Token:     sessionToken,
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
-		ExpiresAt: now.Add(p.config.SessionDuration),
+		UserID:         userEntity.ID,
+		Token:          sessionToken,
+		IPAddress:      ipAddress,
+		UserAgent:      userAgent,
+		ExpiresAt:      now.Add(p.config.SessionDuration),
 		CreatedAt:      now,
 		ExtraContainer: params.ExtraContainer,
 	}
@@ -632,8 +632,8 @@ func (p *Plugin) VerifyAuthentication(ctx context.Context, params *VerifyAuthent
 		}
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventAuthenticationVerified, AuthenticationVerifiedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventAuthenticationVerified, AuthenticationVerifiedPayload{
 			Passkey:   storedPasskey,
 			User:      userEntity,
 			Session:   session,
@@ -684,8 +684,8 @@ func (p *Plugin) UpdatePasskey(ctx context.Context, params *UpdatePasskeyParams)
 		return nil, fmt.Errorf("%w: %v", ErrFailedToUpdatePasskey, err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasskeyUpdated, PasskeyUpdatedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasskeyUpdated, PasskeyUpdatedPayload{
 			Passkey:   pk,
 			OldName:   oldName,
 			NewName:   newName,
@@ -715,8 +715,8 @@ func (p *Plugin) DeletePasskey(ctx context.Context, params *DeletePasskeyParams)
 		return fmt.Errorf("passkey: failed to delete passkey: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasskeyDeleted, PasskeyDeletedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasskeyDeleted, PasskeyDeletedPayload{
 			PasskeyID: params.ID,
 			UserID:    params.CallerUserID,
 			Timestamp: time.Now(),
@@ -759,8 +759,8 @@ func (p *Plugin) findPasskeyByFlexibleID(ctx context.Context, rawID []byte) (*en
 }
 
 func (p *Plugin) publishRegistrationFailed(userID *string, challengeToken, reason string, extra map[string]any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventRegistrationFailed, RegistrationFailedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventRegistrationFailed, RegistrationFailedPayload{
 			UserID:         userID,
 			ChallengeToken: challengeToken,
 			Reason:         reason,
@@ -771,8 +771,8 @@ func (p *Plugin) publishRegistrationFailed(userID *string, challengeToken, reaso
 }
 
 func (p *Plugin) publishAuthenticationFailed(userID *string, challengeToken, reason string, extra map[string]any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventAuthenticationFailed, AuthenticationFailedPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventAuthenticationFailed, AuthenticationFailedPayload{
 			UserID:         userID,
 			ChallengeToken: challengeToken,
 			Reason:         reason,

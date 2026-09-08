@@ -11,7 +11,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
-	"github.com/asaskevich/EventBus"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -35,10 +34,9 @@ func (c *MockCrypto) GenerateRandomToken(length int) (string, error) {
 func setupTestPlugin(t *testing.T, repo *MockRepository, opts ...username.Option) (*username.Plugin, *plugin.Context) {
 	t.Helper()
 	p := username.New(repo, opts...)
-	bus := EventBus.New()
 	crypto := &MockCrypto{}
-	pCtx := plugin.NewContext(crypto, bus)
-	sm := auth.NewSessionManager(repo.MemorySessionRepository, auth.DefaultSessionConfig(), crypto, bus)
+	pCtx := plugin.NewContext(crypto)
+	sm := auth.NewSessionManager(repo.MemorySessionRepository, auth.DefaultSessionConfig(), crypto, pCtx.Pipeline(), pCtx.Hooks())
 	pCtx.SetSessionManager(sm)
 	if err := p.Init(pCtx); err != nil {
 		t.Fatalf("failed to init username plugin: %v", err)

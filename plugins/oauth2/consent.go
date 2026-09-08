@@ -61,8 +61,8 @@ func (p *Plugin) Consent(ctx context.Context, params ConsentParams) (*ConsentRes
 		_ = p.repo.CreateConsent(ctx, newConsent)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventConsentGranted, &ConsentEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventConsentGranted, &ConsentEventPayload{
 			Consent: &OAuthConsent{
 				ClientID: client.ClientID,
 				UserID:   params.UserID,
@@ -102,8 +102,8 @@ func (p *Plugin) RevokeConsent(ctx context.Context, params RevokeConsentParams) 
 		return nil, fmt.Errorf("oauth2: failed to delete consent: %w", err)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventConsentRevoked, &ConsentEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventConsentRevoked, &ConsentEventPayload{
 			Consent:   consent,
 			Timestamp: time.Now().UTC(),
 		})

@@ -69,10 +69,10 @@ func (p *Plugin) Repository() Repository {
 	return p.repo
 }
 
-// publishEvent safely publishes an event to the EventBus if initialized.
+// publishEvent safely publishes an event via Hooks if initialized.
 func (p *Plugin) publishEvent(topic string, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, payload)
 	}
 }
 
@@ -317,9 +317,9 @@ func (p *Plugin) VerifyEmailOTP(ctx context.Context, params *VerifyEmailOTPParam
 		}
 
 		sessParams := &dto.CreateSessionParams{
-			UserID:    user.ID,
-			Token:     token,
-			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+			UserID:         user.ID,
+			Token:          token,
+			ExpiresAt:      time.Now().Add(7 * 24 * time.Hour),
 			CreatedAt:      time.Now(),
 			ExtraContainer: params.ExtraContainer,
 		}
@@ -424,9 +424,9 @@ func (p *Plugin) SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParam
 	}
 
 	sessParams := &dto.CreateSessionParams{
-		UserID:    user.ID,
-		Token:     token,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		UserID:         user.ID,
+		Token:          token,
+		ExpiresAt:      time.Now().Add(7 * 24 * time.Hour),
 		CreatedAt:      time.Now(),
 		ExtraContainer: params.ExtraContainer,
 	}

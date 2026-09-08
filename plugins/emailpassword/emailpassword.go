@@ -123,6 +123,14 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 		return nil, ErrPasswordTooLong
 	}
 
+	// 1. Run BeforeSignUp interceptors (can abort or mutate input.Extra/input fields)
+	if p.ctx != nil && p.ctx.Pipeline() != nil {
+		if err := p.ctx.Pipeline().ExecuteBeforeSignUp(ctx, &input); err != nil {
+			return nil, err
+		}
+	}
+	email = strings.ToLower(strings.TrimSpace(input.Email))
+
 	existingUser, err := p.repo.GetUserByEmail(ctx, email)
 	if err == nil && existingUser != nil {
 		return nil, ErrUserAlreadyExists
@@ -140,8 +148,8 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 		ExtraContainer: input.ExtraContainer,
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignUpBefore, ctx, &SignUpEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignUpBefore, ctx, &SignUpEventPayload{
 			Params: params,
 			Extra:  input.Extra,
 		})
@@ -170,12 +178,21 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 		})
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignUpAfter, ctx, &SignUpEventPayload{
+	// 2. Run AfterSignUp interceptors
+	if p.ctx != nil && p.ctx.Pipeline() != nil {
+		if err := p.ctx.Pipeline().ExecuteAfterSignUp(ctx, newUser); err != nil {
+			return nil, err
+		}
+	}
+
+	// 3. Dispatch typed lifecycle hooks and EventSignUpAfter
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignUpAfter, ctx, &SignUpEventPayload{
 			Params: params,
 			User:   newUser,
 			Extra:  input.Extra,
 		})
+		p.ctx.Hooks().DispatchUserSignedUp(ctx, newUser)
 	}
 
 	return newUser, nil
@@ -271,6 +288,21 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		return nil, ErrInvalidCredentials
 	}
 
+	// 1. Extract per-call session options to pass interceptors to pipeline
+	optsData := plugin.SessionOptions{}
+	for _, opt := range opts {
+		opt(&optsData)
+	}
+
+	// 2. Run BeforeSignIn interceptors BEFORE checking credentials or touching database!
+	// This enables immediate abort for ErrUserBanned, ErrTenantInactive, rate limiting, etc.
+	if p.ctx != nil && p.ctx.Pipeline() != nil {
+		if err := p.ctx.Pipeline().ExecuteBeforeSignIn(ctx, &input, optsData.Interceptors...); err != nil {
+			return nil, err // Abort immediately!
+		}
+	}
+	email = strings.ToLower(strings.TrimSpace(input.Email))
+
 	user, err := p.repo.GetUserByEmail(ctx, email)
 	if err != nil || user == nil {
 		// Timing attack mitigation: compute fake hash to maintain constant-time response
@@ -283,8 +315,8 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		Extra: input.Extra,
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInBefore, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignInBefore, ctx, payload)
 	}
 
 	account, err := p.repo.GetAccountByUserIDAndProvider(ctx, user.ID, CredentialProvider)
@@ -316,17 +348,26 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		return nil, fmt.Errorf("emailpassword: failed to create session: %w", err)
 	}
 
-	payload.Session = sess
-	if p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventSignInAfter, ctx, payload)
-	}
-
 	sessionData := &dto.SessionData{
 		Session: sess,
 		User:    user,
 	}
 	if sess.Extra != nil {
 		sessionData.Extra = sess.Extra
+	}
+
+	// 3. Run AfterSignIn interceptors (allows mutating sessionData.Session.Extra or aborting)
+	if p.ctx != nil && p.ctx.Pipeline() != nil {
+		if err := p.ctx.Pipeline().ExecuteAfterSignIn(ctx, sessionData, optsData.Interceptors...); err != nil {
+			_ = p.ctx.Session().RevokeSession(ctx, sess.Token)
+			return nil, err
+		}
+	}
+
+	payload.Session = sess
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventSignInAfter, ctx, payload)
+		p.ctx.Hooks().DispatchUserSignedIn(ctx, sessionData)
 	}
 
 	return sessionData, nil
@@ -396,16 +437,21 @@ func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordPar
 		Extra:  input.Extra,
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasswordChangeBefore, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasswordChangeBefore, ctx, payload)
 	}
 
 	if err := p.repo.UpdateAccountPassword(ctx, account.ID, newHashedPassword); err != nil {
 		return err
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasswordChangeAfter, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasswordChangeAfter, ctx, payload)
+		user, _ := p.repo.GetUserByID(ctx, input.UserID)
+		if user == nil {
+			user = &entity.User{ID: input.UserID}
+		}
+		p.ctx.Hooks().DispatchPasswordChanged(ctx, user)
 	}
 
 	return nil
@@ -476,13 +522,14 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordPar
 		_ = p.config.SendResetPasswordEmail(ctx, user.Email, tokenStr, expiresAt, input.Extra)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasswordResetRequested, ctx, &PasswordResetRequestedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasswordResetRequested, ctx, &PasswordResetRequestedEventPayload{
 			User:      user,
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
 			Extra:     input.Extra,
 		})
+		p.ctx.Hooks().DispatchPasswordResetRequested(ctx, user.Email, token)
 	}
 
 	return token, nil
@@ -561,11 +608,12 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 
 	_ = p.repo.DeleteVerificationToken(ctx, input.Token)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventPasswordResetCompleted, ctx, &PasswordResetCompletedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventPasswordResetCompleted, ctx, &PasswordResetCompletedEventPayload{
 			UserID: user.ID,
 			Extra:  input.Extra,
 		})
+		p.ctx.Hooks().DispatchPasswordResetCompleted(ctx, user.ID)
 	}
 
 	return nil
@@ -636,13 +684,14 @@ func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerifi
 		_ = p.config.SendVerificationEmail(ctx, user.Email, tokenStr, expiresAt, input.Extra)
 	}
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventEmailVerificationRequested, ctx, &EmailVerificationRequestedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventEmailVerificationRequested, ctx, &EmailVerificationRequestedEventPayload{
 			User:      user,
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
 			Extra:     input.Extra,
 		})
+		p.ctx.Hooks().DispatchEmailVerificationRequested(ctx, user.Email, token)
 	}
 
 	return token, nil
@@ -705,14 +754,16 @@ func (p *Plugin) VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (
 
 	_ = p.repo.DeleteVerificationToken(ctx, input.Token)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventEmailVerified, ctx, &EmailVerifiedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventEmailVerified, ctx, &EmailVerifiedEventPayload{
 			User:  user,
 			Extra: input.Extra,
 		})
+		p.ctx.Hooks().DispatchEmailVerified(ctx, user)
 	}
 
 	return user, nil
+
 }
 
 // VerifyPassword validates whether the provided password matches the user's stored credential password.

@@ -39,15 +39,12 @@ func (p *Plugin) ID() string {
 // Init initializes the plugin with the shared execution context and registers lifecycle event handlers.
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
-	if ctx != nil && ctx.Events() != nil {
-		_ = ctx.Events().Subscribe("auth:session:created", func(c context.Context, payload any) {
-			if scp, ok := payload.(interface{ GetSession() *entity.Session }); ok {
-				sess := scp.GetSession()
-				if sess != nil {
-					go p.publishEvent(EventSessionCreated, c, &SessionCreatedEventPayload{
-						Session: sess,
-					})
-				}
+	if ctx != nil && ctx.Hooks() != nil {
+		ctx.Hooks().OnSessionCreated(func(c context.Context, sess *entity.Session) {
+			if sess != nil {
+				go p.publishEvent(EventSessionCreated, c, &SessionCreatedEventPayload{
+					Session: sess,
+				})
 			}
 		})
 	}
@@ -64,10 +61,10 @@ func (p *Plugin) Repository() Repository {
 	return p.repo
 }
 
-// publishEvent publishes a lifecycle event to the EventBus if available.
+// publishEvent publishes a lifecycle event via Hooks if available.
 func (p *Plugin) publishEvent(topic string, ctx context.Context, payload any) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(topic, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(topic, ctx, payload)
 	}
 }
 

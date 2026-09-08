@@ -11,7 +11,7 @@ import (
 type contextKey string
 
 const (
-	ReferenceIDContextKey contextKey = "stripe:reference_id"
+	ReferenceIDContextKey  contextKey = "stripe:reference_id"
 	SubscriptionContextKey contextKey = "stripe:subscription"
 )
 

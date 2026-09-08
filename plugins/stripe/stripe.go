@@ -80,12 +80,12 @@ func (p *Plugin) CreateCheckoutSession(ctx context.Context, params CreateCheckou
 	}
 
 	sessionParams := &stripe.CheckoutSessionParams{
-		Mode:               stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-		SuccessURL:         stripe.String(params.SuccessURL),
-		CancelURL:          stripe.String(params.CancelURL),
-		LineItems:          lineItems,
-		ClientReferenceID:  stripe.String(params.ReferenceID),
-		Metadata:           metadata,
+		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		SuccessURL:        stripe.String(params.SuccessURL),
+		CancelURL:         stripe.String(params.CancelURL),
+		LineItems:         lineItems,
+		ClientReferenceID: stripe.String(params.ReferenceID),
+		Metadata:          metadata,
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
 			Metadata: metadata,
 		},
@@ -298,9 +298,9 @@ func (p *Plugin) SyncSeats(ctx context.Context, referenceID string, seats int) e
 	return p.repo.UpdateSubscription(ctx, localSub)
 }
 
-// publishEvent dispatches events safely on the shared EventBus.
+// publishEvent dispatches events safely on the shared Hooks dispatcher.
 func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload interface{}) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(eventName, ctx, payload)
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}
 }

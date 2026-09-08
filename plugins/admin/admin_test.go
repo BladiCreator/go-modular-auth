@@ -35,7 +35,7 @@ func TestAdminPlugin_CreateUser(t *testing.T) {
 	app, p, _ := setupAdminTest(t)
 
 	var eventReceived *admin.UserCreatedEventPayload
-	app.Events().Subscribe(admin.EventUserCreated, func(payload *admin.UserCreatedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserCreated, func(payload *admin.UserCreatedEventPayload) {
 		eventReceived = payload
 	})
 
@@ -211,7 +211,7 @@ func TestAdminPlugin_UpdateUser(t *testing.T) {
 	app, p, store := setupAdminTest(t)
 
 	var eventReceived *admin.UserUpdatedEventPayload
-	app.Events().Subscribe(admin.EventUserUpdated, func(payload *admin.UserUpdatedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserUpdated, func(payload *admin.UserUpdatedEventPayload) {
 		eventReceived = payload
 	})
 
@@ -260,7 +260,7 @@ func TestAdminPlugin_RemoveUser(t *testing.T) {
 	app, p, store := setupAdminTest(t)
 
 	var eventReceived *admin.UserDeletedEventPayload
-	app.Events().Subscribe(admin.EventUserDeleted, func(payload *admin.UserDeletedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserDeleted, func(payload *admin.UserDeletedEventPayload) {
 		eventReceived = payload
 	})
 
@@ -303,7 +303,7 @@ func TestAdminPlugin_SetRole(t *testing.T) {
 	app, p, store := setupAdminTest(t)
 
 	var eventReceived *admin.UserRoleChangedEventPayload
-	app.Events().Subscribe(admin.EventUserRoleChanged, func(payload *admin.UserRoleChangedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserRoleChanged, func(payload *admin.UserRoleChangedEventPayload) {
 		eventReceived = payload
 	})
 
@@ -346,7 +346,7 @@ func TestAdminPlugin_SetUserPassword(t *testing.T) {
 	app, p, store := setupAdminTest(t)
 
 	var eventReceived *admin.UserPasswordChangedEventPayload
-	app.Events().Subscribe(admin.EventUserPasswordChanged, func(payload *admin.UserPasswordChangedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserPasswordChanged, func(payload *admin.UserPasswordChangedEventPayload) {
 		eventReceived = payload
 	})
 
@@ -396,10 +396,10 @@ func TestAdminPlugin_ModerationAndBans(t *testing.T) {
 	var bannedEvent *admin.UserBannedEventPayload
 	var unbannedEvent *admin.UserUnbannedEventPayload
 
-	app.Events().Subscribe(admin.EventUserBanned, func(payload *admin.UserBannedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserBanned, func(payload *admin.UserBannedEventPayload) {
 		bannedEvent = payload
 	})
-	app.Events().Subscribe(admin.EventUserUnbanned, func(payload *admin.UserUnbannedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserUnbanned, func(payload *admin.UserUnbannedEventPayload) {
 		unbannedEvent = payload
 	})
 
@@ -508,10 +508,10 @@ func TestAdminPlugin_Impersonation(t *testing.T) {
 	var impersonateEvent *admin.UserImpersonatedEventPayload
 	var stopEvent *admin.ImpersonationStoppedEventPayload
 
-	app.Events().Subscribe(admin.EventUserImpersonated, func(payload *admin.UserImpersonatedEventPayload) {
+	app.Hooks().Subscribe(admin.EventUserImpersonated, func(payload *admin.UserImpersonatedEventPayload) {
 		impersonateEvent = payload
 	})
-	app.Events().Subscribe(admin.EventImpersonationStopped, func(payload *admin.ImpersonationStoppedEventPayload) {
+	app.Hooks().Subscribe(admin.EventImpersonationStopped, func(payload *admin.ImpersonationStoppedEventPayload) {
 		stopEvent = payload
 	})
 
@@ -520,8 +520,8 @@ func TestAdminPlugin_Impersonation(t *testing.T) {
 	anotherAdmin, _ := store.CreateUser(ctx, &dto.CreateUserParams{Name: "Other Admin", Email: "admin2@corp.com", Role: "admin"})
 
 	adminCaller := admin.CallerContext{
-		UserID: adminUser.ID,
-		Role:   admin.RoleAdmin,
+		UserID:         adminUser.ID,
+		Role:           admin.RoleAdmin,
 		ExtraContainer: plugin.ExtraContainer{Extra: map[string]any{admin.ExtraKeyAdminSession: "admin-secret-session-token"}},
 	}
 
@@ -604,10 +604,10 @@ func TestAdminPlugin_SessionManagement(t *testing.T) {
 	var sessionRevokedEvent *admin.SessionRevokedEventPayload
 	var allSessionsRevokedEvent *admin.AllSessionsRevokedEventPayload
 
-	app.Events().Subscribe(admin.EventSessionRevoked, func(payload *admin.SessionRevokedEventPayload) {
+	app.Hooks().Subscribe(admin.EventSessionRevoked, func(payload *admin.SessionRevokedEventPayload) {
 		sessionRevokedEvent = payload
 	})
-	app.Events().Subscribe(admin.EventAllSessionsRevoked, func(payload *admin.AllSessionsRevokedEventPayload) {
+	app.Hooks().Subscribe(admin.EventAllSessionsRevoked, func(payload *admin.AllSessionsRevokedEventPayload) {
 		allSessionsRevokedEvent = payload
 	})
 

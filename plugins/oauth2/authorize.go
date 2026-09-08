@@ -152,8 +152,8 @@ func (p *Plugin) Authorize(ctx context.Context, params AuthorizeParams) (*Author
 	// Construct callback URL with RFC 9207 'iss' parameter
 	callbackURL := buildCallbackURL(params.RedirectURI, rawCode, params.State, p.config.Issuer)
 
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventAuthorizeSuccess, &AuthorizeSuccessEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventAuthorizeSuccess, &AuthorizeSuccessEventPayload{
 			ClientID:    client.ClientID,
 			UserID:      userID,
 			RedirectURI: params.RedirectURI,
@@ -283,8 +283,8 @@ func buildCallbackURL(redirectURI, code, state, issuer string) string {
 }
 
 func (p *Plugin) publishAuthorizeFailed(clientID, errDesc, redirectURI string) {
-	if p.ctx != nil && p.ctx.Events() != nil {
-		p.ctx.Events().Publish(EventAuthorizeFailed, &AuthorizeFailedEventPayload{
+	if p.ctx != nil && p.ctx.Hooks() != nil {
+		p.ctx.Hooks().Publish(EventAuthorizeFailed, &AuthorizeFailedEventPayload{
 			ClientID:    clientID,
 			Error:       errDesc,
 			RedirectURI: redirectURI,

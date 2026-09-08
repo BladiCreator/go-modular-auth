@@ -80,4 +80,3 @@ func (p *Plugin) AfterSignOut(ctx context.Context, w http.ResponseWriter, r *htt
 
 	return nil
 }
-
