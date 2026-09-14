@@ -122,12 +122,10 @@ func (m *MockRepository) CreateUser(ctx context.Context, params *dto.CreateUserP
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if phone, ok := params.Extra[phonenumber.ExtraKeyPhoneNumber].(string); ok && phone != "" {
-		u.PhoneNumber = &phone
-		if verified, ok := params.Extra[phonenumber.ExtraKeyPhoneNumberVerified].(bool); ok {
-			u.PhoneNumberVerified = verified
-		}
-		m.usersByPhone[phone] = u
+	if params.PhoneNumber != nil && *params.PhoneNumber != "" {
+		u.PhoneNumber = params.PhoneNumber
+		u.PhoneNumberVerified = params.PhoneNumberVerified
+		m.usersByPhone[*params.PhoneNumber] = u
 	}
 	m.users[u.ID] = u
 	cp := *u
@@ -488,14 +486,10 @@ func TestSignIn_PhonePassword_And_RequireVerification(t *testing.T) {
 
 	// User not verified initially
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
-		Email: "phoneuser@example.com",
-		Name:  "Phone User",
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{
-				phonenumber.ExtraKeyPhoneNumber:         phone,
-				phonenumber.ExtraKeyPhoneNumberVerified: false,
-			},
-		},
+		Email:               "phoneuser@example.com",
+		Name:                "Phone User",
+		PhoneNumber:         &phone,
+		PhoneNumberVerified: false,
 	})
 	_ = repo.CreateAccount(context.Background(), &entity.Account{
 		ID:       uuid.NewString(),
@@ -551,14 +545,10 @@ func TestSignIn_WithOptions(t *testing.T) {
 	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
-		Email: "opts_phone@example.com",
-		Name:  "Options Phone User",
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{
-				phonenumber.ExtraKeyPhoneNumber:         phone,
-				phonenumber.ExtraKeyPhoneNumberVerified: true,
-			},
-		},
+		Email:               "opts_phone@example.com",
+		Name:                "Options Phone User",
+		PhoneNumber:         &phone,
+		PhoneNumberVerified: true,
 	})
 	_ = repo.CreateAccount(context.Background(), &entity.Account{
 		ID:       uuid.NewString(),
@@ -609,14 +599,10 @@ func TestSignIn_WithoutSessionManager_ReturnsError(t *testing.T) {
 	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
-		Email: "no_sm@example.com",
-		Name:  "No SM User",
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{
-				phonenumber.ExtraKeyPhoneNumber:         phone,
-				phonenumber.ExtraKeyPhoneNumberVerified: true,
-			},
-		},
+		Email:               "no_sm@example.com",
+		Name:                "No SM User",
+		PhoneNumber:         &phone,
+		PhoneNumberVerified: true,
 	})
 	_ = repo.CreateAccount(context.Background(), &entity.Account{
 		ID:       uuid.NewString(),
@@ -650,14 +636,10 @@ func TestPasswordReset_Flow(t *testing.T) {
 
 	phone := "+1777888999"
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
-		Email: "resetuser@example.com",
-		Name:  "Reset User",
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{
-				phonenumber.ExtraKeyPhoneNumber:         phone,
-				phonenumber.ExtraKeyPhoneNumberVerified: true,
-			},
-		},
+		Email:               "resetuser@example.com",
+		Name:                "Reset User",
+		PhoneNumber:         &phone,
+		PhoneNumberVerified: true,
 	})
 	// Create active session
 	_, _ = repo.CreateSession(context.Background(), &dto.CreateSessionParams{
@@ -709,14 +691,10 @@ func TestUnlinkPhoneNumber(t *testing.T) {
 
 	phone := "+1333444555"
 	user, _ := repo.CreateUser(context.Background(), &dto.CreateUserParams{
-		Email: "unlink@example.com",
-		Name:  "Unlink User",
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{
-				phonenumber.ExtraKeyPhoneNumber:         phone,
-				phonenumber.ExtraKeyPhoneNumberVerified: true,
-			},
-		},
+		Email:               "unlink@example.com",
+		Name:                "Unlink User",
+		PhoneNumber:         &phone,
+		PhoneNumberVerified: true,
 	})
 
 	p := phonenumber.New(repo)

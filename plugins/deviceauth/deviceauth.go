@@ -8,7 +8,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the Device Authorization plugin ("device-authorization").

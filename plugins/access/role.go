@@ -3,6 +3,7 @@ package access
 import (
 	"encoding/json"
 	"fmt"
+	"iter"
 	"sync"
 )
 
@@ -35,6 +36,19 @@ func (r *Role) Statements() Statements {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return CloneStatements(r.statements)
+}
+
+// AllStatements returns a push iterator over resource and action permission statements.
+func (r *Role) AllStatements() iter.Seq2[string, []string] {
+	return func(yield func(string, []string) bool) {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		for res, actions := range r.statements {
+			if !yield(res, actions) {
+				return
+			}
+		}
+	}
 }
 
 // Authorize evaluates an AuthorizeRequest against the role's statements using an optional global Connector (default: AND).

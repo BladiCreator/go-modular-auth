@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Event bus topic string constants emitted during administrative lifecycle actions.
@@ -28,7 +27,6 @@ type (
 		CallerID   string       `json:"caller_id"`
 		CallerRole string       `json:"caller_role"`
 		User       *entity.User `json:"user"`
-		plugin.ExtraContainer
 	}
 
 	// UserUpdatedEventPayload is dispatched when an administrator updates a user record.
@@ -36,7 +34,6 @@ type (
 		CallerID   string       `json:"caller_id"`
 		CallerRole string       `json:"caller_role"`
 		User       *entity.User `json:"user"`
-		plugin.ExtraContainer
 	}
 
 	// UserDeletedEventPayload is dispatched when a user account is deleted by an administrator.
@@ -44,7 +41,6 @@ type (
 		CallerID   string `json:"caller_id"`
 		CallerRole string `json:"caller_role"`
 		UserID     string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	// UserRoleChangedEventPayload is dispatched when a user's role assignment is modified.
@@ -55,7 +51,6 @@ type (
 		OldRole    string       `json:"old_role"`
 		NewRole    string       `json:"new_role"`
 		User       *entity.User `json:"user"`
-		plugin.ExtraContainer
 	}
 
 	// UserBannedEventPayload is dispatched when a user account is suspended.
@@ -64,9 +59,8 @@ type (
 		CallerRole string       `json:"caller_role"`
 		UserID     string       `json:"user_id"`
 		BanReason  string       `json:"ban_reason"`
-		BanExpires *time.Time   `json:"ban_expires,omitempty"`
+		BanExpires *time.Time   `json:"ban_expires,omitzero"`
 		User       *entity.User `json:"user"`
-		plugin.ExtraContainer
 	}
 
 	// UserUnbannedEventPayload is dispatched when a suspension is lifted from a user.
@@ -75,7 +69,6 @@ type (
 		CallerRole string       `json:"caller_role"`
 		UserID     string       `json:"user_id"`
 		User       *entity.User `json:"user"`
-		plugin.ExtraContainer
 	}
 
 	// UserImpersonatedEventPayload is dispatched when an administrator begins masquerading as a user.
@@ -84,7 +77,6 @@ type (
 		CallerRole   string          `json:"caller_role"`
 		TargetUserID string          `json:"target_user_id"`
 		Session      *entity.Session `json:"session"`
-		plugin.ExtraContainer
 	}
 
 	// ImpersonationStoppedEventPayload is dispatched when an impersonation session is ended.
@@ -92,7 +84,6 @@ type (
 		AdminUserID  string `json:"admin_user_id"`
 		TargetUserID string `json:"target_user_id"`
 		SessionToken string `json:"session_token"`
-		plugin.ExtraContainer
 	}
 
 	// UserPasswordChangedEventPayload is dispatched when an administrator changes a user's password.
@@ -100,7 +91,6 @@ type (
 		CallerID   string `json:"caller_id"`
 		CallerRole string `json:"caller_role"`
 		UserID     string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	// SessionRevokedEventPayload is dispatched when a specific session is invalidated.
@@ -108,7 +98,6 @@ type (
 		CallerID     string `json:"caller_id"`
 		CallerRole   string `json:"caller_role"`
 		SessionToken string `json:"session_token"`
-		plugin.ExtraContainer
 	}
 
 	// AllSessionsRevokedEventPayload is dispatched when all sessions for a user are invalidated.
@@ -116,6 +105,5 @@ type (
 		CallerID   string `json:"caller_id"`
 		CallerRole string `json:"caller_role"`
 		UserID     string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 )

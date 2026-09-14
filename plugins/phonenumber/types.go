@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Parameter and Result Structs
@@ -12,9 +11,8 @@ type (
 	// SendOTPParams defines parameters required to dispatch an OTP to a user's phone number.
 	SendOTPParams struct {
 		// PhoneNumber is the destination recipient phone number (required).
-		PhoneNumber string `json:"phone_number"`
-
-		plugin.ExtraContainer
+		PhoneNumber string         `json:"phone_number"`
+		Extra       map[string]any `json:"extra,omitzero"`
 	}
 
 	// SendOTPResult contains the delivery status and expiry of the dispatched OTP.
@@ -43,7 +41,7 @@ type (
 		// DisableSession prevents creating an active authentication session upon successful verification.
 		DisableSession bool `json:"disable_session,omitempty"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// VerifyResult contains the updated user profile and optional created session.
@@ -72,7 +70,7 @@ type (
 		// RememberMe extends session lifespan if set to true.
 		RememberMe *bool `json:"remember_me,omitempty"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// SignInResult contains the authenticated user and active session.
@@ -90,9 +88,8 @@ type (
 	// RequestPasswordResetParams defines parameters to request a password reset OTP via SMS.
 	RequestPasswordResetParams struct {
 		// PhoneNumber is the account phone number requesting a password reset.
-		PhoneNumber string `json:"phone_number"`
-
-		plugin.ExtraContainer
+		PhoneNumber string         `json:"phone_number"`
+		Extra       map[string]any `json:"extra,omitzero"`
 	}
 
 	// RequestPasswordResetResult reports the result of the password reset dispatch request.
@@ -112,7 +109,7 @@ type (
 		// NewPassword is the new password string to set.
 		NewPassword string `json:"new_password"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// ResetPasswordResult reports whether the password was successfully reset.
@@ -128,8 +125,6 @@ type (
 
 		// Type specifies the OTP workflow type.
 		Type OTPType `json:"type"`
-
-		plugin.ExtraContainer
 	}
 
 	// CreateVerificationOTPResult contains the status and expiry of the created OTP.
@@ -148,8 +143,6 @@ type (
 
 		// Type specifies the OTP workflow type.
 		Type OTPType `json:"type"`
-
-		plugin.ExtraContainer
 	}
 
 	// GetVerificationOTPResult contains the plain text OTP code retrieved from storage.
@@ -169,7 +162,7 @@ type (
 		// OTP is the code to check.
 		OTP string `json:"otp"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// CheckVerificationOTPResult reports whether the tested OTP code is currently valid.

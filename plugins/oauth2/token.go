@@ -3,11 +3,13 @@ package oauth2
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/google/uuid"
 )
 
 // Token handles token exchanges across all supported OAuth 2.1 grant types:
@@ -327,15 +329,13 @@ func (p *Plugin) mintAccessToken(ctx context.Context, client *OAuthClient, user 
 		}
 
 		if len(p.config.ValidAudiences) > 0 {
-			claims["aud"] = append([]string{client.ClientID}, p.config.ValidAudiences...)
+			claims["aud"] = slices.Concat([]string{client.ClientID}, p.config.ValidAudiences)
 		}
 
 		if p.config.CustomAccessTokenClaims != nil {
 			custom, err := p.config.CustomAccessTokenClaims(ctx, client, user, scopes)
 			if err == nil && custom != nil {
-				for k, v := range custom {
-					claims[k] = v
-				}
+				maps.Copy(claims, custom)
 			}
 		}
 

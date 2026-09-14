@@ -314,9 +314,7 @@ func TestOAuth2_AtomicSingleUse_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := p.Token(ctx, oauth2.TokenParams{
 				GrantType:    "authorization_code",
 				Code:         authRes.Code,
@@ -330,7 +328,7 @@ func TestOAuth2_AtomicSingleUse_Concurrency(t *testing.T) {
 			} else if err == oauth2.ErrInvalidAuthorizationCode {
 				atomic.AddInt32(&failCount, 1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

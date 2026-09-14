@@ -1,9 +1,11 @@
 package auth_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -232,8 +234,8 @@ func TestValidateSession_Success(t *testing.T) {
 		t.Errorf("user resolution mismatch: ID=%s Email=%s", sData.User.ID, sData.User.Email)
 	}
 
-	if sData.Extra == nil || sData.Extra["scope"] != "read:write" {
-		t.Errorf("expected extra scope in SessionData, got %v", sData.Extra)
+	if sData.Session.Extra == nil || sData.Session.Extra["scope"] != "read:write" {
+		t.Errorf("expected extra scope in Session, got %v", sData.Session.Extra)
 	}
 }
 
@@ -502,3 +504,50 @@ func TestAuxiliaryMethods(t *testing.T) {
 		t.Errorf("ListSessionsByUserID expected 0 sessions after mass revoke, got %d", len(listAfter))
 	}
 }
+
+func TestAuth_LoggerAndPluginsIterator(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	store := memory.New()
+	multiPlugin := multisession.New(store)
+
+	a, err := auth.New(
+		config.WithSessionRepository(store),
+		config.WithLogger(logger),
+		config.WithPlugins(multiPlugin),
+	)
+	if err != nil {
+		t.Fatalf("auth.New failed: %v", err)
+	}
+
+	if a.Logger() != logger {
+		t.Errorf("expected configured logger, got %v", a.Logger())
+	}
+
+	a.Logger().Info("test auth message", "component", "test")
+	if !bytes.Contains(buf.Bytes(), []byte("test auth message")) {
+		t.Errorf("expected log output in buffer, got: %s", buf.String())
+	}
+
+	// Test default logger (discard) when none provided
+	defaultAuth, err := auth.New()
+	if err != nil {
+		t.Fatalf("auth.New default failed: %v", err)
+	}
+	if defaultAuth.Logger() == nil {
+		t.Error("expected non-nil default discard logger")
+	}
+
+	// Test Plugins iterator
+	count := 0
+	for p := range a.Plugins() {
+		count++
+		if p.ID() != "multi-session" {
+			t.Errorf("unexpected plugin ID: %s", p.ID())
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected 1 plugin via iterator, got %d", count)
+	}
+}
+

@@ -123,7 +123,10 @@ func TestCustomSession_HooksEmission(t *testing.T) {
 
 func TestCustomSession_SessionInterceptor(t *testing.T) {
 	transformFn := func(ctx context.Context, sData *dto.SessionData, req *http.Request) (any, error) {
-		sData.Set("custom_role", "superuser")
+		if sData.Session.Extra == nil {
+			sData.Session.Extra = make(map[string]any)
+		}
+		sData.Session.Extra["custom_role"] = "superuser"
 		return sData, nil
 	}
 
@@ -175,7 +178,10 @@ func TestCustomSession_SessionInterceptor(t *testing.T) {
 
 func TestCustomSession_MutateListDeviceSessions(t *testing.T) {
 	transformFn := func(ctx context.Context, sData *dto.SessionData, req *http.Request) (any, error) {
-		sData.Set("device_status", "active")
+		if sData.Session.Extra == nil {
+			sData.Session.Extra = make(map[string]any)
+		}
+		sData.Session.Extra["device_status"] = "active"
 		return sData, nil
 	}
 
@@ -212,24 +218,26 @@ func TestCustomSession_MutateListDeviceSessions(t *testing.T) {
 
 func TestCustomSession_FilterUnregisteredFields(t *testing.T) {
 	p := customsession.New(nil,
-		customsession.WithUserAdditionalFields(customsession.AdditionalFieldDefinition{
-			Name: "allowed_field",
-			Type: customsession.FieldTypeString,
-		}),
+		customsession.WithAllowedExtraKeys("allowed_field"),
 		customsession.WithFilterUnregisteredFields(true),
 	)
 
 	sData := &dto.SessionData{
+		Session: &entity.Session{
+			ID: "sess1",
+			Extra: map[string]any{
+				"allowed_field":         "valid",
+				"secret_internal_field": "should_be_removed",
+			},
+		},
 		User: &entity.User{ID: "u1"},
 	}
-	sData.Set("allowed_field", "valid")
-	sData.Set("secret_internal_field", "should_be_removed")
 
 	sanitized := p.SanitizePayload(sData).(*dto.SessionData)
-	if sanitized.Extra["allowed_field"] != "valid" {
+	if sanitized.Session.Extra["allowed_field"] != "valid" {
 		t.Errorf("expected allowed_field to be retained")
 	}
-	if _, exists := sanitized.Extra["secret_internal_field"]; exists {
+	if _, exists := sanitized.Session.Extra["secret_internal_field"]; exists {
 		t.Errorf("expected secret_internal_field to be filtered out")
 	}
 }

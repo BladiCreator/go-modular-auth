@@ -2,7 +2,6 @@ package bearer
 
 import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Parameter and Result Structs
@@ -13,9 +12,7 @@ type (
 		Token string `json:"token"`
 
 		// Secret optionally overrides the default secret key configured on the plugin.
-		Secret string `json:"secret,omitempty"`
-
-		plugin.ExtraContainer
+		Secret string `json:"secret,omitzero"`
 	}
 
 	// VerifyResult contains the outcome of a successful token validation.
@@ -36,12 +33,10 @@ type (
 		Token string `json:"token"`
 
 		// Secret optionally overrides the default secret key configured on the plugin.
-		Secret string `json:"secret,omitempty"`
+		Secret string `json:"secret,omitzero"`
 
 		// UserID optionally associates an owner user ID with the created token.
-		UserID string `json:"user_id,omitempty"`
-
-		plugin.ExtraContainer
+		UserID string `json:"user_id,omitzero"`
 	}
 
 	// CreateTokenResult contains the generated signed token and ready-to-use HTTP header values.
@@ -62,15 +57,13 @@ type (
 	// ResolveSessionParams defines parameters to extract, verify, and look up an active session entity.
 	ResolveSessionParams struct {
 		// Header is the full HTTP Authorization header value (e.g. "Bearer <token>.<sig>").
-		Header string `json:"header,omitempty"`
+		Header string `json:"header,omitzero"`
 
 		// Token is the direct token string if already extracted.
-		Token string `json:"token,omitempty"`
+		Token string `json:"token,omitzero"`
 
 		// Secret optionally overrides the secret key.
-		Secret string `json:"secret,omitempty"`
-
-		plugin.ExtraContainer
+		Secret string `json:"secret,omitzero"`
 	}
 
 	// ResolveSessionResult contains the active session entity and processed token values.

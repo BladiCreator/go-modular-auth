@@ -2,6 +2,7 @@ package httpauth
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -86,14 +87,7 @@ func WithExtractQueryParam(paramName string) ExtractOption {
 		if paramName != "" {
 			c.QueryParam = paramName
 		}
-		hasQuery := false
-		for _, s := range c.Sources {
-			if s == SourceQuery {
-				hasQuery = true
-				break
-			}
-		}
-		if !hasQuery {
+		if !slices.Contains(c.Sources, SourceQuery) {
 			c.Sources = append(c.Sources, SourceQuery)
 		}
 	}
@@ -103,8 +97,7 @@ func WithExtractQueryParam(paramName string) ExtractOption {
 func WithSources(sources ...TokenSource) ExtractOption {
 	return func(c *ExtractConfig) {
 		if len(sources) > 0 {
-			c.Sources = make([]TokenSource, len(sources))
-			copy(c.Sources, sources)
+			c.Sources = slices.Clone(sources)
 		}
 	}
 }

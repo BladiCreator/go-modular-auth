@@ -277,14 +277,13 @@ func (sm *SessionManager) ValidateSession(ctx context.Context, token string) (*d
 		Session: sess,
 		User:    user,
 	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
-	} else if customRepo, ok := sm.repo.(interface {
-		GetCustomSessionFields(ctx context.Context, sessionID string) (map[string]any, error)
-	}); ok {
-		if fields, err := customRepo.GetCustomSessionFields(ctx, sess.ID); err == nil && len(fields) > 0 {
-			sessionData.Extra = fields
-			sess.Extra = fields
+	if sess.Extra == nil {
+		if customRepo, ok := sm.repo.(interface {
+			GetCustomSessionFields(ctx context.Context, sessionID string) (map[string]any, error)
+		}); ok {
+			if fields, err := customRepo.GetCustomSessionFields(ctx, sess.ID); err == nil && len(fields) > 0 {
+				sess.Extra = fields
+			}
 		}
 	}
 

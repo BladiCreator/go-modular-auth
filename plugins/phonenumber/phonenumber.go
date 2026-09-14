@@ -139,9 +139,9 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPRes
 
 	identifier := ToOTPIdentifier(params.PhoneNumber)
 	p.publishEvent(EventPhoneNumberOTPSendBefore, &OTPSentPayload{
-		PhoneNumber:    params.PhoneNumber,
-		Type:           OTPTypeVerification,
-		ExtraContainer: params.ExtraContainer,
+		PhoneNumber: params.PhoneNumber,
+		Type:        OTPTypeVerification,
+		Extra:       params.Extra,
 	})
 
 	rawCode, expiresAt, err := p.resolveOTP(ctx, identifier, params.PhoneNumber, OTPTypeVerification)
@@ -159,10 +159,10 @@ func (p *Plugin) SendOTP(ctx context.Context, params SendOTPParams) (*SendOTPRes
 	}
 
 	p.publishEvent(EventPhoneNumberOTPSent, &OTPSentPayload{
-		PhoneNumber:    params.PhoneNumber,
-		Type:           OTPTypeVerification,
-		ExpiresAt:      expiresAt,
-		ExtraContainer: params.ExtraContainer,
+		PhoneNumber: params.PhoneNumber,
+		Type:        OTPTypeVerification,
+		ExpiresAt:   expiresAt,
+		Extra:       params.Extra,
 	})
 
 	return &SendOTPResult{Success: true, ExpiresAt: expiresAt}, nil
@@ -180,9 +180,9 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	identifier := ToOTPIdentifier(params.PhoneNumber)
 
 	p.publishEvent(EventPhoneNumberOTPVerifyBefore, &OTPSentPayload{
-		PhoneNumber:    params.PhoneNumber,
-		Type:           OTPTypeVerification,
-		ExtraContainer: params.ExtraContainer,
+		PhoneNumber: params.PhoneNumber,
+		Type:        OTPTypeVerification,
+		Extra:       params.Extra,
 	})
 
 	if p.config.VerifyOTP != nil {
@@ -193,10 +193,10 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 		})
 		if err != nil || !valid {
 			p.publishEvent(EventPhoneNumberOTPFailed, &OTPFailedPayload{
-				PhoneNumber:    params.PhoneNumber,
-				Type:           OTPTypeVerification,
-				Reason:         "custom_verify_failed",
-				ExtraContainer: params.ExtraContainer,
+				PhoneNumber: params.PhoneNumber,
+				Type:        OTPTypeVerification,
+				Reason:      "custom_verify_failed",
+				Extra:       params.Extra,
 			})
 			return nil, ErrInvalidOTP
 		}
@@ -240,11 +240,11 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 		}
 
 		p.publishEvent(EventPhoneNumberOTPVerified, &OTPVerifiedPayload{
-			UserID:         user.ID,
-			PhoneNumber:    params.PhoneNumber,
-			Type:           OTPTypeVerification,
-			Timestamp:      time.Now(),
-			ExtraContainer: params.ExtraContainer,
+			UserID:      user.ID,
+			PhoneNumber: params.PhoneNumber,
+			Type:        OTPTypeVerification,
+			Timestamp:   time.Now(),
+			Extra:       params.Extra,
 		})
 		p.publishEvent(EventPhoneNumberUpdated, user)
 
@@ -270,14 +270,10 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 
 		phone := params.PhoneNumber
 		createUserParams := &dto.CreateUserParams{
-			Email: tempEmail,
-			Name:  tempName,
-			ExtraContainer: plugin.ExtraContainer{
-				Extra: map[string]any{
-					ExtraKeyPhoneNumber:         params.PhoneNumber,
-					ExtraKeyPhoneNumberVerified: true,
-				},
-			},
+			Email:               tempEmail,
+			Name:                tempName,
+			PhoneNumber:         &phone,
+			PhoneNumberVerified: true,
 		}
 
 		created, createErr := p.repo.CreateUser(ctx, createUserParams)
@@ -285,9 +281,6 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 			return nil, fmt.Errorf("phonenumber: failed to create user on verification: %w", createErr)
 		}
 		user = created
-		user.PhoneNumber = &phone
-		user.PhoneNumberVerified = true
-		_ = p.repo.UpdateUser(ctx, user)
 		isNewUser = true
 	} else {
 		user.PhoneNumberVerified = true
@@ -322,26 +315,24 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 	}
 
 	p.publishEvent(EventPhoneNumberOTPVerified, &OTPVerifiedPayload{
-		UserID:         user.ID,
-		PhoneNumber:    params.PhoneNumber,
-		Type:           OTPTypeVerification,
-		Timestamp:      time.Now(),
-		ExtraContainer: params.ExtraContainer,
+		UserID:      user.ID,
+		PhoneNumber: params.PhoneNumber,
+		Type:        OTPTypeVerification,
+		Timestamp:   time.Now(),
+		Extra:       params.Extra,
 	})
 
 	if isNewUser {
 		p.publishEvent(EventPhoneNumberSignUpSuccess, &SignInSuccessPayload{
-			User:           user,
-			Session:        session,
-			IsNewUser:      true,
-			ExtraContainer: params.ExtraContainer,
+			User:      user,
+			Session:   session,
+			IsNewUser: true,
 		})
 	} else {
 		p.publishEvent(EventPhoneNumberSignInSuccess, &SignInSuccessPayload{
-			User:           user,
-			Session:        session,
-			IsNewUser:      false,
-			ExtraContainer: params.ExtraContainer,
+			User:      user,
+			Session:   session,
+			IsNewUser: false,
 		})
 	}
 
@@ -373,8 +364,8 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin
 	// Verification requirement protection
 	if p.config.RequireVerification && !user.PhoneNumberVerified {
 		_, _ = p.SendOTP(ctx, SendOTPParams{
-			PhoneNumber:    params.PhoneNumber,
-			ExtraContainer: params.ExtraContainer,
+			PhoneNumber: params.PhoneNumber,
+			Extra:       params.Extra,
 		})
 		return nil, ErrPhoneNumberNotVerified
 	}
@@ -435,18 +426,14 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin
 	}
 
 	p.publishEvent(EventPhoneNumberSignInPasswordSuccess, &SignInSuccessPayload{
-		User:           user,
-		Session:        sess,
-		IsNewUser:      false,
-		ExtraContainer: params.ExtraContainer,
+		User:      user,
+		Session:   sess,
+		IsNewUser: false,
 	})
 
 	sessionData := &dto.SessionData{
 		Session: sess,
 		User:    user,
-	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
@@ -489,10 +476,10 @@ func (p *Plugin) RequestPasswordReset(ctx context.Context, params RequestPasswor
 	}
 
 	p.publishEvent(EventPhoneNumberPasswordResetRequested, &OTPSentPayload{
-		PhoneNumber:    params.PhoneNumber,
-		Type:           OTPTypePasswordReset,
-		ExpiresAt:      expiresAt,
-		ExtraContainer: params.ExtraContainer,
+		PhoneNumber: params.PhoneNumber,
+		Type:        OTPTypePasswordReset,
+		ExpiresAt:   expiresAt,
+		Extra:       params.Extra,
 	})
 
 	return &RequestPasswordResetResult{Success: true}, nil
@@ -559,10 +546,10 @@ func (p *Plugin) ResetPassword(ctx context.Context, params ResetPasswordParams) 
 	}
 
 	p.publishEvent(EventPhoneNumberPasswordResetSuccess, &PasswordResetPayload{
-		UserID:         user.ID,
-		PhoneNumber:    params.PhoneNumber,
-		Timestamp:      time.Now(),
-		ExtraContainer: params.ExtraContainer,
+		UserID:      user.ID,
+		PhoneNumber: params.PhoneNumber,
+		Timestamp:   time.Now(),
+		Extra:       params.Extra,
 	})
 
 	return &ResetPasswordResult{Success: true}, nil

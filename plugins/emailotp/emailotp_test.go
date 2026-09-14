@@ -13,7 +13,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // In-Memory Test Repository implementing emailotp.Repository
@@ -122,7 +122,7 @@ func (r *testRepo) CreateUser(ctx context.Context, params *dto.CreateUserParams)
 	defer r.mu.Unlock()
 
 	u := &entity.User{
-		ID:            "usr_" + uuid.NewString(),
+		ID:            "usr_" + uuid.NewV7().String(),
 		Email:         params.Email,
 		Name:          params.Name,
 		Role:          params.Role,
@@ -661,15 +661,13 @@ func TestConcurrentAtomicVerification(t *testing.T) {
 
 	concurrency := 50
 	var wg sync.WaitGroup
-	wg.Add(concurrency)
 
 	var successCount int64
 	var failureCount int64
 	var mu sync.Mutex
 
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer wg.Done()
+	for range concurrency {
+		wg.Go(func() {
 			res, err := p.VerifyEmailOTP(ctx, &emailotp.VerifyEmailOTPParams{
 				Email: user.Email,
 				OTP:   otp,
@@ -681,7 +679,7 @@ func TestConcurrentAtomicVerification(t *testing.T) {
 			} else {
 				failureCount++
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

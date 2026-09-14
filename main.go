@@ -52,8 +52,7 @@ func main() {
 
 	// 2. Register interceptors and subscribe to native lifecycle hooks
 	app.Pipeline().AddInterceptor(auth.BeforeSignUpFunc(func(ctx context.Context, input *dto.SignUpParams) error {
-		input.Set(emailpassword.ExtraKeyRole, "admin")
-		input.Set(emailpassword.ExtraKeyOrgID, "org_enterprise")
+		input.Role = "admin"
 		return nil
 	}))
 

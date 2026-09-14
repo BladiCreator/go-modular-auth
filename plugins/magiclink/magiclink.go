@@ -11,7 +11,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the Magic Link plugin ("magic-link").
@@ -121,7 +121,7 @@ func (p *Plugin) SignInMagicLink(ctx context.Context, params SignInMagicLinkPara
 
 	identifier := ToMagicLinkIdentifier(email)
 	record := &VerificationRecord{
-		ID:         uuid.NewString(),
+		ID:         uuid.NewV7().String(),
 		Identifier: identifier,
 		Value:      string(payloadBytes),
 		ExpiresAt:  expiresAt,
@@ -137,7 +137,7 @@ func (p *Plugin) SignInMagicLink(ctx context.Context, params SignInMagicLinkPara
 	// Also store reverse token lookup mapping for token-only resolution
 	tokenLookupKey := ToMagicLinkTokenLookupKey(token)
 	lookupRecord := &VerificationRecord{
-		ID:         uuid.NewString(),
+		ID:         uuid.NewV7().String(),
 		Identifier: tokenLookupKey,
 		Value:      email,
 		ExpiresAt:  expiresAt,
@@ -269,7 +269,7 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 		}
 
 		newUser := &entity.User{
-			ID:            uuid.NewString(),
+			ID:            uuid.NewV7().String(),
 			Name:          userName,
 			Email:         email,
 			EmailVerified: true,
@@ -291,7 +291,7 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 
 	sessionParams := &dto.CreateSessionParams{
 		UserID:    user.ID,
-		Token:     uuid.NewString(),
+		Token:     uuid.New().String(),
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		CreatedAt: time.Now(),
 	}

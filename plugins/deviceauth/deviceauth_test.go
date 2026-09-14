@@ -402,10 +402,8 @@ func TestDeviceAuth_Concurrency(t *testing.T) {
 	alreadyConsumedCount := 0
 	var mu sync.Mutex
 
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range goroutines {
+		wg.Go(func() {
 			_, err := p.ExchangeDeviceToken(ctx, deviceauth.ExchangeDeviceTokenParams{
 				GrantType:  deviceauth.OAuth2DeviceGrantType,
 				DeviceCode: res.DeviceCode,
@@ -417,7 +415,7 @@ func TestDeviceAuth_Concurrency(t *testing.T) {
 			} else if errors.Is(err, deviceauth.ErrAlreadyConsumed) || errors.Is(err, deviceauth.ErrInvalidDeviceCode) {
 				alreadyConsumedCount++
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

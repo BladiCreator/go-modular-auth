@@ -2,7 +2,6 @@
 package organization
 
 import (
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Event Name Constants
@@ -71,13 +70,11 @@ type (
 		Slug     string
 		Logo     string
 		Metadata map[string]any
-		plugin.ExtraContainer
 	}
 
 	OrgCreateAfterEventPayload struct {
 		Organization *Organization
 		Member       *Member
-		plugin.ExtraContainer
 	}
 
 	OrgUpdateBeforeEventPayload struct {
@@ -86,28 +83,23 @@ type (
 		Slug           *string
 		Logo           *string
 		Metadata       map[string]any
-		plugin.ExtraContainer
 	}
 
 	OrgUpdateAfterEventPayload struct {
 		Organization *Organization
-		plugin.ExtraContainer
 	}
 
 	OrgDeleteBeforeEventPayload struct {
 		OrganizationID string
-		plugin.ExtraContainer
 	}
 
 	OrgDeleteAfterEventPayload struct {
 		OrganizationID string
-		plugin.ExtraContainer
 	}
 
 	OrgSetActiveBeforeEventPayload struct {
 		UserID         string
 		OrganizationID string
-		plugin.ExtraContainer
 	}
 
 	OrgSetActiveAfterEventPayload struct {
@@ -115,7 +107,6 @@ type (
 		OrganizationID string
 		Organization   *Organization
 		Member         *Member
-		plugin.ExtraContainer
 	}
 
 	// Member Payloads
@@ -124,48 +115,40 @@ type (
 		OrganizationID string
 		UserID         string
 		Role           string
-		plugin.ExtraContainer
 	}
 
 	MemberAddAfterEventPayload struct {
 		Member *Member
-		plugin.ExtraContainer
 	}
 
 	MemberRemoveBeforeEventPayload struct {
 		OrganizationID string
 		UserID         string
-		plugin.ExtraContainer
 	}
 
 	MemberRemoveAfterEventPayload struct {
 		OrganizationID string
 		UserID         string
-		plugin.ExtraContainer
 	}
 
 	MemberRoleUpdateBeforeEventPayload struct {
 		OrganizationID string
 		UserID         string
 		NewRole        string
-		plugin.ExtraContainer
 	}
 
 	MemberRoleUpdateAfterEventPayload struct {
 		Member *Member
-		plugin.ExtraContainer
 	}
 
 	MemberLeaveBeforeEventPayload struct {
 		OrganizationID string
 		UserID         string
-		plugin.ExtraContainer
 	}
 
 	MemberLeaveAfterEventPayload struct {
 		OrganizationID string
 		UserID         string
-		plugin.ExtraContainer
 	}
 
 	// Invitation Payloads
@@ -176,47 +159,39 @@ type (
 		Email          string
 		Role           string
 		TeamID         *string
-		plugin.ExtraContainer
 	}
 
 	InvitationCreateAfterEventPayload struct {
 		Invitation *Invitation
-		plugin.ExtraContainer
 	}
 
 	InvitationAcceptBeforeEventPayload struct {
 		InvitationID string
 		UserID       string
-		plugin.ExtraContainer
 	}
 
 	InvitationAcceptAfterEventPayload struct {
 		Invitation   *Invitation
 		Member       *Member
 		Organization *Organization
-		plugin.ExtraContainer
 	}
 
 	InvitationRejectBeforeEventPayload struct {
 		InvitationID string
 		UserID       string
-		plugin.ExtraContainer
 	}
 
 	InvitationRejectAfterEventPayload struct {
 		Invitation *Invitation
-		plugin.ExtraContainer
 	}
 
 	InvitationCancelBeforeEventPayload struct {
 		InvitationID string
 		UserID       string
-		plugin.ExtraContainer
 	}
 
 	InvitationCancelAfterEventPayload struct {
 		Invitation *Invitation
-		plugin.ExtraContainer
 	}
 
 	// Team Payloads
@@ -224,69 +199,57 @@ type (
 	TeamCreateBeforeEventPayload struct {
 		OrganizationID string
 		Name           string
-		plugin.ExtraContainer
 	}
 
 	TeamCreateAfterEventPayload struct {
 		Team *Team
-		plugin.ExtraContainer
 	}
 
 	TeamUpdateBeforeEventPayload struct {
 		TeamID string
 		Name   string
-		plugin.ExtraContainer
 	}
 
 	TeamUpdateAfterEventPayload struct {
 		Team *Team
-		plugin.ExtraContainer
 	}
 
 	TeamDeleteBeforeEventPayload struct {
 		TeamID string
-		plugin.ExtraContainer
 	}
 
 	TeamDeleteAfterEventPayload struct {
 		TeamID string
-		plugin.ExtraContainer
 	}
 
 	TeamMemberAddBeforeEventPayload struct {
 		TeamID string
 		UserID string
-		plugin.ExtraContainer
 	}
 
 	TeamMemberAddAfterEventPayload struct {
 		TeamMember *TeamMember
-		plugin.ExtraContainer
 	}
 
 	TeamMemberRemoveBeforeEventPayload struct {
 		TeamID string
 		UserID string
-		plugin.ExtraContainer
 	}
 
 	TeamMemberRemoveAfterEventPayload struct {
 		TeamID string
 		UserID string
-		plugin.ExtraContainer
 	}
 
 	TeamSetActiveBeforeEventPayload struct {
 		UserID string
 		TeamID string
-		plugin.ExtraContainer
 	}
 
 	TeamSetActiveAfterEventPayload struct {
 		UserID string
 		TeamID string
 		Team   *Team
-		plugin.ExtraContainer
 	}
 
 	// Dynamic Role Payloads
@@ -295,33 +258,27 @@ type (
 		OrganizationID string
 		Role           string
 		Permissions    map[string][]string
-		plugin.ExtraContainer
 	}
 
 	RoleCreateAfterEventPayload struct {
 		Role *OrganizationRole
-		plugin.ExtraContainer
 	}
 
 	RoleUpdateBeforeEventPayload struct {
 		RoleID      string
 		Role        *string
 		Permissions map[string][]string
-		plugin.ExtraContainer
 	}
 
 	RoleUpdateAfterEventPayload struct {
 		Role *OrganizationRole
-		plugin.ExtraContainer
 	}
 
 	RoleDeleteBeforeEventPayload struct {
 		RoleID string
-		plugin.ExtraContainer
 	}
 
 	RoleDeleteAfterEventPayload struct {
 		RoleID string
-		plugin.ExtraContainer
 	}
 )

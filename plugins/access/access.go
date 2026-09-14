@@ -2,6 +2,7 @@ package access
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 	"strings"
 	"sync"
@@ -133,6 +134,19 @@ func (ac *AccessControl) GetAllRoles() map[string]*Role {
 		result[k] = v.Clone()
 	}
 	return result
+}
+
+// Roles returns a push iterator over all registered roles in AccessControl without heap allocating a map or slice copy.
+func (ac *AccessControl) Roles() iter.Seq[*Role] {
+	return func(yield func(*Role) bool) {
+		ac.mu.RLock()
+		defer ac.mu.RUnlock()
+		for _, r := range ac.roles {
+			if !yield(r) {
+				return
+			}
+		}
+	}
 }
 
 // DeleteRole removes a registered role from AccessControl. Returns true if the role existed and was removed.

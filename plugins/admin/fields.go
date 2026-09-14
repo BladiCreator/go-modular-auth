@@ -33,12 +33,3 @@ const (
 	ActionSessionRevoke = "revoke"
 	ActionSessionDelete = "delete"
 )
-
-// Standard metadata and context keys for Extra payloads and shared plugin.Context storage.
-const (
-	ExtraKeyImpersonatedBy = "impersonated_by"
-	ExtraKeyAdminSession   = "admin_session"
-	ExtraKeyBanReason      = "ban_reason"
-	ExtraKeyBanExpires     = "ban_expires"
-	ExtraKeyRole           = "role"
-)

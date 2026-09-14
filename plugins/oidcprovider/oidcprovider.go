@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the OIDC Provider plugin ("oidc-provider").

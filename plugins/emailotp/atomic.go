@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // storeOTP converts a plain text OTP into its persistent representation according to StoreOTPMode.
@@ -124,7 +124,7 @@ func (p *Plugin) resolveOTP(ctx context.Context, identifier string, email string
 	}
 
 	record := &VerificationRecord{
-		ID:         uuid.NewString(),
+		ID:         uuid.NewV7().String(),
 		Identifier: identifier,
 		Value:      storedValue + ":0",
 		ExpiresAt:  expiresAt,

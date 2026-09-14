@@ -465,13 +465,11 @@ func TestAccessControl_Concurrency(t *testing.T) {
 	workers := 20
 	iterations := 100
 
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
+	for workerID := range workers {
+		wg.Go(func() {
 			roleName := fmt.Sprintf("dynamic_role_%d", workerID)
 
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				// Write
 				_, _ = ac.NewRole(roleName, access.Statements{"project": {"read", "update"}})
 
@@ -483,14 +481,12 @@ func TestAccessControl_Concurrency(t *testing.T) {
 				}
 
 				// Multi-role evaluation
-				_ = ac.AuthorizeRoles([]string{"base_reader", roleName}, access.Req("project", "read"))
-
-				// Delete periodically
-				if j%20 == 0 {
-					ac.DeleteRole(roleName)
+				res := ac.AuthorizeRoles([]string{roleName, "base_reader"}, access.Req("project", "read"))
+				if !res.Success {
+					t.Errorf("expected read access granted during concurrency")
 				}
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -614,4 +610,37 @@ func TestAccessHTTPMiddleware(t *testing.T) {
 			t.Fatalf("expected status 200, got %d", rec.Code)
 		}
 	})
+}
+
+func TestAccessControl_Iterators(t *testing.T) {
+	ac := access.CreateAccessControl(testMasterStatements)
+	ac.MustNewRole("role_a", access.Statements{"project": {"read"}})
+	ac.MustNewRole("role_b", access.Statements{"project": {"create", "update"}})
+
+	// Test Roles() iterator (Go 1.23+ range-over-func)
+	roleCount := 0
+	for r := range ac.Roles() {
+		if r.Name() == "role_a" || r.Name() == "role_b" {
+			roleCount++
+		}
+	}
+	if roleCount != 2 {
+		t.Errorf("expected 2 roles from Roles() iterator, got %d", roleCount)
+	}
+
+	// Test AllStatements() iterator on Role
+	roleB, ok := ac.GetRole("role_b")
+	if !ok {
+		t.Fatalf("expected role_b to exist")
+	}
+
+	stmtCount := 0
+	for res, actions := range roleB.AllStatements() {
+		if res == "project" && len(actions) == 2 {
+			stmtCount++
+		}
+	}
+	if stmtCount != 1 {
+		t.Errorf("expected 1 statement from AllStatements() iterator, got %d", stmtCount)
+	}
 }

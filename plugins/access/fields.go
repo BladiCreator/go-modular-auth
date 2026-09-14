@@ -41,11 +41,4 @@ const (
 
 	// ContextKeySubjectRoles is the context key used by context helpers to pass subject roles.
 	ContextKeySubjectRoles = "access:subject:roles"
-
-	// Extra metadata keys for audit events.
-	ExtraKeyResource = "resource"
-	ExtraKeyActions  = "actions"
-	ExtraKeyRoles    = "roles"
-	ExtraKeySubject  = "subject"
-	ExtraKeyReason   = "reason"
 )

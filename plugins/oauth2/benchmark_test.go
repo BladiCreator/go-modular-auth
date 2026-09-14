@@ -12,8 +12,8 @@ import (
 
 func BenchmarkOAuth2_ComputeCodeChallenge(b *testing.B) {
 	verifier := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		_ = oauth2.ComputeCodeChallenge(verifier)
 	}
 }
@@ -21,8 +21,8 @@ func BenchmarkOAuth2_ComputeCodeChallenge(b *testing.B) {
 func BenchmarkOAuth2_VerifyPKCE(b *testing.B) {
 	verifier := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 	challenge := oauth2.ComputeCodeChallenge(verifier)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		_ = oauth2.VerifyPKCE(verifier, challenge, "S256")
 	}
 }
@@ -31,8 +31,8 @@ func BenchmarkOAuth2_DerivePairwiseSubject(b *testing.B) {
 	salt := "secret-salt-pairwise-32-bytes"
 	sector := "https://client.example.com"
 	userID := "user-123456789"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		_ = oauth2.DerivePairwiseSubject(salt, sector, userID)
 	}
 }
@@ -40,8 +40,8 @@ func BenchmarkOAuth2_DerivePairwiseSubject(b *testing.B) {
 func BenchmarkOAuth2_AES_EncryptDecrypt(b *testing.B) {
 	key := oauth2.DeriveAESKey("my-super-secret-key-32-bytes!!")
 	plaintext := []byte("confidential-token-or-secret-string-123456")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		enc, err := oauth2.Encrypt(plaintext, key)
 		if err != nil {
 			b.Fatal(err)
@@ -79,9 +79,9 @@ func BenchmarkOAuth2_TokenIssuance_JWT(b *testing.B) {
 	challenge := oauth2.ComputeCodeChallenge(verifier)
 
 	ctx := context.Background()
-	b.ResetTimer()
+	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		b.StopTimer()
 		authRes, _ := p.Authorize(ctx, oauth2.AuthorizeParams{
 			ClientID:            client.ClientID,

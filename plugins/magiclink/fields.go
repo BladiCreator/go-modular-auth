@@ -5,18 +5,6 @@ import (
 	"strings"
 )
 
-// Standard Extra metadata keys that can be set or consumed in Magic Link parameters and Event payloads.
-const (
-	ExtraKeyEmail              = "magic_link_email"
-	ExtraKeyToken              = "magic_link_token"
-	ExtraKeyName               = "magic_link_name"
-	ExtraKeyCallbackURL        = "magic_link_callback_url"
-	ExtraKeyNewUserCallbackURL = "magic_link_new_user_callback_url"
-	ExtraKeyErrorCallbackURL   = "magic_link_error_callback_url"
-	ExtraKeyIPAddress          = "ip_address"
-	ExtraKeyUserAgent          = "user_agent"
-)
-
 // Context keys stored in plugin.Context for Magic Link state management.
 const (
 	ContextKeyMagicLinkPendingPrefix  = "magic_link_pending_"

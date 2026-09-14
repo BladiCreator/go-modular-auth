@@ -599,26 +599,28 @@ func (p *Plugin) VerifyAuthentication(ctx context.Context, params *VerifyAuthent
 		return nil, fmt.Errorf("passkey: failed to generate session token: %w", err)
 	}
 
-	ipAddress := ""
-	userAgent := ""
-	if params.Extra != nil {
-		if ip, ok := params.Extra[ExtraKeyIPAddress].(string); ok {
+	ipAddress := params.IPAddress
+	userAgent := params.UserAgent
+	if ipAddress == "" && params.Extra != nil {
+		if ip, ok := params.Extra["ipAddress"].(string); ok {
 			ipAddress = ip
 		}
-		if ua, ok := params.Extra[ExtraKeyUserAgent].(string); ok {
+	}
+	if userAgent == "" && params.Extra != nil {
+		if ua, ok := params.Extra["userAgent"].(string); ok {
 			userAgent = ua
 		}
 	}
 
 	now := time.Now()
 	sessionParams := &dto.CreateSessionParams{
-		UserID:         userEntity.ID,
-		Token:          sessionToken,
-		IPAddress:      ipAddress,
-		UserAgent:      userAgent,
-		ExpiresAt:      now.Add(p.config.SessionDuration),
-		CreatedAt:      now,
-		ExtraContainer: params.ExtraContainer,
+		UserID:    userEntity.ID,
+		Token:     sessionToken,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+		ExpiresAt: now.Add(p.config.SessionDuration),
+		CreatedAt: now,
+		Extra:     params.Extra,
 	}
 
 	session, err := p.repo.CreateSession(ctx, sessionParams)

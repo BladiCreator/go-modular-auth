@@ -154,11 +154,10 @@ func (p *Plugin) CreateUser(ctx context.Context, params CreateUserParams) (*enti
 	}
 
 	createParams := &dto.CreateUserParams{
-		Name:           strings.TrimSpace(params.Name),
-		Email:          email,
-		PasswordHash:   passwordHash,
-		Role:           role,
-		ExtraContainer: params.ExtraContainer,
+		Name:         strings.TrimSpace(params.Name),
+		Email:        email,
+		PasswordHash: passwordHash,
+		Role:         role,
 	}
 
 	user, err := p.repo.CreateUser(ctx, createParams)
@@ -171,10 +170,9 @@ func (p *Plugin) CreateUser(ctx context.Context, params CreateUserParams) (*enti
 	}
 
 	p.publishEvent(EventUserCreated, &UserCreatedEventPayload{
-		CallerID:       params.Caller.UserID,
-		CallerRole:     params.Caller.Role,
-		User:           user,
-		ExtraContainer: params.ExtraContainer,
+		CallerID:   params.Caller.UserID,
+		CallerRole: params.Caller.Role,
+		User:       user,
 	})
 
 	return user, nil
@@ -277,10 +275,9 @@ func (p *Plugin) UpdateUser(ctx context.Context, params UpdateUserParams) (*enti
 	}
 
 	p.publishEvent(EventUserUpdated, &UserUpdatedEventPayload{
-		CallerID:       params.Caller.UserID,
-		CallerRole:     params.Caller.Role,
-		User:           user,
-		ExtraContainer: params.ExtraContainer,
+		CallerID:   params.Caller.UserID,
+		CallerRole: params.Caller.Role,
+		User:       user,
 	})
 
 	return user, nil
@@ -563,9 +560,9 @@ func (p *Plugin) ImpersonateUser(ctx context.Context, params ImpersonateUserPara
 		return nil, err
 	}
 
-	var adminSessionToken string
-	if params.Caller.Extra != nil {
-		if val, ok := params.Caller.Extra[ExtraKeyAdminSession]; ok {
+	adminSessionToken := params.Caller.SessionToken
+	if adminSessionToken == "" && params.Caller.Extra != nil {
+		if val, ok := params.Caller.Extra["admin_session"]; ok {
 			if sToken, ok := val.(string); ok {
 				adminSessionToken = sToken
 			}

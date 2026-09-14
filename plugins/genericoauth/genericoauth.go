@@ -8,7 +8,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the Generic OAuth plugin ("generic-oauth").
@@ -205,7 +205,7 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 			user = existingUser
 			// Link social account to existing user
 			newAccount := &entity.Account{
-				ID:        uuid.New().String(),
+				ID:        uuid.NewV7().String(),
 				UserID:    user.ID,
 				Provider:  providerID,
 				CreatedAt: time.Now(),
@@ -229,7 +229,7 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 		}
 
 		newUser := &entity.User{
-			ID:            uuid.New().String(),
+			ID:            uuid.NewV7().String(),
 			Name:          userName,
 			Email:         userInfo.Email,
 			EmailVerified: userInfo.EmailVerified,
@@ -243,7 +243,7 @@ func (p *Plugin) Callback(ctx context.Context, providerID string, code string, s
 		}
 
 		newAccount := &entity.Account{
-			ID:        uuid.New().String(),
+			ID:        uuid.NewV7().String(),
 			UserID:    user.ID,
 			Provider:  providerID,
 			CreatedAt: time.Now(),
@@ -323,7 +323,7 @@ func (p *Plugin) LinkAccount(ctx context.Context, userID string, providerID stri
 	}
 
 	newAccount := &entity.Account{
-		ID:        uuid.New().String(),
+		ID:        uuid.NewV7().String(),
 		UserID:    userID,
 		Provider:  providerID,
 		CreatedAt: time.Now(),

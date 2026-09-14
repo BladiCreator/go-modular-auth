@@ -9,7 +9,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 )
@@ -520,9 +519,9 @@ func TestAdminPlugin_Impersonation(t *testing.T) {
 	anotherAdmin, _ := store.CreateUser(ctx, &dto.CreateUserParams{Name: "Other Admin", Email: "admin2@corp.com", Role: "admin"})
 
 	adminCaller := admin.CallerContext{
-		UserID:         adminUser.ID,
-		Role:           admin.RoleAdmin,
-		ExtraContainer: plugin.ExtraContainer{Extra: map[string]any{admin.ExtraKeyAdminSession: "admin-secret-session-token"}},
+		UserID:       adminUser.ID,
+		Role:         admin.RoleAdmin,
+		SessionToken: "admin-secret-session-token",
 	}
 
 	t.Run("Cannot impersonate self", func(t *testing.T) {

@@ -10,7 +10,6 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/config"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
-	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/internal/mock"
 	"github.com/BladiCreator/go-modular-auth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
@@ -305,11 +304,6 @@ func TestSignIn_WithOptionsAndSessionManager(t *testing.T) {
 	authRes, err := p.SignIn(ctx, dto.SignInParams{
 		Email:    "opts@example.com",
 		Password: "password123",
-		ExtraContainer: entity.ExtraContainer{
-			Extra: map[string]any{
-				"paramExtra": "from_params",
-			},
-		},
 	},
 		emailpassword.WithRememberMe(true),
 		emailpassword.WithIPAddress("192.168.1.50"),
@@ -871,26 +865,21 @@ func TestEventEmissions(t *testing.T) {
 	}
 }
 
-func TestSignUp_WithCreateUserParamsExtra(t *testing.T) {
+func TestSignUp_WithCreateUserParams(t *testing.T) {
 	app, p, _ := setupTestAuth(t)
 	ctx := context.Background()
 
 	var interceptedRole string
-	var extraFound bool
 
 	app.Hooks().Subscribe(emailpassword.EventSignUpBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
-			req.Params.Set(emailpassword.ExtraKeyRole, "admin")
-			req.Params.Set(emailpassword.ExtraKeyOrgID, "org_999")
+			req.Params.Role = "admin"
 		}
 	})
 
 	app.Hooks().Subscribe(emailpassword.EventSignUpAfter, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*emailpassword.SignUpEventPayload); ok && req.Params != nil {
-			if val, ok := req.Params.Get(emailpassword.ExtraKeyRole); ok {
-				interceptedRole, _ = val.(string)
-				extraFound = true
-			}
+			interceptedRole = req.Params.Role
 		}
 	})
 
@@ -903,7 +892,7 @@ func TestSignUp_WithCreateUserParamsExtra(t *testing.T) {
 		t.Fatalf("SignUp failed: %v", err)
 	}
 
-	if !extraFound || interceptedRole != "admin" {
-		t.Errorf("Expected role 'admin' in CreateUserParams.Extra, got %v (found: %v)", interceptedRole, extraFound)
+	if interceptedRole != "admin" {
+		t.Errorf("Expected role 'admin' in CreateUserParams.Role, got %v", interceptedRole)
 	}
 }

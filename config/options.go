@@ -1,6 +1,8 @@
 package config
 
 import (
+	"log/slog"
+
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 )
@@ -107,5 +109,17 @@ func WithHooks(hooks *plugin.Hooks) Option {
 func WithAsyncHooks(async bool) Option {
 	return func(c *Config) {
 		c.AsyncHooks = async
+	}
+}
+
+// WithLogger sets a structured slog.Logger for the Auth engine and plugins.
+// If nil is passed, a discard logger is used to prevent nil pointer panics.
+func WithLogger(logger *slog.Logger) Option {
+	return func(c *Config) {
+		if logger == nil {
+			c.Logger = slog.New(slog.DiscardHandler)
+			return
+		}
+		c.Logger = logger
 	}
 }

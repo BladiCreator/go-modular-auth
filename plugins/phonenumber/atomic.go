@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/google/uuid"
 )
 
@@ -151,10 +150,10 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 	if err == nil && existing != nil && existing.ExpiresAt.Before(time.Now()) {
 		_ = p.repo.DeleteVerificationValue(ctx, identifier)
 		p.publishEvent(EventPhoneNumberOTPExpired, &OTPFailedPayload{
-			PhoneNumber:    phoneNumber,
-			Type:           otpType,
-			Reason:         "expired",
-			ExtraContainer: plugin.ExtraContainer{Extra: extra},
+			PhoneNumber: phoneNumber,
+			Type:        otpType,
+			Reason:      "expired",
+			Extra:       extra,
 		})
 		return ErrOTPExpired
 	}
@@ -163,10 +162,10 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 	consumed, err := p.repo.ConsumeVerificationValue(ctx, identifier)
 	if err != nil || consumed == nil {
 		p.publishEvent(EventPhoneNumberOTPFailed, &OTPFailedPayload{
-			PhoneNumber:    phoneNumber,
-			Type:           otpType,
-			Reason:         "invalid_or_consumed",
-			ExtraContainer: plugin.ExtraContainer{Extra: extra},
+			PhoneNumber: phoneNumber,
+			Type:        otpType,
+			Reason:      "invalid_or_consumed",
+			Extra:       extra,
 		})
 		return ErrInvalidOTP
 	}
@@ -174,10 +173,10 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 	// Check if the consumed record had already expired
 	if consumed.ExpiresAt.Before(time.Now()) {
 		p.publishEvent(EventPhoneNumberOTPExpired, &OTPFailedPayload{
-			PhoneNumber:    phoneNumber,
-			Type:           otpType,
-			Reason:         "expired",
-			ExtraContainer: plugin.ExtraContainer{Extra: extra},
+			PhoneNumber: phoneNumber,
+			Type:        otpType,
+			Reason:      "expired",
+			Extra:       extra,
 		})
 		return ErrOTPExpired
 	}
@@ -188,11 +187,11 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 	// 3. Attempt budget check
 	if attempts >= p.config.AllowedAttempts {
 		p.publishEvent(EventPhoneNumberOTPAttemptsExceeded, &OTPFailedPayload{
-			PhoneNumber:    phoneNumber,
-			Type:           otpType,
-			AttemptsUsed:   attempts,
-			Reason:         "too_many_attempts",
-			ExtraContainer: plugin.ExtraContainer{Extra: extra},
+			PhoneNumber:  phoneNumber,
+			Type:         otpType,
+			AttemptsUsed: attempts,
+			Reason:       "too_many_attempts",
+			Extra:        extra,
 		})
 		return ErrTooManyAttempts
 	}
@@ -216,7 +215,7 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 				AttemptsUsed:      newAttempts,
 				AttemptsRemaining: p.config.AllowedAttempts - newAttempts,
 				Reason:            "invalid_code",
-				ExtraContainer:    plugin.ExtraContainer{Extra: extra},
+				Extra:             extra,
 			})
 			return ErrInvalidOTP
 		}
@@ -228,7 +227,7 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 			AttemptsUsed:      newAttempts,
 			AttemptsRemaining: 0,
 			Reason:            "too_many_attempts",
-			ExtraContainer:    plugin.ExtraContainer{Extra: extra},
+			Extra:             extra,
 		})
 		return ErrTooManyAttempts
 	}

@@ -614,26 +614,26 @@ func TestOrganization_ConfigLimits(t *testing.T) {
 	}
 }
 
-// 7. Event Emissions & Extra Metadata
-func TestOrganization_EventEmissionsAndExtra(t *testing.T) {
+// 7. Event Emissions & Metadata
+func TestOrganization_EventEmissionsAndMetadata(t *testing.T) {
 	p, store, pCtx := setupTestEnvironment()
 	ctx := context.Background()
 
 	var eventOrgCreatedAfter bool
 	pCtx.Hooks().Subscribe(organization.EventOrgCreateAfter, func(payload *organization.OrgCreateAfterEventPayload) {
 		eventOrgCreatedAfter = true
-		if payload.Extra["source"] != "mobile_app" {
-			t.Errorf("expected Extra[source] = mobile_app, got %v", payload.Extra["source"])
+		if payload.Organization.Metadata["source"] != "mobile_app" {
+			t.Errorf("expected Organization.Metadata[source] = mobile_app, got %v", payload.Organization.Metadata["source"])
 		}
 	})
 
 	u, _ := store.CreateUser(ctx, &dto.CreateUserParams{Name: "Sam", Email: "sam@example.com"})
 
 	params := organization.CreateOrganizationParams{
-		UserID: u.ID,
-		Name:   "App Studio",
+		UserID:   u.ID,
+		Name:     "App Studio",
+		Metadata: map[string]any{"source": "mobile_app"},
 	}
-	params.Set("source", "mobile_app")
 
 	res, err := p.CreateOrganization(ctx, params)
 	if err != nil {
@@ -644,9 +644,9 @@ func TestOrganization_EventEmissionsAndExtra(t *testing.T) {
 		t.Fatal("expected EventOrgCreateAfter to be published")
 	}
 
-	val, ok := params.Get("source")
+	val, ok := params.Metadata["source"]
 	if !ok || val != "mobile_app" {
-		t.Fatalf("expected params.Get(source) = mobile_app, got %v", val)
+		t.Fatalf("expected params.Metadata[source] = mobile_app, got %v", val)
 	}
 	_ = res
 }
@@ -685,9 +685,8 @@ func TestOrganization_Concurrency(t *testing.T) {
 	const workerCount = 20
 
 	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
+		idx := i
+		wg.Go(func() {
 			user, _ := store.CreateUser(ctx, &dto.CreateUserParams{
 				Name:  "Worker",
 				Email: "worker" + string(rune(idx+'a')) + "@example.com",
@@ -701,7 +700,7 @@ func TestOrganization_Concurrency(t *testing.T) {
 			}
 			_, _ = p.GetOrganization(ctx, organization.GetOrganizationParams{OrganizationID: orgID})
 			_, _ = p.ListMembers(ctx, organization.ListMembersParams{OrganizationID: orgID, Limit: 10})
-		}(i)
+		})
 	}
 
 	wg.Wait()

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Parameter and Result Structs
@@ -17,7 +16,7 @@ type (
 		// Type specifies the OTP workflow type ("email-verification", "sign-in", "forget-password", "change-email").
 		Type OTPType `json:"type"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// SendVerificationOTPResult contains the delivery status and expiry of the dispatched OTP.
@@ -36,8 +35,6 @@ type (
 
 		// Type specifies the OTP workflow type.
 		Type OTPType `json:"type"`
-
-		plugin.ExtraContainer
 	}
 
 	// GetVerificationOTPParams defines parameters for server-side inspection of an active OTP code.
@@ -47,8 +44,6 @@ type (
 
 		// Type specifies the OTP workflow type.
 		Type OTPType `json:"type"`
-
-		plugin.ExtraContainer
 	}
 
 	// GetVerificationOTPResult contains the plain text OTP code retrieved from storage.
@@ -68,7 +63,7 @@ type (
 		// OTP is the code to check.
 		OTP string `json:"otp"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// CheckVerificationOTPResult reports whether the tested OTP code is valid.
@@ -85,7 +80,7 @@ type (
 		// OTP is the verification code submitted by the user.
 		OTP string `json:"otp"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// VerifyEmailOTPResult contains the updated user profile and optional auto-created session.
@@ -114,7 +109,7 @@ type (
 		// Name is the optional display name assigned if a new user is created.
 		Name string `json:"name,omitempty"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// SignInEmailOTPResult contains the authenticated user profile, session, and registration indicator.
@@ -137,7 +132,7 @@ type (
 		// Email is the account email requesting a password reset.
 		Email string `json:"email"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// RequestPasswordResetResult reports the result of the password reset dispatch request.
@@ -157,7 +152,7 @@ type (
 		// NewPassword is the new password string to set.
 		NewPassword string `json:"new_password"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// ResetPasswordResult reports whether the password was successfully updated.
@@ -177,7 +172,7 @@ type (
 		// OTP is the verification code for the current email if VerifyCurrentEmail is enabled.
 		OTP string `json:"otp,omitempty"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// RequestEmailChangeResult reports whether the email change OTP was dispatched to the new email.
@@ -197,7 +192,7 @@ type (
 		// OTP is the confirmation code delivered to the new email.
 		OTP string `json:"otp"`
 
-		plugin.ExtraContainer
+		Extra map[string]any `json:"extra,omitzero"`
 	}
 
 	// ChangeEmailResult reports the outcome of the email change confirmation.

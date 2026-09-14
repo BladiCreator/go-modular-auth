@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
@@ -37,6 +38,7 @@ type Config struct {
 	Interceptors      []any
 	Hooks             *plugin.Hooks
 	AsyncHooks        bool
+	Logger            *slog.Logger
 }
 
 // DefaultConfig returns a Config initialized with sensible default values.
@@ -46,6 +48,7 @@ func DefaultConfig() Config {
 		Plugins:       []plugin.Plugin{},
 		SessionConfig: DefaultSessionConfig(),
 		Interceptors:  []any{},
+		Logger:        slog.New(slog.DiscardHandler),
 	}
 }
 

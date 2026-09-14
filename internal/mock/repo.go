@@ -1,14 +1,14 @@
 package mock
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"math/rand"
-	"sort"
-	"strconv"
+	"slices"
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -69,7 +69,7 @@ func (m *MockRepo) CreateUser(ctx context.Context, params *dto.CreateUserParams)
 	defer m.mu.Unlock()
 
 	user := &entity.User{
-		ID:           "usr_" + strconv.FormatInt(rand.Int63(), 10),
+		ID:           "usr_" + uuid.NewV7().String(),
 		Name:         params.Name,
 		Email:        params.Email,
 		Role:         params.Role,
@@ -189,25 +189,21 @@ func (m *MockRepo) ListUsers(ctx context.Context, filter admin.ListUsersFilter) 
 		matched = append(matched, &cloned)
 	}
 
-	sort.Slice(matched, func(i, j int) bool {
+	slices.SortFunc(matched, func(a, b *entity.User) int {
 		asc := strings.ToLower(filter.SortDirection) == "asc"
+		var cmpRes int
 		switch strings.ToLower(filter.SortBy) {
 		case "email":
-			if asc {
-				return matched[i].Email < matched[j].Email
-			}
-			return matched[i].Email > matched[j].Email
+			cmpRes = cmp.Compare(a.Email, b.Email)
 		case "name":
-			if asc {
-				return matched[i].Name < matched[j].Name
-			}
-			return matched[i].Name > matched[j].Name
-		default:
-			if asc {
-				return matched[i].CreatedAt.Before(matched[j].CreatedAt)
-			}
-			return matched[i].CreatedAt.After(matched[j].CreatedAt)
+			cmpRes = cmp.Compare(a.Name, b.Name)
+		default: // created_at
+			cmpRes = a.CreatedAt.Compare(b.CreatedAt)
 		}
+		if asc {
+			return cmpRes
+		}
+		return -cmpRes
 	})
 
 	total := int64(len(matched))
@@ -242,7 +238,7 @@ func (m *MockRepo) LinkCredentialAccount(ctx context.Context, userID, passwordHa
 	}
 
 	acc := &entity.Account{
-		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		ID:        "acc_" + uuid.NewV7().String(),
 		UserID:    userID,
 		Provider:  "credential",
 		Password:  passwordHash,
@@ -260,7 +256,7 @@ func (m *MockRepo) CreateAccount(ctx context.Context, params *dto.CreateAccountP
 	defer m.mu.Unlock()
 
 	acc := &entity.Account{
-		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		ID:        "acc_" + uuid.NewV7().String(),
 		UserID:    params.UserID,
 		Provider:  params.Provider,
 		Password:  params.Password,
@@ -512,8 +508,8 @@ func (m *MockRepo) ListPasskeysByUserID(ctx context.Context, userID string) ([]*
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *entity.Passkey) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil

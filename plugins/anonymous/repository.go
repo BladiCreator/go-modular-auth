@@ -8,7 +8,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 var (
@@ -80,7 +80,7 @@ func (r *MemoryRepository) CreateAnonymousUser(_ context.Context, email, name st
 
 	now := time.Now()
 	u := &entity.User{
-		ID:          uuid.NewString(),
+		ID:          uuid.NewV7().String(),
 		Name:        name,
 		Email:       email,
 		IsAnonymous: true,

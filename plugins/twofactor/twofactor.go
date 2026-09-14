@@ -532,18 +532,16 @@ func (p *Plugin) VerifyMFAChallenge(ctx context.Context, params dto.VerifyChalle
 	switch method {
 	case MethodTOTP:
 		vRes, err = p.VerifyTOTP(ctx, VerifyTOTPParams{
-			UserID:         challenge.UserID,
-			Code:           params.Code,
-			TrustDevice:    params.TrustDevice,
-			DeviceID:       params.DeviceID,
-			ExtraContainer: params.ExtraContainer,
+			UserID:      challenge.UserID,
+			Code:        params.Code,
+			TrustDevice: params.TrustDevice,
+			DeviceID:    params.DeviceID,
 		})
 		// Fallback: if TOTP fails, check if the provided code is a valid single-use backup code
 		if err != nil {
 			if bRes, bErr := p.VerifyBackupCode(ctx, VerifyBackupCodeParams{
-				UserID:         challenge.UserID,
-				Code:           params.Code,
-				ExtraContainer: params.ExtraContainer,
+				UserID: challenge.UserID,
+				Code:   params.Code,
 			}); bErr == nil {
 				vRes = bRes
 				err = nil
@@ -551,15 +549,13 @@ func (p *Plugin) VerifyMFAChallenge(ctx context.Context, params dto.VerifyChalle
 		}
 	case MethodBackupCode:
 		vRes, err = p.VerifyBackupCode(ctx, VerifyBackupCodeParams{
-			UserID:         challenge.UserID,
-			Code:           params.Code,
-			ExtraContainer: params.ExtraContainer,
+			UserID: challenge.UserID,
+			Code:   params.Code,
 		})
 	case MethodOTP, MethodSMS, MethodEmail:
 		vRes, err = p.VerifyOTP(ctx, VerifyOTPParams{
-			UserID:         challenge.UserID,
-			Code:           params.Code,
-			ExtraContainer: params.ExtraContainer,
+			UserID: challenge.UserID,
+			Code:   params.Code,
 		})
 	default:
 		return nil, fmt.Errorf("twofactor: unsupported verification method '%s'", params.Method)
@@ -589,7 +585,6 @@ func (p *Plugin) VerifyChallenge(ctx context.Context, params VerifyChallengePara
 		Method:         params.Method,
 		TrustDevice:    params.TrustDevice,
 		DeviceID:       params.DeviceID,
-		ExtraContainer: params.ExtraContainer,
 	})
 	if err != nil {
 		return nil, err
@@ -620,14 +615,9 @@ func (p *Plugin) VerifyChallengeSession(ctx context.Context, params dto.VerifyCh
 		return nil, fmt.Errorf("twofactor: failed to issue session: %w", err)
 	}
 
-	sessionData := &dto.SessionData{
+	return &dto.SessionData{
 		Session: sess,
-	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
-	}
-
-	return sessionData, nil
+	}, nil
 }
 
 // TrustDevice explicitly authorizes a client device for the configured trust duration.

@@ -44,20 +44,6 @@ const (
 	ResendStrategyReuse ResendStrategy = "reuse"
 )
 
-// Standard Extra metadata keys that can be set or consumed in Phone Number parameters and Event payloads.
-const (
-	ExtraKeyPhoneNumber         = "phone_number"
-	ExtraKeyPhoneNumberVerified = "phone_number_verified"
-	ExtraKeyOTPCode             = "otp_code"
-	ExtraKeyOTPType             = "otp_type"
-	ExtraKeyRememberMe          = "remember_me"
-	ExtraKeyUpdatePhone         = "update_phone_number"
-	ExtraKeyDisableSession      = "disable_session"
-	ExtraKeyDeviceID            = "device_id"
-	ExtraKeyIPAddress           = "ip_address"
-	ExtraKeyUserAgent           = "user_agent"
-)
-
 // ToOTPIdentifier formats the standard storage identifier for phone verification or sign-in OTP.
 // Format: "phone-verification-otp-<normalized_phone>"
 func ToOTPIdentifier(phoneNumber string) string {

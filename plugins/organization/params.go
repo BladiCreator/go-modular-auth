@@ -1,7 +1,6 @@
 package organization
 
 import (
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Parameter and Result Structs
@@ -15,7 +14,6 @@ type (
 		Slug     string         `json:"slug,omitempty"`
 		Logo     string         `json:"logo,omitempty"`
 		Metadata map[string]any `json:"metadata,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	CreateOrganizationResult struct {
@@ -25,7 +23,6 @@ type (
 
 	GetOrganizationParams struct {
 		OrganizationID string `json:"organization_id"`
-		plugin.ExtraContainer
 	}
 
 	GetOrganizationResult struct {
@@ -34,7 +31,6 @@ type (
 
 	GetOrganizationBySlugParams struct {
 		Slug string `json:"slug"`
-		plugin.ExtraContainer
 	}
 
 	GetOrganizationBySlugResult struct {
@@ -43,7 +39,6 @@ type (
 
 	GetFullOrganizationParams struct {
 		OrganizationID string `json:"organization_id"`
-		plugin.ExtraContainer
 	}
 
 	GetFullOrganizationResult struct {
@@ -60,7 +55,6 @@ type (
 		Slug           *string        `json:"slug,omitempty"`
 		Logo           *string        `json:"logo,omitempty"`
 		Metadata       map[string]any `json:"metadata,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	UpdateOrganizationResult struct {
@@ -70,7 +64,6 @@ type (
 	DeleteOrganizationParams struct {
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	DeleteOrganizationResult struct {
@@ -79,7 +72,6 @@ type (
 
 	ListOrganizationsParams struct {
 		UserID string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	ListOrganizationsResult struct {
@@ -88,7 +80,6 @@ type (
 
 	CheckSlugParams struct {
 		Slug string `json:"slug"`
-		plugin.ExtraContainer
 	}
 
 	CheckSlugResult struct {
@@ -98,7 +89,6 @@ type (
 	SetActiveOrganizationParams struct {
 		UserID         string `json:"user_id"`
 		OrganizationID string `json:"organization_id"`
-		plugin.ExtraContainer
 	}
 
 	SetActiveOrganizationResult struct {
@@ -108,7 +98,6 @@ type (
 
 	GetActiveOrganizationParams struct {
 		UserID string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	GetActiveOrganizationResult struct {
@@ -123,7 +112,6 @@ type (
 		UserID         string `json:"user_id"`
 		Role           string `json:"role"`
 		InvokingUserID string `json:"invoking_user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	AddMemberResult struct {
@@ -133,7 +121,6 @@ type (
 	GetMemberParams struct {
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	GetMemberResult struct {
@@ -143,7 +130,6 @@ type (
 	GetActiveMemberParams struct {
 		UserID         string `json:"user_id"`
 		OrganizationID string `json:"organization_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	GetActiveMemberResult struct {
@@ -153,7 +139,6 @@ type (
 	GetActiveMemberRoleParams struct {
 		UserID         string `json:"user_id"`
 		OrganizationID string `json:"organization_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	GetActiveMemberRoleResult struct {
@@ -165,7 +150,6 @@ type (
 		UserID         string `json:"user_id"`
 		Role           string `json:"role"`
 		InvokingUserID string `json:"invoking_user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	UpdateMemberRoleResult struct {
@@ -176,7 +160,6 @@ type (
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id"`
 		InvokingUserID string `json:"invoking_user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	RemoveMemberResult struct {
@@ -186,7 +169,6 @@ type (
 	LeaveOrganizationParams struct {
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	LeaveOrganizationResult struct {
@@ -197,7 +179,6 @@ type (
 		OrganizationID string `json:"organization_id"`
 		Limit          int    `json:"limit,omitempty"`
 		Offset         int    `json:"offset,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	ListMembersResult struct {
@@ -213,7 +194,6 @@ type (
 		Email          string  `json:"email"`
 		Role           string  `json:"role"`
 		TeamID         *string `json:"team_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	CreateInvitationResult struct {
@@ -222,7 +202,6 @@ type (
 
 	GetInvitationParams struct {
 		InvitationID string `json:"invitation_id"`
-		plugin.ExtraContainer
 	}
 
 	GetInvitationResult struct {
@@ -232,7 +211,6 @@ type (
 	AcceptInvitationParams struct {
 		InvitationID string `json:"invitation_id"`
 		UserID       string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	AcceptInvitationResult struct {
@@ -244,7 +222,6 @@ type (
 	RejectInvitationParams struct {
 		InvitationID string `json:"invitation_id"`
 		UserID       string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	RejectInvitationResult struct {
@@ -254,7 +231,6 @@ type (
 	CancelInvitationParams struct {
 		InvitationID string `json:"invitation_id"`
 		UserID       string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	CancelInvitationResult struct {
@@ -264,7 +240,6 @@ type (
 	ListInvitationsParams struct {
 		OrganizationID string            `json:"organization_id"`
 		Status         *InvitationStatus `json:"status,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	ListInvitationsResult struct {
@@ -274,7 +249,6 @@ type (
 	ListUserInvitationsParams struct {
 		Email  string            `json:"email"`
 		Status *InvitationStatus `json:"status,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	ListUserInvitationsResult struct {
@@ -287,7 +261,6 @@ type (
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id,omitempty"`
 		Name           string `json:"name"`
-		plugin.ExtraContainer
 	}
 
 	CreateTeamResult struct {
@@ -296,7 +269,6 @@ type (
 
 	GetTeamParams struct {
 		TeamID string `json:"team_id"`
-		plugin.ExtraContainer
 	}
 
 	GetTeamResult struct {
@@ -307,7 +279,6 @@ type (
 		TeamID string `json:"team_id"`
 		UserID string `json:"user_id,omitempty"`
 		Name   string `json:"name"`
-		plugin.ExtraContainer
 	}
 
 	UpdateTeamResult struct {
@@ -317,7 +288,6 @@ type (
 	DeleteTeamParams struct {
 		TeamID string `json:"team_id"`
 		UserID string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	DeleteTeamResult struct {
@@ -327,7 +297,6 @@ type (
 	ListTeamsParams struct {
 		OrganizationID string `json:"organization_id"`
 		UserID         string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	ListTeamsResult struct {
@@ -338,7 +307,6 @@ type (
 		TeamID         string `json:"team_id"`
 		UserID         string `json:"user_id"`
 		InvokingUserID string `json:"invoking_user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	AddTeamMemberResult struct {
@@ -349,7 +317,6 @@ type (
 		TeamID         string `json:"team_id"`
 		UserID         string `json:"user_id"`
 		InvokingUserID string `json:"invoking_user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	RemoveTeamMemberResult struct {
@@ -358,7 +325,6 @@ type (
 
 	ListTeamMembersParams struct {
 		TeamID string `json:"team_id"`
-		plugin.ExtraContainer
 	}
 
 	ListTeamMembersResult struct {
@@ -368,7 +334,6 @@ type (
 	SetActiveTeamParams struct {
 		UserID string `json:"user_id"`
 		TeamID string `json:"team_id"`
-		plugin.ExtraContainer
 	}
 
 	SetActiveTeamResult struct {
@@ -377,7 +342,6 @@ type (
 
 	GetActiveTeamParams struct {
 		UserID string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	GetActiveTeamResult struct {
@@ -391,7 +355,6 @@ type (
 		UserID         string              `json:"user_id,omitempty"`
 		Role           string              `json:"role"`
 		Permissions    map[string][]string `json:"permissions"`
-		plugin.ExtraContainer
 	}
 
 	CreateRoleResult struct {
@@ -400,7 +363,6 @@ type (
 
 	GetRoleParams struct {
 		RoleID string `json:"role_id"`
-		plugin.ExtraContainer
 	}
 
 	GetRoleResult struct {
@@ -412,7 +374,6 @@ type (
 		UserID      string              `json:"user_id,omitempty"`
 		Role        *string             `json:"role,omitempty"`
 		Permissions map[string][]string `json:"permissions,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	UpdateRoleResult struct {
@@ -422,7 +383,6 @@ type (
 	DeleteRoleParams struct {
 		RoleID string `json:"role_id"`
 		UserID string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
 	}
 
 	DeleteRoleResult struct {
@@ -431,7 +391,6 @@ type (
 
 	ListRolesParams struct {
 		OrganizationID string `json:"organization_id"`
-		plugin.ExtraContainer
 	}
 
 	ListRolesResult struct {
@@ -443,7 +402,6 @@ type (
 		UserID         string      `json:"user_id,omitempty"`
 		Role           string      `json:"role,omitempty"`
 		Permissions    Permissions `json:"permissions"`
-		plugin.ExtraContainer
 	}
 
 	HasPermissionResult struct {

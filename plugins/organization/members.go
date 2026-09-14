@@ -61,7 +61,6 @@ func (p *Plugin) AddMember(ctx context.Context, params AddMemberParams) (*AddMem
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
 		Role:           role,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Create Member Entity
@@ -80,7 +79,6 @@ func (p *Plugin) AddMember(ctx context.Context, params AddMemberParams) (*AddMem
 	// 6. Emit After Event
 	p.publishEvent(EventMemberAddAfter, &MemberAddAfterEventPayload{
 		Member:         member,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &AddMemberResult{Member: member}, nil
@@ -138,7 +136,6 @@ func (p *Plugin) GetActiveMemberRole(ctx context.Context, params GetActiveMember
 	res, err := p.GetActiveMember(ctx, GetActiveMemberParams{
 		UserID:         params.UserID,
 		OrganizationID: params.OrganizationID,
-		ExtraContainer: params.ExtraContainer,
 	})
 	if err != nil {
 		return nil, err
@@ -189,7 +186,6 @@ func (p *Plugin) UpdateMemberRole(ctx context.Context, params UpdateMemberRolePa
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
 		NewRole:        params.Role,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Persist Role Update
@@ -204,7 +200,6 @@ func (p *Plugin) UpdateMemberRole(ctx context.Context, params UpdateMemberRolePa
 	// 6. Emit After Event
 	p.publishEvent(EventMemberRoleUpdateAfter, &MemberRoleUpdateAfterEventPayload{
 		Member:         member,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &UpdateMemberRoleResult{Member: member}, nil
@@ -251,7 +246,6 @@ func (p *Plugin) RemoveMember(ctx context.Context, params RemoveMemberParams) (*
 	p.publishEvent(EventMemberRemoveBefore, &MemberRemoveBeforeEventPayload{
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Persist Member Removal
@@ -263,7 +257,6 @@ func (p *Plugin) RemoveMember(ctx context.Context, params RemoveMemberParams) (*
 	p.publishEvent(EventMemberRemoveAfter, &MemberRemoveAfterEventPayload{
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &RemoveMemberResult{Success: true}, nil
@@ -296,7 +289,6 @@ func (p *Plugin) LeaveOrganization(ctx context.Context, params LeaveOrganization
 	p.publishEvent(EventMemberLeaveBefore, &MemberLeaveBeforeEventPayload{
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 4. Persist Deletion
@@ -308,7 +300,6 @@ func (p *Plugin) LeaveOrganization(ctx context.Context, params LeaveOrganization
 	p.publishEvent(EventMemberLeaveAfter, &MemberLeaveAfterEventPayload{
 		OrganizationID: params.OrganizationID,
 		UserID:         params.UserID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &LeaveOrganizationResult{Success: true}, nil

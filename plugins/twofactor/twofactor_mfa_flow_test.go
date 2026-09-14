@@ -212,7 +212,6 @@ func TestTwoFactor_MFAChallenge_CompleteFlow(t *testing.T) {
 	bypassRes, err := epPlugin.SignIn(ctx, dto.SignInParams{
 		Email:    "mfa.user@example.com",
 		Password: "SecurePassword123!",
-		ExtraContainer: dto.SessionData{}.ExtraContainer,
 	}, auth.WithExtra("device_id", deviceID), auth.WithExtra("trust_device_token", trustedRec.TokenHash))
 	if err != nil {
 		t.Fatalf("SignIn with trusted device bypass failed: %v", err)

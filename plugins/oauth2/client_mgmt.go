@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // RegisterClient performs RFC 7591 Dynamic Client Registration or programmatic client creation.

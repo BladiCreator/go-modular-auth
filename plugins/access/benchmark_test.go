@@ -12,9 +12,8 @@ func BenchmarkRole_HasPermission(b *testing.B) {
 		"user":    {"create", "read", "update", "delete"},
 	}, true)
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = role.HasPermission("project", "update")
 	}
 }
@@ -26,9 +25,8 @@ func BenchmarkRole_Authorize_SingleAction(b *testing.B) {
 	}, true)
 	req := access.Req("project", "update")
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = role.Authorize(req)
 	}
 }
@@ -50,9 +48,8 @@ func BenchmarkRole_Authorize_MultiResource_AND(b *testing.B) {
 		Require("res5", "act1").
 		Build()
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = role.Authorize(req, access.ConnectorAND)
 	}
 }
@@ -70,9 +67,8 @@ func BenchmarkRole_Authorize_MultiResource_OR(b *testing.B) {
 		Require("res3", "act1").
 		Build()
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = role.Authorize(req, access.ConnectorOR)
 	}
 }
@@ -83,9 +79,8 @@ func BenchmarkRole_Authorize_Wildcard(b *testing.B) {
 	}, true)
 	req := access.Req("anything", "any_action")
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = role.Authorize(req)
 	}
 }
@@ -99,9 +94,8 @@ func BenchmarkAccessControl_AuthorizeRoles_Multi(b *testing.B) {
 	roles := []string{"role_a", "role_b", "role_c"}
 	req := access.Req("res2", "act1")
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = ac.AuthorizeRoles(roles, req)
 	}
 }

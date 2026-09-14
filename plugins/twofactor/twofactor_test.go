@@ -538,21 +538,22 @@ func TestTwoFactor_ExtraMetadataAndContextKeys(t *testing.T) {
 
 	app.Hooks().Subscribe(twofactor.EventEnableBefore, func(ctx context.Context, payload any) {
 		if req, ok := payload.(*twofactor.EnableBeforeEventPayload); ok && req.Params != nil {
-			req.Params.Set(twofactor.ExtraKeyTwoFactorMethod, twofactor.MethodTOTP)
-			if m, ok := req.Params.Get(twofactor.ExtraKeyTwoFactorMethod); ok {
-				interceptedMethod, _ = m.(string)
-				extraCaptured = true
-			}
+			req.Params.Issuer = "CustomApp"
+			interceptedMethod = req.Params.Issuer
+			extraCaptured = true
 		}
 	})
 
-	_, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
+	res, err := p.Enable(ctx, twofactor.EnableParams{UserID: userID})
 	if err != nil {
 		t.Fatalf("Enable failed: %v", err)
 	}
 
-	if !extraCaptured || interceptedMethod != twofactor.MethodTOTP {
-		t.Errorf("Expected ExtraKeyTwoFactorMethod to be captured, got %s", interceptedMethod)
+	if !extraCaptured || interceptedMethod != "CustomApp" {
+		t.Errorf("Expected Issuer to be captured, got %s", interceptedMethod)
+	}
+	if res == nil || res.TOTPURI == "" {
+		t.Errorf("Expected valid EnableResult with TOTPURI")
 	}
 
 	// Verify Context helper functions

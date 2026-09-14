@@ -2,7 +2,6 @@ package username
 
 import (
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // DTO Parameter and Result Structs
@@ -18,7 +17,7 @@ type SignInUsernameParams struct {
 	// RememberMe extends session lifespan if true.
 	RememberMe *bool `json:"remember_me,omitempty"`
 
-	plugin.ExtraContainer
+	Extra map[string]any `json:"extra,omitzero"`
 }
 
 // SignInUsernameResult contains the authenticated user entity and session details.
@@ -37,8 +36,6 @@ type SignInUsernameResult struct {
 type IsUsernameAvailableParams struct {
 	// Username is the username candidate to check.
 	Username string `json:"username"`
-
-	plugin.ExtraContainer
 }
 
 // IsUsernameAvailableResult reports username availability.
@@ -59,9 +56,7 @@ type UpdateUsernameParams struct {
 	Username string `json:"username"`
 
 	// DisplayUsername is the optional display username (defaults to Username if empty).
-	DisplayUsername string `json:"display_username,omitempty"`
-
-	plugin.ExtraContainer
+	DisplayUsername string `json:"display_username,omitzero"`
 }
 
 // UpdateUsernameResult reports the result of updating a username.

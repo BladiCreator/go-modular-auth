@@ -6,8 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Consent processes the end-user's decision to grant or deny requested scopes.

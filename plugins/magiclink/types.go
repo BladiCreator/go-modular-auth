@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // DTO Parameter and Result Structs
@@ -15,18 +14,19 @@ type SignInMagicLinkParams struct {
 	Email string `json:"email"`
 
 	// Name is an optional recipient display name.
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitzero"`
 
 	// CallbackURL is the target redirect URL after successful verification.
-	CallbackURL string `json:"callback_url,omitempty"`
+	CallbackURL string `json:"callback_url,omitzero"`
 
 	// NewUserCallbackURL is an optional target redirect URL for newly created users.
-	NewUserCallbackURL string `json:"new_user_callback_url,omitempty"`
+	NewUserCallbackURL string `json:"new_user_callback_url,omitzero"`
 
 	// ErrorCallbackURL is an optional target redirect URL on verification error.
-	ErrorCallbackURL string `json:"error_callback_url,omitempty"`
+	ErrorCallbackURL string `json:"error_callback_url,omitzero"`
 
-	plugin.ExtraContainer
+	// Extra holds dynamic metadata passed through request parameters or hooks.
+	Extra map[string]any `json:"extra,omitzero"`
 }
 
 // SignInMagicLinkResult contains delivery status and expiration of the generated magic link.
@@ -44,18 +44,19 @@ type VerifyMagicLinkParams struct {
 	Token string `json:"token"`
 
 	// Email is an optional email address parameter for token scoping.
-	Email string `json:"email,omitempty"`
+	Email string `json:"email,omitzero"`
 
 	// CallbackURL overrides post-verification redirect URL.
-	CallbackURL string `json:"callback_url,omitempty"`
+	CallbackURL string `json:"callback_url,omitzero"`
 
 	// NewUserCallbackURL overrides new-user redirect URL.
-	NewUserCallbackURL string `json:"new_user_callback_url,omitempty"`
+	NewUserCallbackURL string `json:"new_user_callback_url,omitzero"`
 
 	// ErrorCallbackURL overrides error redirect URL.
-	ErrorCallbackURL string `json:"error_callback_url,omitempty"`
+	ErrorCallbackURL string `json:"error_callback_url,omitzero"`
 
-	plugin.ExtraContainer
+	// Extra holds dynamic metadata passed through request parameters or hooks.
+	Extra map[string]any `json:"extra,omitzero"`
 }
 
 // VerifyMagicLinkResult contains the authenticated user, session, and redirect URL output.

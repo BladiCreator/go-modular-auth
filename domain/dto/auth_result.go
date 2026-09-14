@@ -23,25 +23,23 @@ type (
 		TempToken      string    `json:"temp_token"`
 		ExpiresAt      time.Time `json:"expires_at"`
 		CreatedAt      time.Time `json:"created_at"`
-		entity.ExtraContainer
 	}
 
 	// VerifyChallengeParams defines parameters submitted by the client to solve an active MFA challenge.
 	VerifyChallengeParams struct {
 		ChallengeToken string `json:"challenge_token" binding:"required"`
 		Code           string `json:"code" binding:"required"`
-		Method         string `json:"method,omitempty"` // "totp", "backup_code", "otp" (optional, auto-fallback)
-		TrustDevice    bool   `json:"trust_device,omitempty"`
-		DeviceID       string `json:"device_id,omitempty"`
-		entity.ExtraContainer
+		Method         string `json:"method,omitzero"` // "totp", "backup_code", "otp" (optional, auto-fallback)
+		TrustDevice    bool   `json:"trust_device,omitzero"`
+		DeviceID       string `json:"device_id,omitzero"`
 	}
 
 	// ChallengeVerificationResult contains data produced upon successfully validating an MFA challenge.
 	ChallengeVerificationResult struct {
 		UserID           string `json:"user_id"`
 		Method           string `json:"method"`
-		TrustDeviceToken string `json:"trust_device_token,omitempty"`
-		RemainingCodes   int    `json:"remaining_codes,omitempty"`
+		TrustDeviceToken string `json:"trust_device_token,omitzero"`
+		RemainingCodes   int    `json:"remaining_codes,omitzero"`
 	}
 
 	// AuthResult represents the polymorphic response of a sign-in operation.
@@ -49,10 +47,9 @@ type (
 	// or an AuthChallenge (when multi-factor authentication is required).
 	AuthResult struct {
 		Status          string          `json:"status"` // "complete" | "mfa_required"
-		Session         *entity.Session `json:"session,omitempty"`
-		User            *entity.User    `json:"user,omitempty"`
-		ChallengeDetail *AuthChallenge  `json:"challenge,omitempty"`
-		entity.ExtraContainer
+		Session         *entity.Session `json:"session,omitzero"`
+		User            *entity.User    `json:"user,omitzero"`
+		ChallengeDetail *AuthChallenge  `json:"challenge,omitzero"`
 
 		sessionData *SessionData
 		challenge   *AuthChallenge
@@ -65,11 +62,10 @@ func NewAuthResultCompleted(data *SessionData) *AuthResult {
 		return &AuthResult{Status: AuthStatusComplete}
 	}
 	return &AuthResult{
-		Status:         AuthStatusComplete,
-		Session:        data.Session,
-		User:           data.User,
-		ExtraContainer: data.ExtraContainer,
-		sessionData:    data,
+		Status:      AuthStatusComplete,
+		Session:     data.Session,
+		User:        data.User,
+		sessionData: data,
 	}
 }
 
@@ -81,7 +77,6 @@ func NewAuthResultChallenge(challenge *AuthChallenge) *AuthResult {
 	return &AuthResult{
 		Status:          AuthStatusMFARequired,
 		ChallengeDetail: challenge,
-		ExtraContainer:  challenge.ExtraContainer,
 		challenge:       challenge,
 	}
 }
@@ -106,9 +101,8 @@ func (r *AuthResult) SessionData() *SessionData {
 	}
 	if r.Session != nil || r.User != nil {
 		return &SessionData{
-			Session:        r.Session,
-			User:           r.User,
-			ExtraContainer: r.ExtraContainer,
+			Session: r.Session,
+			User:    r.User,
 		}
 	}
 	return nil

@@ -173,11 +173,6 @@ func TestPlugin_Verify(t *testing.T) {
 		signed := bearer.SignToken("session_123", testSecret)
 
 		params := bearer.VerifyParams{Token: signed}
-		params.Set("client_ip", "127.0.0.1")
-		ip, ok := params.Get("client_ip")
-		if !ok || ip != "127.0.0.1" {
-			t.Fatalf("failed to retrieve extra metadata")
-		}
 
 		res, err := p.Verify(ctx, params)
 		if err != nil {
@@ -241,10 +236,6 @@ func TestPlugin_CreateToken(t *testing.T) {
 	params := bearer.CreateTokenParams{
 		Token:  "session_token_xyz",
 		UserID: "usr_100",
-	}
-	params.Set("origin", "mobile")
-	if v, _ := params.Get("origin"); v != "mobile" {
-		t.Fatalf("failed to retrieve extra metadata")
 	}
 
 	res, err := p.CreateToken(ctx, params)
@@ -412,8 +403,8 @@ func TestPlugin_FullIntegration(t *testing.T) {
 func BenchmarkSignToken(b *testing.B) {
 	token := "session_benchmark_token_123456789"
 	secret := "benchmark-secret-key-32-bytes!!"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		_ = bearer.SignToken(token, secret)
 	}
 }
@@ -421,8 +412,8 @@ func BenchmarkSignToken(b *testing.B) {
 func BenchmarkVerifyToken(b *testing.B) {
 	secret := "benchmark-secret-key-32-bytes!!"
 	signed := bearer.SignToken("session_benchmark_token_123456789", secret)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		_, _ = bearer.VerifyToken(signed, secret)
 	}
 }

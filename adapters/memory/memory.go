@@ -2,14 +2,15 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"math/rand"
-	"sort"
-	"strconv"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -122,7 +123,7 @@ func (s *Store) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*
 	defer s.mu.Unlock()
 
 	user := &entity.User{
-		ID:           "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		ID:           "memory:" + uuid.NewV7().String(),
 		Name:         params.Name,
 		Email:        params.Email,
 		Role:         params.Role,
@@ -270,25 +271,21 @@ func (s *Store) ListUsers(ctx context.Context, filter admin.ListUsersFilter) ([]
 	}
 
 	// Sort
-	sort.Slice(matched, func(i, j int) bool {
+	slices.SortFunc(matched, func(a, b *entity.User) int {
 		asc := strings.ToLower(filter.SortDirection) == "asc"
+		var cmpRes int
 		switch strings.ToLower(filter.SortBy) {
 		case "email":
-			if asc {
-				return matched[i].Email < matched[j].Email
-			}
-			return matched[i].Email > matched[j].Email
+			cmpRes = cmp.Compare(a.Email, b.Email)
 		case "name":
-			if asc {
-				return matched[i].Name < matched[j].Name
-			}
-			return matched[i].Name > matched[j].Name
+			cmpRes = cmp.Compare(a.Name, b.Name)
 		default: // created_at
-			if asc {
-				return matched[i].CreatedAt.Before(matched[j].CreatedAt)
-			}
-			return matched[i].CreatedAt.After(matched[j].CreatedAt)
+			cmpRes = a.CreatedAt.Compare(b.CreatedAt)
 		}
+		if asc {
+			return cmpRes
+		}
+		return -cmpRes
 	})
 
 	total := int64(len(matched))
@@ -323,7 +320,7 @@ func (s *Store) LinkCredentialAccount(ctx context.Context, userID, passwordHash 
 	}
 
 	acc := &entity.Account{
-		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		ID:        "acc_" + uuid.NewV7().String(),
 		UserID:    userID,
 		Provider:  "credential",
 		Password:  passwordHash,
@@ -341,7 +338,7 @@ func (s *Store) CreateAccount(ctx context.Context, params *dto.CreateAccountPara
 	defer s.mu.Unlock()
 
 	acc := &entity.Account{
-		ID:        "acc_" + strconv.FormatInt(rand.Int63(), 10),
+		ID:        "acc_" + uuid.NewV7().String(),
 		UserID:    params.UserID,
 		Provider:  params.Provider,
 		Password:  params.Password,
@@ -414,7 +411,7 @@ func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionPar
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sessionCreated := &entity.Session{
-		ID:                   "memory:" + strconv.FormatInt(rand.Int63(), 10),
+		ID:                   "memory:" + uuid.NewV7().String(),
 		UserID:               session.UserID,
 		Token:                session.Token,
 		IPAddress:            session.IPAddress,
@@ -429,10 +426,7 @@ func (s *Store) CreateSession(ctx context.Context, session *dto.CreateSessionPar
 		sessionCreated.DeviceID = &session.DeviceID
 	}
 	if session.Extra != nil {
-		cpFields := make(map[string]any, len(session.Extra))
-		for k, v := range session.Extra {
-			cpFields[k] = v
-		}
+		cpFields := maps.Clone(session.Extra)
 		if s.customSessionFields == nil {
 			s.customSessionFields = make(map[string]map[string]any)
 		}
@@ -476,8 +470,8 @@ func (s *Store) ListSessionsByUserID(ctx context.Context, userID string) ([]*ent
 			result = append(result, &cloned)
 		}
 	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *entity.Session) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 	return result, nil
 }
@@ -798,8 +792,8 @@ func (s *Store) GetAllKeys(ctx context.Context) ([]*jwt.JWKRecord, error) {
 	for _, k := range s.jwks {
 		records = append(records, k)
 	}
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].CreatedAt.After(records[j].CreatedAt)
+	slices.SortFunc(records, func(a, b *jwt.JWKRecord) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 	return records, nil
 }
@@ -940,8 +934,8 @@ func (s *Store) ListOrganizationsByUserID(ctx context.Context, userID string) ([
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.Organization) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 
 	return result, nil
@@ -1043,8 +1037,8 @@ func (s *Store) ListMembers(ctx context.Context, orgID string, limit, offset int
 		}
 	}
 
-	sort.Slice(all, func(i, j int) bool {
-		return all[i].CreatedAt.Before(all[j].CreatedAt)
+	slices.SortFunc(all, func(a, b *organization.Member) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	total := len(all)
@@ -1159,8 +1153,8 @@ func (s *Store) ListInvitationsByOrgID(ctx context.Context, orgID string, status
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.Invitation) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 
 	return result, nil
@@ -1179,8 +1173,8 @@ func (s *Store) ListInvitationsByEmail(ctx context.Context, email string, status
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.Invitation) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 
 	return result, nil
@@ -1272,8 +1266,8 @@ func (s *Store) ListTeamsByOrgID(ctx context.Context, orgID string) ([]*organiza
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.Team) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil
@@ -1293,8 +1287,8 @@ func (s *Store) ListTeamsByUserID(ctx context.Context, orgID, userID string) ([]
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.Team) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil
@@ -1364,8 +1358,8 @@ func (s *Store) ListTeamMembers(ctx context.Context, teamID string) ([]*organiza
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.TeamMember) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil
@@ -1463,8 +1457,8 @@ func (s *Store) ListRolesByOrgID(ctx context.Context, orgID string) ([]*organiza
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *organization.OrganizationRole) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil
@@ -1532,8 +1526,8 @@ func (s *Store) ListPasskeysByUserID(ctx context.Context, userID string) ([]*ent
 		}
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	slices.SortFunc(result, func(a, b *entity.Passkey) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
 	})
 
 	return result, nil

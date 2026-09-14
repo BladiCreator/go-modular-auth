@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"iter"
+	"log/slog"
 	"reflect"
 
 	"github.com/BladiCreator/go-modular-auth/config"
@@ -23,6 +25,7 @@ type Auth struct {
 	pipeline       *plugin.Pipeline
 	hooks          *plugin.Hooks
 	sessionManager *SessionManager
+	logger         *slog.Logger
 	plugins        map[reflect.Type]plugin.Plugin
 }
 
@@ -65,13 +68,19 @@ func New(opts ...config.Option) (*Auth, error) {
 
 	crypto := &defaultCrypto{bcryptCost: cfg.BcryptCost}
 
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
 	a := &Auth{
 		pipeline: pipeline,
 		hooks:    hooks,
+		logger:   logger,
 		plugins:  make(map[reflect.Type]plugin.Plugin),
 	}
 
-	a.ctx = plugin.NewContext(crypto, plugin.WithPipeline(pipeline), plugin.WithHooks(hooks))
+	a.ctx = plugin.NewContext(crypto, plugin.WithPipeline(pipeline), plugin.WithHooks(hooks), plugin.WithContextLogger(logger))
 
 	if cfg.SessionRepository != nil {
 		a.sessionManager = NewSessionManager(cfg.SessionRepository, cfg.SessionConfig, crypto, pipeline, hooks)
@@ -156,9 +165,6 @@ func (a *Auth) VerifyChallenge(ctx context.Context, params dto.VerifyChallengePa
 		Session: sess,
 		User:    user,
 	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
-	}
 
 	if a.hooks != nil {
 		a.hooks.DispatchUserSignedIn(ctx, sessionData)
@@ -195,4 +201,20 @@ func Plugin[P any](a *Auth) *P {
 	}
 
 	panic(fmt.Sprintf("Auth: plugin %T is not registered", zero))
+}
+
+// Plugins returns a push iterator over all registered plugins in the Auth engine.
+func (a *Auth) Plugins() iter.Seq[plugin.Plugin] {
+	return func(yield func(plugin.Plugin) bool) {
+		for _, p := range a.plugins {
+			if !yield(p) {
+				return
+			}
+		}
+	}
+}
+
+// Logger returns the structured slog.Logger configured for the Auth engine.
+func (a *Auth) Logger() *slog.Logger {
+	return a.logger
 }

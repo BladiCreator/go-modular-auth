@@ -15,7 +15,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // mockRepository implements magiclink.Repository for unit tests
@@ -85,7 +85,7 @@ func (m *mockRepository) CreateUser(ctx context.Context, user *entity.User) (*en
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if user.ID == "" {
-		user.ID = uuid.NewString()
+		user.ID = uuid.NewV7().String()
 	}
 	m.users[user.ID] = user
 	m.usersByEmail[user.Email] = user

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 // Parameter and Result Structs
@@ -12,27 +11,25 @@ type (
 	// SignParams defines parameters required to construct and sign a JSON Web Token.
 	SignParams struct {
 		// Payload contains custom application claims to include in the token (optional).
-		Payload map[string]any `json:"payload,omitempty"`
+		Payload map[string]any `json:"payload,omitzero"`
 
 		// Subject sets the "sub" claim value (optional, overrides default).
-		Subject string `json:"subject,omitempty"`
+		Subject string `json:"subject,omitzero"`
 
 		// Issuer overrides the default configured "iss" claim value (optional).
-		Issuer string `json:"issuer,omitempty"`
+		Issuer string `json:"issuer,omitzero"`
 
 		// Audience overrides the default configured "aud" claim list (optional).
-		Audience []string `json:"audience,omitempty"`
+		Audience []string `json:"audience,omitzero"`
 
 		// ExpiresIn overrides the default validity duration for this specific token (optional).
-		ExpiresIn time.Duration `json:"expires_in,omitempty"`
+		ExpiresIn time.Duration `json:"expires_in,omitzero"`
 
 		// NotBefore optionally sets the "nbf" claim timestamp (optional).
-		NotBefore *time.Time `json:"not_before,omitempty"`
+		NotBefore *time.Time `json:"not_before,omitzero"`
 
 		// KeyID explicitly specifies which persisted key to use for signing (optional; uses active key if empty).
-		KeyID string `json:"key_id,omitempty"`
-
-		plugin.ExtraContainer
+		KeyID string `json:"key_id,omitzero"`
 	}
 
 	// SignResult contains the signed compact JWT string and associated metadata.
@@ -62,15 +59,13 @@ type (
 		Token string `json:"token"`
 
 		// Issuer optionally enforces an expected "iss" claim match during verification.
-		Issuer string `json:"issuer,omitempty"`
+		Issuer string `json:"issuer,omitzero"`
 
 		// Audience optionally enforces expected "aud" claim recipients.
-		Audience []string `json:"audience,omitempty"`
+		Audience []string `json:"audience,omitzero"`
 
 		// Leeway overrides the clock skew tolerance window for exp/nbf validation (optional).
-		Leeway time.Duration `json:"leeway,omitempty"`
-
-		plugin.ExtraContainer
+		Leeway time.Duration `json:"leeway,omitzero"`
 	}
 
 	// VerifyResult contains the outcome of a successful JWT verification.
@@ -79,7 +74,7 @@ type (
 		Valid bool `json:"valid"`
 
 		// Subject is the "sub" claim extracted from the payload.
-		Subject string `json:"subject,omitempty"`
+		Subject string `json:"subject,omitzero"`
 
 		// Claims contains all claims present in the token payload.
 		Claims map[string]any `json:"claims"`
@@ -91,13 +86,13 @@ type (
 		Algorithm Algorithm `json:"alg"`
 
 		// ExpiresAt is the expiration time parsed from the "exp" claim (if present).
-		ExpiresAt *time.Time `json:"expires_at,omitempty"`
+		ExpiresAt *time.Time `json:"expires_at,omitzero"`
 
 		// IssuedAt is the timestamp parsed from the "iat" claim (if present).
-		IssuedAt *time.Time `json:"issued_at,omitempty"`
+		IssuedAt *time.Time `json:"issued_at,omitzero"`
 
 		// NotBefore is the timestamp parsed from the "nbf" claim (if present).
-		NotBefore *time.Time `json:"not_before,omitempty"`
+		NotBefore *time.Time `json:"not_before,omitzero"`
 	}
 
 	// GetTokenParams defines parameters to generate a signed JWT for an active session and user.
@@ -106,12 +101,10 @@ type (
 		Session *entity.Session `json:"session"`
 
 		// User is the authenticated user entity (optional, provides email/name for custom claims).
-		User *entity.User `json:"user,omitempty"`
+		User *entity.User `json:"user,omitzero"`
 
 		// ExpiresIn overrides the default validity duration for this session token (optional).
-		ExpiresIn time.Duration `json:"expires_in,omitempty"`
-
-		plugin.ExtraContainer
+		ExpiresIn time.Duration `json:"expires_in,omitzero"`
 	}
 
 	// GetTokenResult contains the generated session JWT and HTTP header representations.
@@ -138,9 +131,7 @@ type (
 	// GetJWKSParams defines parameters to retrieve the public JSON Web Key Set.
 	GetJWKSParams struct {
 		// IncludeExpired specifies whether to include keys older than the grace period (default: false).
-		IncludeExpired bool `json:"include_expired,omitempty"`
-
-		plugin.ExtraContainer
+		IncludeExpired bool `json:"include_expired,omitzero"`
 	}
 
 	// GetJWKSResult contains the public JWKS collection and metadata.
@@ -155,15 +146,13 @@ type (
 	// RotateKeysParams defines parameters to trigger an immediate key rotation.
 	RotateKeysParams struct {
 		// Algorithm optionally specifies a different algorithm for the new key (optional).
-		Algorithm Algorithm `json:"alg,omitempty"`
+		Algorithm Algorithm `json:"alg,omitzero"`
 
 		// RSABits optionally specifies the RSA bit length if rotating to an RSA key (optional).
-		RSABits int `json:"rsa_bits,omitempty"`
+		RSABits int `json:"rsa_bits,omitzero"`
 
 		// ExpiresIn optionally sets an expiration date for the old active key (optional).
-		ExpiresIn time.Duration `json:"expires_in,omitempty"`
-
-		plugin.ExtraContainer
+		ExpiresIn time.Duration `json:"expires_in,omitzero"`
 	}
 
 	// RotateKeysResult contains details of the newly created and active key pair.
@@ -175,6 +164,6 @@ type (
 		JWK *JWK `json:"jwk"`
 
 		// OldKeyID is the Key ID of the rotated previous key (if one was active).
-		OldKeyID string `json:"old_key_id,omitempty"`
+		OldKeyID string `json:"old_key_id,omitzero"`
 	}
 )

@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"log/slog"
 	"sync"
 )
 
@@ -46,6 +47,15 @@ func WithMFAProvider(p MFAProvider) ContextOption {
 	}
 }
 
+// WithContextLogger configures a structured logger into the plugin Context.
+func WithContextLogger(l *slog.Logger) ContextOption {
+	return func(c *Context) {
+		if l != nil {
+			c.logger = l
+		}
+	}
+}
+
 // Context represents the shared environment provided to plugins upon initialization,
 // containing cryptographic tools, synchronous execution pipelines, typed lifecycle hooks,
 // central session management, and a thread-safe key-value store.
@@ -55,6 +65,7 @@ type Context struct {
 	hooks          *Hooks
 	sessionManager SessionManager
 	mfaProvider    MFAProvider
+	logger         *slog.Logger
 	store          sync.Map
 }
 
@@ -64,6 +75,7 @@ func NewContext(crypto CryptoUtils, opts ...ContextOption) *Context {
 		crypto:   crypto,
 		pipeline: NewPipeline(),
 		hooks:    NewHooks(),
+		logger:   slog.New(slog.DiscardHandler),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -102,6 +114,23 @@ func (c *Context) MFAProvider() MFAProvider { return c.mfaProvider }
 
 // SetMFAProvider registers an MFAProvider into the shared plugin context.
 func (c *Context) SetMFAProvider(p MFAProvider) { c.mfaProvider = p }
+
+// Logger returns the configured structured logger or a discard logger if none was explicitly configured.
+func (c *Context) Logger() *slog.Logger {
+	if c.logger == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return c.logger
+}
+
+// SetLogger updates the structured logger in the shared context.
+func (c *Context) SetLogger(l *slog.Logger) {
+	if l == nil {
+		c.logger = slog.New(slog.DiscardHandler)
+		return
+	}
+	c.logger = l
+}
 
 // Set stores a key-value pair in the shared thread-safe context store.
 func (c *Context) Set(key string, value any) { c.store.Store(key, value) }

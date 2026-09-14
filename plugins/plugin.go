@@ -1712,15 +1712,17 @@ func Anonymous(repo anonymous.Repository, opts ...anonymous.Option) *anonymous.P
 //
 //   - customsession.WithTransformFunc(fn TransformSessionFunc): Custom dynamic transformation callback.
 //   - customsession.WithMutateListDeviceSessions(mutate bool): Toggle whether session transformation applies to GET /multi-session/list-device-sessions.
-//   - customsession.WithUserAdditionalFields(fields ...AdditionalFieldDefinition): Register dynamic field definitions for User entities.
-//   - customsession.WithSessionAdditionalFields(fields ...AdditionalFieldDefinition): Register dynamic field definitions for Session entities.
+//   - customsession.WithAllowedExtraKeys(keys ...string): Register allowed keys for session Extra metadata filtering.
 //   - customsession.WithFilterUnregisteredFields(filter bool): Omit unregistered extra fields from serialized output.
 //
 // Example:
 //
 //	storage := customsession.NewMemoryRepository()
 //	p := plugins.CustomSession(storage, customsession.WithTransformFunc(func(ctx context.Context, s *dto.SessionData, r *http.Request) (any, error) {
-//		s.Set("custom_role", "admin")
+//		if s.Session.Extra == nil {
+//			s.Session.Extra = make(map[string]any)
+//		}
+//		s.Session.Extra["custom_role"] = "admin"
 //		return s, nil
 //	}))
 //	_ = p

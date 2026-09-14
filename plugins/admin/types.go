@@ -4,15 +4,15 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 type (
 	// CallerContext carries identification, role, and metadata of the user initiating an administrative operation.
 	CallerContext struct {
-		UserID string `json:"user_id"`
-		Role   string `json:"role"`
-		plugin.ExtraContainer
+		UserID       string         `json:"user_id"`
+		Role         string         `json:"role"`
+		SessionToken string         `json:"session_token,omitzero"`
+		Extra        map[string]any `json:"extra,omitzero"`
 	}
 
 	// CreateUserParams defines payload requirements for administrative user provisioning.
@@ -20,9 +20,8 @@ type (
 		Caller   CallerContext `json:"caller"`
 		Name     string        `json:"name"`
 		Email    string        `json:"email"`
-		Password string        `json:"password,omitempty"`
-		Role     string        `json:"role,omitempty"`
-		plugin.ExtraContainer
+		Password string        `json:"password,omitzero"`
+		Role     string        `json:"role,omitzero"`
 	}
 
 	// GetUserParams defines payload requirements for retrieving user details by ID.
@@ -49,14 +48,13 @@ type (
 	UpdateUserParams struct {
 		Caller        CallerContext `json:"caller"`
 		UserID        string        `json:"user_id"`
-		Name          *string       `json:"name,omitempty"`
-		Email         *string       `json:"email,omitempty"`
-		EmailVerified *bool         `json:"email_verified,omitempty"`
-		Role          *string       `json:"role,omitempty"`
-		Banned        *bool         `json:"banned,omitempty"`
-		BanReason     *string       `json:"ban_reason,omitempty"`
-		BanExpires    *time.Time    `json:"ban_expires,omitempty"`
-		plugin.ExtraContainer
+		Name          *string       `json:"name,omitzero"`
+		Email         *string       `json:"email,omitzero"`
+		EmailVerified *bool         `json:"email_verified,omitzero"`
+		Role          *string       `json:"role,omitzero"`
+		Banned        *bool         `json:"banned,omitzero"`
+		BanReason     *string       `json:"ban_reason,omitzero"`
+		BanExpires    *time.Time    `json:"ban_expires,omitzero"`
 	}
 
 	// RemoveUserParams defines parameters for permanently removing a user account.
@@ -76,8 +74,8 @@ type (
 	BanUserParams struct {
 		Caller       CallerContext  `json:"caller"`
 		UserID       string         `json:"user_id"`
-		BanReason    string         `json:"ban_reason,omitempty"`
-		BanExpiresIn *time.Duration `json:"ban_expires_in,omitempty"`
+		BanReason    string         `json:"ban_reason,omitzero"`
+		BanExpiresIn *time.Duration `json:"ban_expires_in,omitzero"`
 	}
 
 	// UnbanUserParams defines parameters for lifting a suspension from a user account.
@@ -97,27 +95,27 @@ type (
 	ImpersonateUserParams struct {
 		Caller    CallerContext  `json:"caller"`
 		UserID    string         `json:"user_id"`
-		IPAddress string         `json:"ip_address,omitempty"`
-		UserAgent string         `json:"user_agent,omitempty"`
-		Duration  *time.Duration `json:"duration,omitempty"`
+		IPAddress string         `json:"ip_address,omitzero"`
+		UserAgent string         `json:"user_agent,omitzero"`
+		Duration  *time.Duration `json:"duration,omitzero"`
 	}
 
 	// ImpersonateResult contains the newly issued masquerade session and target user profile.
 	ImpersonateResult struct {
 		Session           *entity.Session `json:"session"`
 		User              *entity.User    `json:"user"`
-		AdminSessionToken string          `json:"admin_session_token,omitempty"`
+		AdminSessionToken string          `json:"admin_session_token,omitzero"`
 	}
 
 	// StopImpersonatingParams defines tokens required to terminate an impersonation session.
 	StopImpersonatingParams struct {
 		ImpersonatedSessionToken string `json:"impersonated_session_token"`
-		AdminSessionToken        string `json:"admin_session_token,omitempty"`
+		AdminSessionToken        string `json:"admin_session_token,omitzero"`
 	}
 
 	// StopImpersonatingResult contains the restored administrator session and profile.
 	StopImpersonatingResult struct {
-		AdminSession *entity.Session `json:"admin_session,omitempty"`
+		AdminSession *entity.Session `json:"admin_session,omitzero"`
 		AdminUser    *entity.User    `json:"admin_user"`
 	}
 
@@ -143,6 +141,6 @@ type (
 	CheckPermissionParams struct {
 		Caller      CallerContext `json:"caller"`
 		Permissions Permissions   `json:"permissions"`
-		Connector   Connector     `json:"connector,omitempty"`
+		Connector   Connector     `json:"connector,omitzero"`
 	}
 )

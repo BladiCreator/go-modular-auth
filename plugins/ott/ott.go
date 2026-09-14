@@ -7,7 +7,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the One-Time Token plugin ("one-time-token").

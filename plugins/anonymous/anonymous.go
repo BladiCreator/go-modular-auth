@@ -8,7 +8,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the Anonymous plugin ("anonymous").
@@ -78,7 +78,7 @@ func (p *Plugin) SignInAnonymous(ctx context.Context, currentSession *entity.Ses
 			return nil, err
 		}
 	} else {
-		email = "temp-" + uuid.NewString() + "@" + p.config.EmailDomainName
+		email = "temp-" + uuid.New().String() + "@" + p.config.EmailDomainName
 	}
 
 	// Validate email address format
@@ -110,10 +110,10 @@ func (p *Plugin) SignInAnonymous(ctx context.Context, currentSession *entity.Ses
 	if p.ctx != nil && p.ctx.Crypto() != nil {
 		token, err = p.ctx.Crypto().GenerateRandomToken(32)
 		if err != nil || token == "" {
-			token = uuid.NewString()
+			token = uuid.New().String()
 		}
 	} else {
-		token = uuid.NewString()
+		token = uuid.New().String()
 	}
 
 	now := time.Now()

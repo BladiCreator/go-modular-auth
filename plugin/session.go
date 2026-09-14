@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"errors"
+	"maps"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -38,8 +39,8 @@ type SessionOptions struct {
 	UserAgent string
 	// DeviceID optionally identifies the physical device initiating the session.
 	DeviceID string
-	// ExtraContainer provides dynamic key-value metadata for the session.
-	ExtraContainer
+	// Extra holds dynamic key-value metadata for the session.
+	Extra map[string]any
 	// Interceptors contains optional per-call interceptors executed during authentication and session creation.
 	Interceptors []any
 }
@@ -85,16 +86,21 @@ func WithDeviceID(deviceID string) SessionOption {
 // WithExtra sets a dynamic key-value pair in the session extra metadata.
 func WithExtra(key string, val any) SessionOption {
 	return func(o *SessionOptions) {
-		o.Set(key, val)
+		if o.Extra == nil {
+			o.Extra = make(map[string]any)
+		}
+		o.Extra[key] = val
 	}
 }
 
 // WithExtraMap copies a map of key-value pairs into the session extra metadata.
 func WithExtraMap(m map[string]any) SessionOption {
 	return func(o *SessionOptions) {
-		for k, v := range m {
-			o.Set(k, v)
+		if o.Extra == nil {
+			o.Extra = maps.Clone(m)
+			return
 		}
+		maps.Copy(o.Extra, m)
 	}
 }
 

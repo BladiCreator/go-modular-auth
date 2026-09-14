@@ -1,6 +1,7 @@
 package emailpassword
 
 import (
+	"maps"
 	"context"
 	"fmt"
 	"net/mail"
@@ -142,16 +143,19 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 	}
 
 	params := &dto.CreateUserParams{
-		Email:          email,
-		Name:           input.Name,
-		PasswordHash:   hashedPassword,
-		ExtraContainer: input.ExtraContainer,
+		Email:           email,
+		Name:            input.Name,
+		PasswordHash:    hashedPassword,
+		Role:            input.Role,
+		Username:        input.Username,
+		DisplayUsername: input.DisplayUsername,
+		PhoneNumber:     input.PhoneNumber,
+		Extra:           input.Extra,
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventSignUpBefore, ctx, &SignUpEventPayload{
 			Params: params,
-			Extra:  input.Extra,
 		})
 	}
 
@@ -161,10 +165,9 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 	}
 
 	accountParams := &dto.CreateAccountParams{
-		UserID:         newUser.ID,
-		Provider:       CredentialProvider,
-		Password:       hashedPassword,
-		ExtraContainer: input.ExtraContainer,
+		UserID:   newUser.ID,
+		Provider: CredentialProvider,
+		Password: hashedPassword,
 	}
 
 	if err := p.repo.CreateAccount(ctx, accountParams); err != nil {
@@ -173,8 +176,7 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 
 	if p.config.SendVerificationOnSignUp {
 		_, _ = p.SendVerificationEmail(ctx, dto.SendVerificationEmailParams{
-			Email:          newUser.Email,
-			ExtraContainer: input.ExtraContainer,
+			Email: newUser.Email,
 		})
 	}
 
@@ -190,7 +192,6 @@ func (p *Plugin) SignUp(ctx context.Context, input dto.SignUpParams) (*entity.Us
 		p.ctx.Hooks().Publish(EventSignUpAfter, ctx, &SignUpEventPayload{
 			Params: params,
 			User:   newUser,
-			Extra:  input.Extra,
 		})
 		p.ctx.Hooks().DispatchUserSignedUp(ctx, newUser)
 	}
@@ -316,7 +317,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 
 	payload := &SignInEventPayload{
 		User:  user,
-		Extra: input.Extra,
+		Extra: optsData.Extra,
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
@@ -340,14 +341,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 	// 3. Step-Up / Multi-Factor Authentication (MFA) Check
 	if p.ctx != nil && p.ctx.MFAProvider() != nil {
 		mfa := p.ctx.MFAProvider()
-		combinedExtra := make(map[string]any)
-		for k, v := range input.Extra {
-			combinedExtra[k] = v
-		}
-		for k, v := range optsData.Extra {
-			combinedExtra[k] = v
-		}
-		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, combinedExtra)
+		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, optsData.Extra)
 		if err != nil {
 			return nil, fmt.Errorf("emailpassword: failed to evaluate 2FA: %w", err)
 		}
@@ -364,13 +358,7 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 		return nil, ErrSessionManagerRequired
 	}
 
-	combinedOpts := make([]plugin.SessionOption, 0, len(opts)+1)
-	if len(input.Extra) > 0 {
-		combinedOpts = append(combinedOpts, plugin.WithExtraMap(input.Extra))
-	}
-	combinedOpts = append(combinedOpts, opts...)
-
-	sess, err := p.ctx.Session().CreateSession(ctx, user.ID, combinedOpts...)
+	sess, err := p.ctx.Session().CreateSession(ctx, user.ID, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("emailpassword: failed to create session: %w", err)
 	}
@@ -378,9 +366,6 @@ func (p *Plugin) SignIn(ctx context.Context, input dto.SignInParams, opts ...plu
 	sessionData := &dto.SessionData{
 		Session: sess,
 		User:    user,
-	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
 	}
 
 	// 4. Run AfterSignIn interceptors (allows mutating sessionData.Session.Extra or aborting)
@@ -461,7 +446,6 @@ func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordPar
 
 	payload := &PasswordChangeEventPayload{
 		UserID: input.UserID,
-		Extra:  input.Extra,
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
@@ -546,7 +530,14 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordPar
 	}
 
 	if p.config.SendResetPasswordEmail != nil {
-		_ = p.config.SendResetPasswordEmail(ctx, user.Email, tokenStr, expiresAt, input.Extra)
+		extra := maps.Clone(input.Extra)
+		if extra == nil && input.RedirectTo != "" {
+			extra = make(map[string]any)
+		}
+		if input.RedirectTo != "" {
+			extra["redirectTo"] = input.RedirectTo
+		}
+		_ = p.config.SendResetPasswordEmail(ctx, user.Email, tokenStr, expiresAt, extra)
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
@@ -554,7 +545,6 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordPar
 			User:      user,
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
-			Extra:     input.Extra,
 		})
 		p.ctx.Hooks().DispatchPasswordResetRequested(ctx, user.Email, token)
 	}
@@ -638,7 +628,6 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventPasswordResetCompleted, ctx, &PasswordResetCompletedEventPayload{
 			UserID: user.ID,
-			Extra:  input.Extra,
 		})
 		p.ctx.Hooks().DispatchPasswordResetCompleted(ctx, user.ID)
 	}
@@ -708,7 +697,14 @@ func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerifi
 	}
 
 	if p.config.SendVerificationEmail != nil {
-		_ = p.config.SendVerificationEmail(ctx, user.Email, tokenStr, expiresAt, input.Extra)
+		extra := maps.Clone(input.Extra)
+		if extra == nil && input.CallbackURL != "" {
+			extra = make(map[string]any)
+		}
+		if input.CallbackURL != "" {
+			extra["callbackURL"] = input.CallbackURL
+		}
+		_ = p.config.SendVerificationEmail(ctx, user.Email, tokenStr, expiresAt, extra)
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
@@ -716,7 +712,6 @@ func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerifi
 			User:      user,
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
-			Extra:     input.Extra,
 		})
 		p.ctx.Hooks().DispatchEmailVerificationRequested(ctx, user.Email, token)
 	}
@@ -783,8 +778,7 @@ func (p *Plugin) VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventEmailVerified, ctx, &EmailVerifiedEventPayload{
-			User:  user,
-			Extra: input.Extra,
+			User: user,
 		})
 		p.ctx.Hooks().DispatchEmailVerified(ctx, user)
 	}

@@ -6,8 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Authorize handles the authorization step of the OAuth 2.1 Authorization Code Flow.

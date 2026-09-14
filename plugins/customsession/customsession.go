@@ -113,45 +113,65 @@ func (p *Plugin) TransformSession(ctx context.Context, sessionData *dto.SessionD
 
 // SanitizePayload filters unregistered additional fields from session payloads when FilterUnregisteredFields is true.
 func (p *Plugin) SanitizePayload(payload any) any {
-	sData, ok := payload.(*dto.SessionData)
-	if !ok {
+	if len(p.config.AllowedExtraKeys) == 0 {
 		return payload
 	}
 
-	if sData.Extra != nil && len(p.config.UserAdditionalFields) > 0 {
-		allowed := make(map[string]bool)
-		for _, f := range p.config.UserAdditionalFields {
-			allowed[f.Name] = true
+	allowed := make(map[string]bool, len(p.config.AllowedExtraKeys))
+	for _, k := range p.config.AllowedExtraKeys {
+		allowed[k] = true
+	}
+
+	filterMap := func(m map[string]any) map[string]any {
+		if m == nil {
+			return nil
 		}
 		filtered := make(map[string]any)
-		for k, v := range sData.Extra {
+		for k, v := range m {
 			if allowed[k] {
 				filtered[k] = v
 			}
 		}
-		sData.Extra = filtered
+		return filtered
 	}
 
-	return sData
+	switch v := payload.(type) {
+	case *dto.SessionData:
+		if v != nil && v.Session != nil && v.Session.Extra != nil {
+			v.Session.Extra = filterMap(v.Session.Extra)
+		}
+		return v
+	case *CustomSessionData:
+		if v != nil && v.Extra != nil {
+			v.Extra = filterMap(v.Extra)
+		}
+		return v
+	default:
+		return payload
+	}
 }
 
 func (p *Plugin) enrichWithRepositoryFields(ctx context.Context, sessionData *dto.SessionData) {
-	if p.repo == nil || sessionData == nil {
+	if p.repo == nil || sessionData == nil || sessionData.Session == nil {
 		return
+	}
+
+	if sessionData.Session.Extra == nil {
+		sessionData.Session.Extra = make(map[string]any)
 	}
 
 	if sessionData.User != nil && sessionData.User.ID != "" {
 		if uFields, err := p.repo.GetCustomUserFields(ctx, sessionData.User.ID); err == nil && len(uFields) > 0 {
 			for k, v := range uFields {
-				sessionData.Set(k, v)
+				sessionData.Session.Extra[k] = v
 			}
 		}
 	}
 
-	if sessionData.Session != nil && sessionData.Session.ID != "" {
+	if sessionData.Session.ID != "" {
 		if sFields, err := p.repo.GetCustomSessionFields(ctx, sessionData.Session.ID); err == nil && len(sFields) > 0 {
 			for k, v := range sFields {
-				sessionData.Set("session_"+k, v)
+				sessionData.Session.Extra["session_"+k] = v
 			}
 		}
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain"
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/google/uuid"
+	"uuid"
 )
 
 var (
@@ -378,7 +378,7 @@ func (r *MemorySessionRepository) CreateSession(_ context.Context, params *dto.C
 	}
 
 	sess := &entity.Session{
-		ID:                   uuid.NewString(),
+		ID:                   uuid.NewV7().String(),
 		UserID:               params.UserID,
 		Token:                params.Token,
 		ExpiresAt:            params.ExpiresAt,
@@ -397,8 +397,7 @@ func (r *MemorySessionRepository) CreateSession(_ context.Context, params *dto.C
 	r.tokens[sess.Token] = sess.ID
 
 	if params.Extra != nil {
-		cpFields := make(map[string]any, len(params.Extra))
-		maps.Copy(cpFields, params.Extra)
+		cpFields := maps.Clone(params.Extra)
 		r.customFields[sess.ID] = cpFields
 		sess.Extra = cpFields
 	}
@@ -533,8 +532,7 @@ func (r *MemorySessionRepository) SaveCustomSessionFields(_ context.Context, ses
 		return ErrSessionNotFound
 	}
 
-	cpFields := make(map[string]any, len(fields))
-	maps.Copy(cpFields, fields)
+	cpFields := maps.Clone(fields)
 	r.customFields[sessionID] = cpFields
 	sess.Extra = cpFields
 
@@ -557,9 +555,7 @@ func (r *MemorySessionRepository) GetCustomSessionFields(_ context.Context, sess
 		return make(map[string]any), nil
 	}
 
-	res := make(map[string]any, len(fields))
-	maps.Copy(res, fields)
-	return res, nil
+	return maps.Clone(fields), nil
 }
 
 // DeleteSession removes a session by token from memory.

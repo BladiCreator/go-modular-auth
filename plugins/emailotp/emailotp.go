@@ -11,8 +11,8 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"uuid"
 )
 
 // PluginID is the unique string identifier for the Email OTP plugin ("email-otp").
@@ -317,11 +317,11 @@ func (p *Plugin) VerifyEmailOTP(ctx context.Context, params *VerifyEmailOTPParam
 		}
 
 		sessParams := &dto.CreateSessionParams{
-			UserID:         user.ID,
-			Token:          token,
-			ExpiresAt:      time.Now().Add(7 * 24 * time.Hour),
-			CreatedAt:      time.Now(),
-			ExtraContainer: params.ExtraContainer,
+			UserID:    user.ID,
+			Token:     token,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+			CreatedAt: time.Now(),
+			Extra:     params.Extra,
 		}
 
 		sess, err := p.repo.CreateSession(ctx, sessParams)
@@ -382,10 +382,9 @@ func (p *Plugin) SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParam
 		}
 
 		createUserParams := &dto.CreateUserParams{
-			Email:          email,
-			Name:           name,
-			Role:           "user",
-			ExtraContainer: params.ExtraContainer,
+			Email: email,
+			Name:  name,
+			Role:  "user",
 		}
 
 		newUser, createErr := p.repo.CreateUser(ctx, createUserParams)
@@ -399,7 +398,7 @@ func (p *Plugin) SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParam
 
 		// Create credential account record
 		_ = p.repo.CreateAccount(ctx, &entity.Account{
-			ID:        "acc_" + uuid.NewString(),
+			ID:        "acc_" + uuid.NewV7().String(),
 			UserID:    newUser.ID,
 			Provider:  "email-otp",
 			CreatedAt: time.Now(),
@@ -424,11 +423,11 @@ func (p *Plugin) SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParam
 	}
 
 	sessParams := &dto.CreateSessionParams{
-		UserID:         user.ID,
-		Token:          token,
-		ExpiresAt:      time.Now().Add(7 * 24 * time.Hour),
-		CreatedAt:      time.Now(),
-		ExtraContainer: params.ExtraContainer,
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		CreatedAt: time.Now(),
+		Extra:     params.Extra,
 	}
 
 	session, err := p.repo.CreateSession(ctx, sessParams)
@@ -550,7 +549,7 @@ func (p *Plugin) ResetPasswordEmailOTP(ctx context.Context, params *ResetPasswor
 	// Update or create credential account
 	if err := p.repo.UpdateAccountPassword(ctx, user.ID, hash); err != nil {
 		_ = p.repo.CreateAccount(ctx, &entity.Account{
-			ID:        "acc_" + uuid.NewString(),
+			ID:        "acc_" + uuid.NewV7().String(),
 			UserID:    user.ID,
 			Provider:  "credential",
 			Password:  hash,

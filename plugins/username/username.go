@@ -3,6 +3,7 @@ package username
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -206,13 +207,11 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams, opts .
 	// Step-Up / Multi-Factor Authentication (MFA) Check
 	if p.ctx != nil && p.ctx.MFAProvider() != nil {
 		mfa := p.ctx.MFAProvider()
-		combinedExtra := make(map[string]any)
-		for k, v := range params.Extra {
-			combinedExtra[k] = v
+		combinedExtra := maps.Clone(params.Extra)
+		if combinedExtra == nil {
+			combinedExtra = make(map[string]any)
 		}
-		for k, v := range optsData.Extra {
-			combinedExtra[k] = v
-		}
+		maps.Copy(combinedExtra, optsData.Extra)
 		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, combinedExtra)
 		if err != nil {
 			return nil, fmt.Errorf("username: failed to evaluate 2FA: %w", err)
@@ -247,9 +246,6 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInUsernameParams, opts .
 	sessionData := &dto.SessionData{
 		Session: sess,
 		User:    user,
-	}
-	if sess.Extra != nil {
-		sessionData.Extra = sess.Extra
 	}
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {

@@ -2,23 +2,19 @@ package twofactor
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth/plugin"
 )
 
 type (
-	// EnableParams defines parameters required to enable 2FA for a user.
+	// EnableParams defines parameters to initiate TOTP configuration.
 	EnableParams struct {
-		// UserID is the unique identifier of the user enrolling in 2FA (required).
+		// UserID identifies the user enabling two-factor authentication (required).
 		UserID string `json:"user_id"`
 
 		// Password is the user's current password if password re-authentication is enforced (optional).
-		Password string `json:"password,omitempty"`
+		Password string `json:"password,omitzero"`
 
 		// Issuer overrides the default application issuer name shown in authenticator apps (optional).
-		Issuer string `json:"issuer,omitempty"`
-
-		plugin.ExtraContainer
+		Issuer string `json:"issuer,omitzero"`
 	}
 
 	// EnableResult contains the generated Base32 secret, TOTP setup URI, and initial single-use backup codes.
@@ -39,9 +35,7 @@ type (
 		UserID string `json:"user_id"`
 
 		// Password is the optional password confirmation.
-		Password string `json:"password,omitempty"`
-
-		plugin.ExtraContainer
+		Password string `json:"password,omitzero"`
 	}
 
 	// GetTOTPURIParams defines parameters to retrieve the TOTP URI for an already configured user.
@@ -50,9 +44,7 @@ type (
 		UserID string `json:"user_id"`
 
 		// Password is an optional password check.
-		Password string `json:"password,omitempty"`
-
-		plugin.ExtraContainer
+		Password string `json:"password,omitzero"`
 	}
 
 	// VerifyTOTPParams defines parameters to verify an incoming 6- or 8-digit TOTP code.
@@ -64,12 +56,13 @@ type (
 		Code string `json:"code"`
 
 		// TrustDevice indicates whether the client requests authorizing this device to bypass subsequent 2FA prompts.
-		TrustDevice bool `json:"trust_device,omitempty"`
+		TrustDevice bool `json:"trust_device,omitzero"`
 
 		// DeviceID specifies the unique client hardware/installation identifier required when TrustDevice is true.
-		DeviceID string `json:"device_id,omitempty"`
+		DeviceID string `json:"device_id,omitzero"`
 
-		plugin.ExtraContainer
+		// IPAddress specifies client IP address.
+		IPAddress string `json:"ip_address,omitzero"`
 	}
 
 	// VerifyBackupCodeParams defines parameters to verify and consume a single-use backup code.
@@ -79,16 +72,12 @@ type (
 
 		// Code is the alphanumeric single-use recovery code (required).
 		Code string `json:"code"`
-
-		plugin.ExtraContainer
 	}
 
 	// SendOTPParams defines parameters to trigger an SMS or Email OTP challenge.
 	SendOTPParams struct {
 		// UserID identifies the user receiving the OTP challenge (required).
 		UserID string `json:"user_id"`
-
-		plugin.ExtraContainer
 	}
 
 	// SendOTPResult contains metadata about the dispatched OTP challenge.
@@ -104,8 +93,6 @@ type (
 
 		// Code is the numeric challenge code delivered to the user (required).
 		Code string `json:"code"`
-
-		plugin.ExtraContainer
 	}
 
 	// VerifyResult represents the comprehensive result of any successful 2FA verification.
@@ -120,18 +107,16 @@ type (
 		Method string `json:"method"`
 
 		// TrustDeviceToken contains the signed device authorization token if TrustDevice was requested and succeeded.
-		TrustDeviceToken string `json:"trust_device_token,omitempty"`
+		TrustDeviceToken string `json:"trust_device_token,omitzero"`
 
 		// RemainingCodes reports the count of unconsumed backup recovery codes (populated on backup_code verification).
-		RemainingCodes int `json:"remaining_codes,omitempty"`
+		RemainingCodes int `json:"remaining_codes,omitzero"`
 	}
 
 	// CreateChallengeParams defines parameters to issue a temporary sign-in challenge token.
 	CreateChallengeParams struct {
 		// UserID identifies the user required to fulfill the 2FA challenge (required).
 		UserID string `json:"user_id"`
-
-		plugin.ExtraContainer
 	}
 
 	// ChallengeResult contains the generated challenge token and its expiration.
@@ -158,12 +143,13 @@ type (
 		Code string `json:"code"`
 
 		// TrustDevice indicates whether to trust this device upon successful verification.
-		TrustDevice bool `json:"trust_device,omitempty"`
+		TrustDevice bool `json:"trust_device,omitzero"`
 
 		// DeviceID specifies the client device identifier.
-		DeviceID string `json:"device_id,omitempty"`
+		DeviceID string `json:"device_id,omitzero"`
 
-		plugin.ExtraContainer
+		// IPAddress specifies the client IP address.
+		IPAddress string `json:"ip_address,omitzero"`
 	}
 
 	// TrustDeviceParams defines parameters to explicitly trust a client device.
@@ -174,7 +160,11 @@ type (
 		// DeviceID is the unique client hardware/installation identifier (required).
 		DeviceID string `json:"device_id"`
 
-		plugin.ExtraContainer
+		// IPAddress is the IP address of the client device.
+		IPAddress string `json:"ip_address,omitzero"`
+
+		// UserAgent is the user agent string of the client device.
+		UserAgent string `json:"user_agent,omitzero"`
 	}
 
 	// TrustDeviceResult contains the issued cryptographic device token and its expiration.
@@ -196,8 +186,6 @@ type (
 
 		// Token is the cryptographic token previously issued to this device (required).
 		Token string `json:"token"`
-
-		plugin.ExtraContainer
 	}
 
 	// RevokeTrustedDeviceParams defines parameters to unauthorize a specific client device.
@@ -207,8 +195,6 @@ type (
 
 		// DeviceID is the client hardware/installation identifier to revoke (required).
 		DeviceID string `json:"device_id"`
-
-		plugin.ExtraContainer
 	}
 
 	// GenerateBackupCodesParams defines parameters to regenerate a fresh set of single-use backup codes.
@@ -217,9 +203,7 @@ type (
 		UserID string `json:"user_id"`
 
 		// Password is an optional password check.
-		Password string `json:"password,omitempty"`
-
-		plugin.ExtraContainer
+		Password string `json:"password,omitzero"`
 	}
 
 	// BackupCodesResult contains the slice of active single-use backup recovery codes.
@@ -232,7 +216,5 @@ type (
 	ViewBackupCodesParams struct {
 		// UserID identifies the user querying their backup codes (required).
 		UserID string `json:"user_id"`
-
-		plugin.ExtraContainer
 	}
 )

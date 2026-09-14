@@ -114,9 +114,7 @@ func CloneStatements(s Statements) Statements {
 	}
 	clone := make(Statements, len(s))
 	for res, actions := range s {
-		copied := make([]string, len(actions))
-		copy(copied, actions)
-		clone[res] = copied
+		clone[res] = slices.Clone(actions)
 	}
 	return clone
 }
@@ -134,7 +132,7 @@ func MergeStatements(dst, src Statements) Statements {
 
 // mergeUnique appends items from src to dst if they do not already exist in dst.
 func mergeUnique(dst, src []string) []string {
-	result := append([]string(nil), dst...)
+	result := slices.Clone(dst)
 	for _, item := range src {
 		if !slices.Contains(result, item) {
 			result = append(result, item)

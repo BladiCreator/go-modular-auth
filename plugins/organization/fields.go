@@ -50,45 +50,6 @@ const (
 	ActionCancel = "cancel"
 )
 
-// Standard Extra metadata keys that can be set or consumed in organization operations and events.
-const (
-	// ExtraKeyOrgID stores the organization identifier in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyOrgID = "org_id"
-
-	// ExtraKeyOrgSlug stores the organization URL-friendly slug in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyOrgSlug = "org_slug"
-
-	// ExtraKeyOrgName stores the organization display name in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyOrgName = "org_name"
-
-	// ExtraKeyMemberRole stores the role assigned to a member in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyMemberRole = "member_role"
-
-	// ExtraKeyTeamID stores the team identifier in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyTeamID = "team_id"
-
-	// ExtraKeyInviterID stores the user ID of the inviter in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyInviterID = "inviter_id"
-
-	// ExtraKeyInvitationID stores the invitation identifier in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyInvitationID = "invitation_id"
-
-	// ExtraKeyUserID stores the associated user identifier in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyUserID = "user_id"
-
-	// ExtraKeyEmail stores the targeted email address in dynamic Extra metadata.
-	// Expected type: string.
-	ExtraKeyEmail = "email"
-)
-
 // Shared plugin context key prefixes used for active tenant context in plugin.Context.
 const (
 	// ContextKeyActiveOrgPrefix is the key prefix used when tracking a user's active organization in plugin.Context.

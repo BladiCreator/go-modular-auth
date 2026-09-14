@@ -1,9 +1,5 @@
 package oauth2
 
-import (
-	"github.com/BladiCreator/go-modular-auth/plugin"
-)
-
 // Parameter and Result Structs
 type (
 	// AuthorizeParams defines input parameters for initiating the OAuth 2.1 authorization code flow.
@@ -15,20 +11,19 @@ type (
 		CodeChallengeMethod string `json:"code_challenge_method"`
 		Scope               string `json:"scope"`
 		State               string `json:"state"`
-		Nonce               string `json:"nonce,omitempty"`
-		Prompt              string `json:"prompt,omitempty"`
-		Resource            string `json:"resource,omitempty"`
-		SessionID           string `json:"session_id,omitempty"`
-		UserID              string `json:"user_id,omitempty"`
-		plugin.ExtraContainer
+		Nonce               string `json:"nonce,omitzero"`
+		Prompt              string `json:"prompt,omitzero"`
+		Resource            string `json:"resource,omitzero"`
+		SessionID           string `json:"session_id,omitzero"`
+		UserID              string `json:"user_id,omitzero"`
 	}
 
 	// AuthorizeResult represents the outcome of an authorization request.
 	AuthorizeResult struct {
 		RedirectURI  string `json:"redirect_uri"`
-		Code         string `json:"code,omitempty"`
-		State        string `json:"state,omitempty"`
-		Issuer       string `json:"iss,omitempty"`
+		Code         string `json:"code,omitzero"`
+		State        string `json:"state,omitzero"`
+		Issuer       string `json:"iss,omitzero"`
 		IsRedirect   bool   `json:"is_redirect"`
 		NeedsLogin   bool   `json:"needs_login"`
 		NeedsConsent bool   `json:"needs_consent"`
@@ -40,7 +35,6 @@ type (
 		OAuthSignature string `json:"oauth_signature"`
 		SessionID      string `json:"session_id"`
 		UserID         string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	// ConsentParams defines input parameters for user approval or denial of requested scopes.
@@ -50,22 +44,20 @@ type (
 		UserID         string   `json:"user_id"`
 		ApprovedScopes []string `json:"approved_scopes"`
 		Denied         bool     `json:"denied"`
-		plugin.ExtraContainer
 	}
 
 	// ConsentResult represents the result of processing user consent.
 	ConsentResult struct {
 		RedirectURI string `json:"redirect_uri"`
-		Code        string `json:"code,omitempty"`
-		State       string `json:"state,omitempty"`
-		Issuer      string `json:"iss,omitempty"`
+		Code        string `json:"code,omitzero"`
+		State       string `json:"state,omitzero"`
+		Issuer      string `json:"iss,omitzero"`
 	}
 
 	// RevokeConsentParams defines input parameters to revoke user consent for a client.
 	RevokeConsentParams struct {
 		ClientID string `json:"client_id"`
 		UserID   string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	// RevokeConsentResult reports the outcome of revoking consent.
@@ -76,7 +68,6 @@ type (
 	// ListConsentsParams defines input parameters to list user consents.
 	ListConsentsParams struct {
 		UserID string `json:"user_id"`
-		plugin.ExtraContainer
 	}
 
 	// ListConsentsResult contains the list of active user consents.
@@ -87,15 +78,14 @@ type (
 	// TokenParams defines input parameters for the token endpoint exchange.
 	TokenParams struct {
 		GrantType    string `json:"grant_type"`
-		Code         string `json:"code,omitempty"`
-		CodeVerifier string `json:"code_verifier,omitempty"`
-		RedirectURI  string `json:"redirect_uri,omitempty"`
-		ClientID     string `json:"client_id,omitempty"`
-		ClientSecret string `json:"client_secret,omitempty"`
-		RefreshToken string `json:"refresh_token,omitempty"`
-		Scope        string `json:"scope,omitempty"`
-		Resource     string `json:"resource,omitempty"`
-		plugin.ExtraContainer
+		Code         string `json:"code,omitzero"`
+		CodeVerifier string `json:"code_verifier,omitzero"`
+		RedirectURI  string `json:"redirect_uri,omitzero"`
+		ClientID     string `json:"client_id,omitzero"`
+		ClientSecret string `json:"client_secret,omitzero"`
+		RefreshToken string `json:"refresh_token,omitzero"`
+		Scope        string `json:"scope,omitzero"`
+		Resource     string `json:"resource,omitzero"`
 	}
 
 	// TokenResult represents the response issued by the token endpoint.
@@ -103,44 +93,42 @@ type (
 		AccessToken  string `json:"access_token"`
 		TokenType    string `json:"token_type"`
 		ExpiresIn    int64  `json:"expires_in"`
-		RefreshToken string `json:"refresh_token,omitempty"`
-		IDToken      string `json:"id_token,omitempty"`
-		Scope        string `json:"scope,omitempty"`
+		RefreshToken string `json:"refresh_token,omitzero"`
+		IDToken      string `json:"id_token,omitzero"`
+		Scope        string `json:"scope,omitzero"`
 	}
 
 	// IntrospectParams defines input parameters for token introspection (RFC 7662).
 	IntrospectParams struct {
 		Token         string `json:"token"`
-		TokenTypeHint string `json:"token_type_hint,omitempty"`
-		ClientID      string `json:"client_id,omitempty"`
-		ClientSecret  string `json:"client_secret,omitempty"`
-		plugin.ExtraContainer
+		TokenTypeHint string `json:"token_type_hint,omitzero"`
+		ClientID      string `json:"client_id,omitzero"`
+		ClientSecret  string `json:"client_secret,omitzero"`
 	}
 
 	// IntrospectResult represents the introspection metadata (RFC 7662).
 	IntrospectResult struct {
 		Active    bool           `json:"active"`
-		Scope     string         `json:"scope,omitempty"`
-		ClientID  string         `json:"client_id,omitempty"`
-		Username  string         `json:"username,omitempty"`
-		TokenType string         `json:"token_type,omitempty"`
-		Exp       int64          `json:"exp,omitempty"`
-		Iat       int64          `json:"iat,omitempty"`
-		Nbf       int64          `json:"nbf,omitempty"`
-		Sub       string         `json:"sub,omitempty"`
-		Aud       []string       `json:"aud,omitempty"`
-		Iss       string         `json:"iss,omitempty"`
-		Jti       string         `json:"jti,omitempty"`
-		Extra     map[string]any `json:"extra,omitempty"`
+		Scope     string         `json:"scope,omitzero"`
+		ClientID  string         `json:"client_id,omitzero"`
+		Username  string         `json:"username,omitzero"`
+		TokenType string         `json:"token_type,omitzero"`
+		Exp       int64          `json:"exp,omitzero"`
+		Iat       int64          `json:"iat,omitzero"`
+		Nbf       int64          `json:"nbf,omitzero"`
+		Sub       string         `json:"sub,omitzero"`
+		Aud       []string       `json:"aud,omitzero"`
+		Iss       string         `json:"iss,omitzero"`
+		Jti       string         `json:"jti,omitzero"`
+		Extra     map[string]any `json:"extra,omitzero"`
 	}
 
 	// RevokeParams defines input parameters for token revocation (RFC 7009).
 	RevokeParams struct {
 		Token         string `json:"token"`
-		TokenTypeHint string `json:"token_type_hint,omitempty"`
-		ClientID      string `json:"client_id,omitempty"`
-		ClientSecret  string `json:"client_secret,omitempty"`
-		plugin.ExtraContainer
+		TokenTypeHint string `json:"token_type_hint,omitzero"`
+		ClientID      string `json:"client_id,omitzero"`
+		ClientSecret  string `json:"client_secret,omitzero"`
 	}
 
 	// RevokeResult reports the result of token revocation.
@@ -151,29 +139,27 @@ type (
 	// UserInfoParams defines input parameters for the OIDC UserInfo endpoint.
 	UserInfoParams struct {
 		AccessToken string `json:"access_token"`
-		plugin.ExtraContainer
 	}
 
 	// UserInfoResult represents claims returned by the OIDC UserInfo endpoint.
 	UserInfoResult struct {
 		Sub                 string         `json:"sub"`
-		Name                string         `json:"name,omitempty"`
-		Email               string         `json:"email,omitempty"`
-		EmailVerified       *bool          `json:"email_verified,omitempty"`
-		PhoneNumber         string         `json:"phone_number,omitempty"`
-		PhoneNumberVerified *bool          `json:"phone_number_verified,omitempty"`
-		Picture             string         `json:"picture,omitempty"`
-		Claims              map[string]any `json:"claims,omitempty"`
+		Name                string         `json:"name,omitzero"`
+		Email               string         `json:"email,omitzero"`
+		EmailVerified       *bool          `json:"email_verified,omitzero"`
+		PhoneNumber         string         `json:"phone_number,omitzero"`
+		PhoneNumberVerified *bool          `json:"phone_number_verified,omitzero"`
+		Picture             string         `json:"picture,omitzero"`
+		Claims              map[string]any `json:"claims,omitzero"`
 	}
 
 	// EndSessionParams defines input parameters for RP-Initiated Logout.
 	EndSessionParams struct {
-		IDTokenHint           string `json:"id_token_hint,omitempty"`
-		ClientID              string `json:"client_id,omitempty"`
-		PostLogoutRedirectURI string `json:"post_logout_redirect_uri,omitempty"`
-		State                 string `json:"state,omitempty"`
-		SessionID             string `json:"session_id,omitempty"`
-		plugin.ExtraContainer
+		IDTokenHint           string `json:"id_token_hint,omitzero"`
+		ClientID              string `json:"client_id,omitzero"`
+		PostLogoutRedirectURI string `json:"post_logout_redirect_uri,omitzero"`
+		State                 string `json:"state,omitzero"`
+		SessionID             string `json:"session_id,omitzero"`
 	}
 
 	// EndSessionResult contains the redirection target after logout.
@@ -184,39 +170,37 @@ type (
 	// RegisterClientParams defines input parameters for Dynamic Client Registration (RFC 7591).
 	RegisterClientParams struct {
 		ClientName              string                  `json:"client_name"`
-		ClientURI               string                  `json:"client_uri,omitempty"`
-		LogoURI                 string                  `json:"logo_uri,omitempty"`
-		Contacts                []string                `json:"contacts,omitempty"`
-		TOSURI                  string                  `json:"tos_uri,omitempty"`
-		PolicyURI               string                  `json:"policy_uri,omitempty"`
-		SoftwareID              string                  `json:"software_id,omitempty"`
-		SoftwareVersion         string                  `json:"software_version,omitempty"`
+		ClientURI               string                  `json:"client_uri,omitzero"`
+		LogoURI                 string                  `json:"logo_uri,omitzero"`
+		Contacts                []string                `json:"contacts,omitzero"`
+		TOSURI                  string                  `json:"tos_uri,omitzero"`
+		PolicyURI               string                  `json:"policy_uri,omitzero"`
+		SoftwareID              string                  `json:"software_id,omitzero"`
+		SoftwareVersion         string                  `json:"software_version,omitzero"`
 		RedirectURIs            []string                `json:"redirect_uris"`
-		PostLogoutRedirectURIs  []string                `json:"post_logout_redirect_uris,omitempty"`
-		TokenEndpointAuthMethod TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitempty"`
-		GrantTypes              []GrantType             `json:"grant_types,omitempty"`
-		ResponseTypes           []ResponseType          `json:"response_types,omitempty"`
-		Scope                   string                  `json:"scope,omitempty"`
-		Public                  bool                    `json:"public,omitempty"`
-		SubjectType             SubjectType             `json:"subject_type,omitempty"`
-		SkipConsent             bool                    `json:"skip_consent,omitempty"`
-		EnableEndSession        bool                    `json:"enable_end_session,omitempty"`
-		UserID                  *string                 `json:"user_id,omitempty"`
-		Metadata                map[string]any          `json:"metadata,omitempty"`
-		plugin.ExtraContainer
+		PostLogoutRedirectURIs  []string                `json:"post_logout_redirect_uris,omitzero"`
+		TokenEndpointAuthMethod TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitzero"`
+		GrantTypes              []GrantType             `json:"grant_types,omitzero"`
+		ResponseTypes           []ResponseType          `json:"response_types,omitzero"`
+		Scope                   string                  `json:"scope,omitzero"`
+		Public                  bool                    `json:"public,omitzero"`
+		SubjectType             SubjectType             `json:"subject_type,omitzero"`
+		SkipConsent             bool                    `json:"skip_consent,omitzero"`
+		EnableEndSession        bool                    `json:"enable_end_session,omitzero"`
+		UserID                  *string                 `json:"user_id,omitzero"`
+		Metadata                map[string]any          `json:"metadata,omitzero"`
 	}
 
 	// RegisterClientResult contains the registered client entity and generated secrets.
 	RegisterClientResult struct {
 		Client       *OAuthClient `json:"client"`
 		ClientID     string       `json:"client_id"`
-		ClientSecret string       `json:"client_secret,omitempty"`
+		ClientSecret string       `json:"client_secret,omitzero"`
 	}
 
 	// GetClientParams defines input parameters to lookup an OAuth client.
 	GetClientParams struct {
 		ClientID string `json:"client_id"`
-		plugin.ExtraContainer
 	}
 
 	// GetClientResult contains the client entity.
@@ -227,19 +211,18 @@ type (
 	// UpdateClientParams defines input parameters to update an OAuth client.
 	UpdateClientParams struct {
 		ClientID               string         `json:"client_id"`
-		ClientName             *string        `json:"client_name,omitempty"`
-		ClientURI              *string        `json:"client_uri,omitempty"`
-		LogoURI                *string        `json:"logo_uri,omitempty"`
-		Contacts               []string       `json:"contacts,omitempty"`
-		RedirectURIs           []string       `json:"redirect_uris,omitempty"`
-		PostLogoutRedirectURIs []string       `json:"post_logout_redirect_uris,omitempty"`
-		GrantTypes             []GrantType    `json:"grant_types,omitempty"`
-		Scopes                 []string       `json:"scopes,omitempty"`
-		SkipConsent            *bool          `json:"skip_consent,omitempty"`
-		EnableEndSession       *bool          `json:"enable_end_session,omitempty"`
-		Disabled               *bool          `json:"disabled,omitempty"`
-		Metadata               map[string]any `json:"metadata,omitempty"`
-		plugin.ExtraContainer
+		ClientName             *string        `json:"client_name,omitzero"`
+		ClientURI              *string        `json:"client_uri,omitzero"`
+		LogoURI                *string        `json:"logo_uri,omitzero"`
+		Contacts               []string       `json:"contacts,omitzero"`
+		RedirectURIs           []string       `json:"redirect_uris,omitzero"`
+		PostLogoutRedirectURIs []string       `json:"post_logout_redirect_uris,omitzero"`
+		GrantTypes             []GrantType    `json:"grant_types,omitzero"`
+		Scopes                 []string       `json:"scopes,omitzero"`
+		SkipConsent            *bool          `json:"skip_consent,omitzero"`
+		EnableEndSession       *bool          `json:"enable_end_session,omitzero"`
+		Disabled               *bool          `json:"disabled,omitzero"`
+		Metadata               map[string]any `json:"metadata,omitzero"`
 	}
 
 	// UpdateClientResult contains the updated client entity.
@@ -250,7 +233,6 @@ type (
 	// DeleteClientParams defines input parameters to delete an OAuth client.
 	DeleteClientParams struct {
 		ClientID string `json:"client_id"`
-		plugin.ExtraContainer
 	}
 
 	// DeleteClientResult reports the outcome of deleting a client.
@@ -261,7 +243,6 @@ type (
 	// RotateClientSecretParams defines input parameters to rotate a client secret.
 	RotateClientSecretParams struct {
 		ClientID string `json:"client_id"`
-		plugin.ExtraContainer
 	}
 
 	// RotateClientSecretResult contains the new raw client secret.
@@ -271,9 +252,7 @@ type (
 	}
 
 	// OpenIDConfigurationParams defines input parameters for OpenID Provider metadata.
-	OpenIDConfigurationParams struct {
-		plugin.ExtraContainer
-	}
+	OpenIDConfigurationParams struct{}
 
 	// OpenIDConfigurationResult represents discovery metadata (OpenID Connect Discovery 1.0).
 	OpenIDConfigurationResult struct {
@@ -283,9 +262,9 @@ type (
 		UserinfoEndpoint                  string   `json:"userinfo_endpoint"`
 		IntrospectionEndpoint             string   `json:"introspection_endpoint"`
 		RevocationEndpoint                string   `json:"revocation_endpoint"`
-		EndSessionEndpoint                string   `json:"end_session_endpoint,omitempty"`
-		RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"`
-		JwksURI                           string   `json:"jwks_uri,omitempty"`
+		EndSessionEndpoint                string   `json:"end_session_endpoint,omitzero"`
+		RegistrationEndpoint              string   `json:"registration_endpoint,omitzero"`
+		JwksURI                           string   `json:"jwks_uri,omitzero"`
 		ResponseTypesSupported            []string `json:"response_types_supported"`
 		SubjectTypesSupported             []string `json:"subject_types_supported"`
 		IDTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
@@ -297,9 +276,7 @@ type (
 	}
 
 	// OAuthMetadataParams defines input parameters for RFC 8414 metadata.
-	OAuthMetadataParams struct {
-		plugin.ExtraContainer
-	}
+	OAuthMetadataParams struct{}
 
 	// OAuthMetadataResult represents Authorization Server Metadata (RFC 8414).
 	OAuthMetadataResult struct {
@@ -308,7 +285,7 @@ type (
 		TokenEndpoint                     string   `json:"token_endpoint"`
 		IntrospectionEndpoint             string   `json:"introspection_endpoint"`
 		RevocationEndpoint                string   `json:"revocation_endpoint"`
-		RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"`
+		RegistrationEndpoint              string   `json:"registration_endpoint,omitzero"`
 		ResponseTypesSupported            []string `json:"response_types_supported"`
 		GrantTypesSupported               []string `json:"grant_types_supported"`
 		CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`

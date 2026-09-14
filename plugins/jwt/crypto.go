@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -19,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 )
@@ -248,18 +248,15 @@ func ParsePublicKeyFromJWK(jwk *JWK) (crypto.PublicKey, error) {
 
 	case "EC":
 		var (
-			curve     elliptic.Curve
-			ecdhCurve ecdh.Curve
-			byteLen   int
+			curve   elliptic.Curve
+			byteLen int
 		)
 		switch jwk.Crv {
 		case "P-256":
 			curve = elliptic.P256()
-			ecdhCurve = ecdh.P256()
 			byteLen = 32
 		case "P-521":
 			curve = elliptic.P521()
-			ecdhCurve = ecdh.P521()
 			byteLen = 66
 		default:
 			return nil, fmt.Errorf("jwt: unsupported EC curve '%s'", jwk.Crv)
@@ -280,16 +277,13 @@ func ParsePublicKeyFromJWK(jwk *JWK) (crypto.PublicKey, error) {
 		yPadded := make([]byte, byteLen)
 		copy(yPadded[byteLen-len(yBytes):], yBytes)
 
-		uncompressedPoint := append([]byte{0x04}, append(xPadded, yPadded...)...)
-		if _, err := ecdhCurve.NewPublicKey(uncompressedPoint); err != nil {
+		uncompressedPoint := slices.Concat([]byte{0x04}, xPadded, yPadded)
+		pubKey, err := ecdsa.ParseUncompressedPublicKey(curve, uncompressedPoint)
+		if err != nil {
 			return nil, fmt.Errorf("jwt: invalid EC public key point: %w", err)
 		}
 
-		return &ecdsa.PublicKey{
-			Curve: curve,
-			X:     new(big.Int).SetBytes(xBytes),
-			Y:     new(big.Int).SetBytes(yBytes),
-		}, nil
+		return pubKey, nil
 
 	case "RSA":
 		nBytes, err := base64.RawURLEncoding.DecodeString(jwk.N)

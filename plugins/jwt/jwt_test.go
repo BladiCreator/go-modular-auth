@@ -583,7 +583,8 @@ func BenchmarkPlugin_SignAndVerify(b *testing.B) {
 	b.ReportAllocs()
 
 	b.Run("Sign-EdDSA", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		b.ReportAllocs()
+		for b.Loop() {
 			_, _ = p.Sign(ctx, jwt.SignParams{
 				Subject: "benchmark_user",
 				Payload: map[string]any{"role": "user", "scope": "read:write"},
@@ -597,7 +598,8 @@ func BenchmarkPlugin_SignAndVerify(b *testing.B) {
 	})
 
 	b.Run("Verify-EdDSA", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		b.ReportAllocs()
+		for b.Loop() {
 			_, _ = p.Verify(ctx, jwt.VerifyParams{
 				Token: signRes.Token,
 			})

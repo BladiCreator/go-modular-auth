@@ -139,7 +139,6 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 		Slug:           slug,
 		Logo:           params.Logo,
 		Metadata:       params.Metadata,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Create Organization Entity
@@ -201,7 +200,6 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 	p.publishEvent(EventOrgCreateAfter, &OrgCreateAfterEventPayload{
 		Organization:   org,
 		Member:         member,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &CreateOrganizationResult{
@@ -330,7 +328,6 @@ func (p *Plugin) UpdateOrganization(ctx context.Context, params UpdateOrganizati
 		Slug:           params.Slug,
 		Logo:           params.Logo,
 		Metadata:       params.Metadata,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 5. Persist Update
@@ -341,7 +338,6 @@ func (p *Plugin) UpdateOrganization(ctx context.Context, params UpdateOrganizati
 	// 6. Emit After Event
 	p.publishEvent(EventOrgUpdateAfter, &OrgUpdateAfterEventPayload{
 		Organization:   org,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &UpdateOrganizationResult{Organization: org}, nil
@@ -370,7 +366,6 @@ func (p *Plugin) DeleteOrganization(ctx context.Context, params DeleteOrganizati
 	// 2. Emit Before Event
 	p.publishEvent(EventOrgDeleteBefore, &OrgDeleteBeforeEventPayload{
 		OrganizationID: params.OrganizationID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	// 3. Persist Deletion
@@ -381,7 +376,6 @@ func (p *Plugin) DeleteOrganization(ctx context.Context, params DeleteOrganizati
 	// 4. Emit After Event
 	p.publishEvent(EventOrgDeleteAfter, &OrgDeleteAfterEventPayload{
 		OrganizationID: params.OrganizationID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &DeleteOrganizationResult{Success: true}, nil
@@ -435,7 +429,6 @@ func (p *Plugin) SetActiveOrganization(ctx context.Context, params SetActiveOrga
 	p.publishEvent(EventOrgSetActiveBefore, &OrgSetActiveBeforeEventPayload{
 		UserID:         params.UserID,
 		OrganizationID: params.OrganizationID,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	if p.ctx != nil {
@@ -447,7 +440,6 @@ func (p *Plugin) SetActiveOrganization(ctx context.Context, params SetActiveOrga
 		OrganizationID: params.OrganizationID,
 		Organization:   org,
 		Member:         member,
-		ExtraContainer: params.ExtraContainer,
 	})
 
 	return &SetActiveOrganizationResult{

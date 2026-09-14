@@ -2,8 +2,9 @@ package plugin
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -185,7 +186,7 @@ func (h *Hooks) DispatchUserSignedUp(ctx context.Context, user *entity.User) {
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]UserSignedUpHookFn(nil), h.userSignedUpCallbacks...)
+	callbacks := slices.Clone(h.userSignedUpCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -210,7 +211,7 @@ func (h *Hooks) DispatchUserSignedIn(ctx context.Context, data *dto.SessionData)
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]UserSignedInHookFn(nil), h.userSignedInCallbacks...)
+	callbacks := slices.Clone(h.userSignedInCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -234,7 +235,7 @@ func (h *Hooks) DispatchSessionCreated(ctx context.Context, session *entity.Sess
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]SessionCreatedHookFn(nil), h.sessionCreatedCallbacks...)
+	callbacks := slices.Clone(h.sessionCreatedCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -258,7 +259,7 @@ func (h *Hooks) DispatchSessionRevoked(ctx context.Context, token string, sessio
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]SessionRevokedHookFn(nil), h.sessionRevokedCallbacks...)
+	callbacks := slices.Clone(h.sessionRevokedCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -282,7 +283,7 @@ func (h *Hooks) DispatchSessionValidated(ctx context.Context, data *dto.SessionD
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]SessionValidatedHookFn(nil), h.sessionValidatedCallbacks...)
+	callbacks := slices.Clone(h.sessionValidatedCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -306,7 +307,7 @@ func (h *Hooks) DispatchPasswordResetRequested(ctx context.Context, email string
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]PasswordResetReqHookFn(nil), h.passwordResetReqCallbacks...)
+	callbacks := slices.Clone(h.passwordResetReqCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -330,7 +331,7 @@ func (h *Hooks) DispatchPasswordResetCompleted(ctx context.Context, userID strin
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]PasswordResetCompHookFn(nil), h.passwordResetCompCallbacks...)
+	callbacks := slices.Clone(h.passwordResetCompCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -354,7 +355,7 @@ func (h *Hooks) DispatchEmailVerificationRequested(ctx context.Context, email st
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]EmailVerificationReqHookFn(nil), h.emailVerificationReqCallbacks...)
+	callbacks := slices.Clone(h.emailVerificationReqCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -378,7 +379,7 @@ func (h *Hooks) DispatchEmailVerified(ctx context.Context, user *entity.User) {
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]EmailVerifiedHookFn(nil), h.emailVerifiedCallbacks...)
+	callbacks := slices.Clone(h.emailVerifiedCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -402,7 +403,7 @@ func (h *Hooks) DispatchPasswordChanged(ctx context.Context, user *entity.User) 
 		return
 	}
 	h.mu.RLock()
-	callbacks := append([]PasswordChangedHookFn(nil), h.passwordChangedCallbacks...)
+	callbacks := slices.Clone(h.passwordChangedCallbacks)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -453,7 +454,7 @@ func (h *Hooks) Dispatch(ctx context.Context, topic string, payload any) {
 		h.mu.RUnlock()
 		return
 	}
-	copied := append([]any(nil), subs...)
+	copied := slices.Clone(subs)
 	isAsync := h.async
 	h.mu.RUnlock()
 
@@ -555,7 +556,7 @@ func invokeSubscriber(sub any, ctx context.Context, payload any) {
 func safeInvoke(fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			_ = fmt.Sprintf("Hooks: recovered panic in hook: %v", r)
+			slog.Default().Error("Hooks: recovered panic in lifecycle hook", "panic", r)
 		}
 	}()
 	fn()

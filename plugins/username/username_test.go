@@ -11,8 +11,8 @@ import (
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"uuid"
 )
 
 // MockCrypto implements plugin.CryptoUtils for username tests.
@@ -28,7 +28,7 @@ func (c *MockCrypto) ComparePassword(hash, password string) bool {
 }
 
 func (c *MockCrypto) GenerateRandomToken(length int) (string, error) {
-	return "test_token_" + uuid.NewString(), nil
+	return "test_token_" + uuid.New().String(), nil
 }
 
 func setupTestPlugin(t *testing.T, repo *MockRepository, opts ...username.Option) (*username.Plugin, *plugin.Context) {
@@ -320,9 +320,7 @@ func TestUsername_SignIn_WithOptions(t *testing.T) {
 		Username:   "opts_user",
 		Password:   "Password123!",
 		RememberMe: &remember,
-		ExtraContainer: plugin.ExtraContainer{
-			Extra: map[string]any{"param_key": "param_val"},
-		},
+		Extra:      map[string]any{"param_key": "param_val"},
 	},
 		username.WithIPAddress("10.0.0.1"),
 		username.WithUserAgent("Go-Agent/1.0"),
