@@ -20,7 +20,7 @@ func GetClientIP(r *http.Request) string {
 
 	// 1. Check X-Forwarded-For header.
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		for _, part := range strings.Split(xff, ",") {
+		for part := range strings.SplitSeq(xff, ",") {
 			candidate := strings.TrimSpace(part)
 			if candidate == "" {
 				continue

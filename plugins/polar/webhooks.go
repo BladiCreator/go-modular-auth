@@ -352,10 +352,10 @@ func verifyWebhookSignature(payload []byte, signature, secret string) error {
 
 	sig := signature
 	if strings.Contains(signature, "v1=") {
-		parts := strings.Split(signature, ",")
-		for _, part := range parts {
-			if strings.HasPrefix(strings.TrimSpace(part), "v1=") {
-				sig = strings.TrimPrefix(strings.TrimSpace(part), "v1=")
+		parts := strings.SplitSeq(signature, ",")
+		for part := range parts {
+			if after, ok := strings.CutPrefix(strings.TrimSpace(part), "v1="); ok {
+				sig = after
 				break
 			}
 		}

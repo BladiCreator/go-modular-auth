@@ -447,7 +447,7 @@ func TestVerify_AntiReplay_RaceCondition(t *testing.T) {
 	var mu sync.Mutex
 
 	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 			res, err := p.Verify(context.Background(), phonenumber.VerifyParams{

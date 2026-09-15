@@ -3,6 +3,7 @@ package oauth2_test
 import (
 	"context"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -313,7 +314,7 @@ func TestOAuth2_AtomicSingleUse_Concurrency(t *testing.T) {
 	var failCount int32
 	var wg sync.WaitGroup
 
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		wg.Go(func() {
 			_, err := p.Token(ctx, oauth2.TokenParams{
 				GrantType:    "authorization_code",
@@ -639,10 +640,5 @@ func TestOAuth2_EndSession_RPInitiatedLogout(t *testing.T) {
 }
 
 func containsStr(slice []string, val string) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, val)
 }

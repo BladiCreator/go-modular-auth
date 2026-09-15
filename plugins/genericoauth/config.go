@@ -28,8 +28,8 @@ type Tokens struct {
 	RefreshToken          string         `json:"refresh_token,omitempty"`
 	IDToken               string         `json:"id_token,omitempty"`
 	TokenType             string         `json:"token_type,omitempty"`
-	AccessTokenExpiresAt  time.Time      `json:"access_token_expires_at,omitempty"`
-	RefreshTokenExpiresAt time.Time      `json:"refresh_token_expires_at,omitempty"`
+	AccessTokenExpiresAt  time.Time      `json:"access_token_expires_at"`
+	RefreshTokenExpiresAt time.Time      `json:"refresh_token_expires_at"`
 	Scopes                []string       `json:"scopes,omitempty"`
 	Raw                   map[string]any `json:"raw,omitempty"`
 }

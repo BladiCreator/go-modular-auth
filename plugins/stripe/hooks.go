@@ -58,8 +58,8 @@ func (p *Plugin) OnUserCreated(ctx context.Context, user *entity.User) error {
 	}
 
 	params := &stripsdk.CustomerParams{
-		Email: stripsdk.String(user.Email),
-		Name:  stripsdk.String(user.Name),
+		Email: new(user.Email),
+		Name:  new(user.Name),
 		Metadata: map[string]string{
 			"user_id":      user.ID,
 			"reference_id": user.ID,

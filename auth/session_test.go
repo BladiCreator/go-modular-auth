@@ -169,7 +169,7 @@ func TestCreateSession_CryptographicEntropy(t *testing.T) {
 	seen := make(map[string]bool)
 	const count = 50
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		sess, err := a.CreateSession(ctx, "user-entropy")
 		if err != nil {
 			t.Fatalf("failed to create session on iteration %d: %v", i, err)

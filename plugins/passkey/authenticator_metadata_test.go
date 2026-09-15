@@ -19,7 +19,7 @@ func TestGetAuthenticatorName(t *testing.T) {
 		},
 		{
 			name:     "Empty AAGUID",
-			aaguid:   ptr(""),
+			aaguid:   new(""),
 			expected: "Passkey",
 		},
 		{
@@ -29,37 +29,37 @@ func TestGetAuthenticatorName(t *testing.T) {
 		},
 		{
 			name:     "Google Password Manager (exact)",
-			aaguid:   ptr("ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4"),
+			aaguid:   new("ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4"),
 			expected: "Google Password Manager",
 		},
 		{
 			name:     "Apple Passwords (uppercase)",
-			aaguid:   ptr("FBFC3007-154E-4ECC-8C0B-6E020557D7BD"),
+			aaguid:   new("FBFC3007-154E-4ECC-8C0B-6E020557D7BD"),
 			expected: "Apple Passwords",
 		},
 		{
 			name:     "Windows Hello with whitespace",
-			aaguid:   ptr("  08987058-cadc-4b81-b6e1-30de50dcbe96  "),
+			aaguid:   new("  08987058-cadc-4b81-b6e1-30de50dcbe96  "),
 			expected: "Windows Hello",
 		},
 		{
 			name:     "1Password",
-			aaguid:   ptr("bada5566-a7aa-401f-bd96-45619a55120d"),
+			aaguid:   new("bada5566-a7aa-401f-bd96-45619a55120d"),
 			expected: "1Password",
 		},
 		{
 			name:     "Bitwarden",
-			aaguid:   ptr("d548826e-79b4-db40-a3d8-11116f7e8349"),
+			aaguid:   new("d548826e-79b4-db40-a3d8-11116f7e8349"),
 			expected: "Bitwarden",
 		},
 		{
 			name:     "YubiKey 5 Series",
-			aaguid:   ptr("cb69481e-8ff7-4039-93ec-0a2729a1ef67"),
+			aaguid:   new("cb69481e-8ff7-4039-93ec-0a2729a1ef67"),
 			expected: "YubiKey 5 Series",
 		},
 		{
 			name:     "Unknown valid AAGUID returns Passkey fallback",
-			aaguid:   ptr("11111111-2222-3333-4444-555555555555"),
+			aaguid:   new("11111111-2222-3333-4444-555555555555"),
 			expected: "Passkey",
 		},
 	}
@@ -74,6 +74,7 @@ func TestGetAuthenticatorName(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func ptr(s string) *string {
-	return &s
+	return new(s)
 }

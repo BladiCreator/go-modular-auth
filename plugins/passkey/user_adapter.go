@@ -78,8 +78,8 @@ func passkeyToCredential(pk *entity.Passkey) (webauthn.Credential, error) {
 
 	var transports []protocol.AuthenticatorTransport
 	if pk.Transports != nil && *pk.Transports != "" {
-		parts := strings.Split(*pk.Transports, ",")
-		for _, p := range parts {
+		parts := strings.SplitSeq(*pk.Transports, ",")
+		for p := range parts {
 			t := strings.TrimSpace(p)
 			if t != "" {
 				transports = append(transports, protocol.AuthenticatorTransport(t))

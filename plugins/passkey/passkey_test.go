@@ -472,7 +472,7 @@ func TestPlugin_PasskeyManagement_CRUD(t *testing.T) {
 	// Seed passkeys
 	pk1 := &entity.Passkey{
 		ID:           "pk_101",
-		Name:         ptr("My YubiKey"),
+		Name:         new("My YubiKey"),
 		UserID:       u1.ID,
 		CredentialID: "cred_101",
 		PublicKey:    base64.StdEncoding.EncodeToString([]byte("pub1")),
@@ -482,7 +482,7 @@ func TestPlugin_PasskeyManagement_CRUD(t *testing.T) {
 	}
 	pk2 := &entity.Passkey{
 		ID:           "pk_102",
-		Name:         ptr("Work MacBook"),
+		Name:         new("Work MacBook"),
 		UserID:       u1.ID,
 		CredentialID: "cred_102",
 		PublicKey:    base64.StdEncoding.EncodeToString([]byte("pub2")),

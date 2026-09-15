@@ -171,7 +171,7 @@ func (ac *AccessControl) AuthorizeRoles(roleNames []string, request AuthorizeReq
 	mergedStatements := make(Statements)
 	ac.mu.RLock()
 	for _, rawName := range roleNames {
-		for _, name := range strings.Split(rawName, ",") {
+		for name := range strings.SplitSeq(rawName, ",") {
 			trimmed := strings.TrimSpace(name)
 			if trimmed == "" {
 				continue

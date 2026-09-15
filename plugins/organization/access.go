@@ -96,9 +96,9 @@ func EvaluatePermissions(granted, required Permissions) bool {
 // custom static roles, and dynamic organization roles when enabled. Supports compound roles (e.g. "admin,billing").
 func (p *Plugin) ResolveRolePermissions(ctx context.Context, orgID, roleStr string) (Permissions, error) {
 	merged := make(Permissions)
-	roles := strings.Split(roleStr, ",")
+	roles := strings.SplitSeq(roleStr, ",")
 
-	for _, rawRole := range roles {
+	for rawRole := range roles {
 		roleName := strings.TrimSpace(rawRole)
 		if roleName == "" {
 			continue

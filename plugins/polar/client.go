@@ -43,10 +43,10 @@ func (c *polarSDKClient) CreateCustomer(ctx context.Context, email, name, extern
 		Email: email,
 	}
 	if name != "" {
-		ind.Name = polarsdk.String(name)
+		ind.Name = new(name)
 	}
 	if externalID != "" {
-		ind.ExternalID = polarsdk.String(externalID)
+		ind.ExternalID = new(externalID)
 	}
 
 	req := polarmodels.CreateCustomerCreateCustomerIndividualCreate(ind)
@@ -69,19 +69,19 @@ func (c *polarSDKClient) CreateCheckout(ctx context.Context, params CreateChecko
 		req.Products = []string{params.ProductPriceID}
 	}
 	if params.SuccessURL != "" {
-		req.SuccessURL = polarsdk.String(params.SuccessURL)
+		req.SuccessURL = new(params.SuccessURL)
 	}
 	if params.CustomerEmail != "" {
-		req.CustomerEmail = polarsdk.String(params.CustomerEmail)
+		req.CustomerEmail = new(params.CustomerEmail)
 	}
 	if params.CustomerName != "" {
-		req.CustomerName = polarsdk.String(params.CustomerName)
+		req.CustomerName = new(params.CustomerName)
 	}
 	if params.AllowDiscountCodes {
-		req.AllowDiscountCodes = polarsdk.Bool(params.AllowDiscountCodes)
+		req.AllowDiscountCodes = new(params.AllowDiscountCodes)
 	}
 	if params.ReferenceID != "" {
-		req.ExternalCustomerID = polarsdk.String(params.ReferenceID)
+		req.ExternalCustomerID = new(params.ReferenceID)
 	}
 
 	res, err := c.sdk.Checkouts.Create(ctx, req)

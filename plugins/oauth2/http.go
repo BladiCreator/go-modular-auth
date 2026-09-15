@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -42,13 +43,7 @@ func (p *Plugin) RequireScope(requiredScopes ...string) func(next http.Handler) 
 			if len(requiredScopes) > 0 {
 				tokenScopes := strings.Split(intro.Scope, " ")
 				for _, reqScope := range requiredScopes {
-					found := false
-					for _, ts := range tokenScopes {
-						if ts == reqScope {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(tokenScopes, reqScope)
 					if !found {
 						http.Error(w, "Forbidden: Missing required OAuth2 scope "+reqScope, http.StatusForbidden)
 						return

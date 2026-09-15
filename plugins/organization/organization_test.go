@@ -684,7 +684,7 @@ func TestOrganization_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	const workerCount = 20
 
-	for i := 0; i < workerCount; i++ {
+	for i := range workerCount {
 		idx := i
 		wg.Go(func() {
 			user, _ := store.CreateUser(ctx, &dto.CreateUserParams{

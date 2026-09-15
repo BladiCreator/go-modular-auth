@@ -2,6 +2,7 @@ package captcha
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/BladiCreator/go-modular-auth/plugin"
@@ -53,10 +54,8 @@ func (p *Plugin) IsProtectedPath(path string) bool {
 	cleanPath := strings.TrimSpace(path)
 
 	// Check exempt endpoints first
-	for _, exempt := range p.config.ExemptEndpoints {
-		if cleanPath == exempt {
-			return false
-		}
+	if slices.Contains(p.config.ExemptEndpoints, cleanPath) {
+		return false
 	}
 
 	// Check protected endpoints
@@ -65,8 +64,8 @@ func (p *Plugin) IsProtectedPath(path string) bool {
 			return true
 		}
 		// Prefix matching for wildcard / subpath protection
-		if strings.HasSuffix(endpoint, "/*") {
-			prefix := strings.TrimSuffix(endpoint, "/*")
+		if before, ok := strings.CutSuffix(endpoint, "/*"); ok {
+			prefix := before
 			if strings.HasPrefix(cleanPath, prefix) {
 				return true
 			}

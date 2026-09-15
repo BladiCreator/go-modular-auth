@@ -106,10 +106,7 @@ func (p *Plugin) CreateKey(ctx context.Context, params CreateApiKeyParams) (*Cre
 		return nil, err
 	}
 
-	startLen := 8
-	if len(rawKey) < startLen {
-		startLen = len(rawKey)
-	}
+	startLen := min(len(rawKey), 8)
 	startChars := rawKey[:startLen]
 
 	now := time.Now()

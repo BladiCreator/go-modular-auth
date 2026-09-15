@@ -123,7 +123,7 @@ func TestCreateAndVerifyApiKey(t *testing.T) {
 	ctx := context.Background()
 
 	res, err := plugin.CreateKey(ctx, apikey.CreateApiKeyParams{
-		Name:        stringPtr("Test Key"),
+		Name:        new("Test Key"),
 		ReferenceID: "usr_123",
 		Permissions: map[string][]string{
 			"documents": {"read", "write"},
@@ -177,7 +177,7 @@ func TestDisabledAndExpiredApiKey(t *testing.T) {
 	// Disable key
 	_, err = plugin.UpdateKey(ctx, apikey.UpdateApiKeyParams{
 		ID:      res.ApiKey.ID,
-		Enabled: boolPtr(false),
+		Enabled: new(false),
 	})
 	if err != nil {
 		t.Fatalf("UpdateKey failed: %v", err)
@@ -313,6 +313,11 @@ func TestHTTPMiddleware(t *testing.T) {
 	}
 }
 
-func stringPtr(s string) *string { return &s }
-func boolPtr(b bool) *bool       { return &b }
-func int64Ptr(i int64) *int64    { return &i }
+//go:fix inline
+func stringPtr(s string) *string { return new(s) }
+
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
+
+//go:fix inline
+func int64Ptr(i int64) *int64 { return new(i) }

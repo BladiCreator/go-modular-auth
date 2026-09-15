@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -180,9 +182,7 @@ func NewAccessControl() *AccessControl {
 	ac := &AccessControl{
 		roles: make(map[string]Role),
 	}
-	for name, role := range DefaultRoles() {
-		ac.roles[name] = role
-	}
+	maps.Copy(ac.roles, DefaultRoles())
 	return ac
 }
 
@@ -230,10 +230,8 @@ type HasPermissionInput struct {
 // HasPermission verifies whether a caller possesses the required permissions considering their roles, custom configs, and AdminUserIDs bypass.
 func HasPermission(input HasPermissionInput) bool {
 	if input.UserID != "" && len(input.AdminUserIDs) > 0 {
-		for _, adminID := range input.AdminUserIDs {
-			if input.UserID == adminID {
-				return true
-			}
+		if slices.Contains(input.AdminUserIDs, input.UserID) {
+			return true
 		}
 	}
 
@@ -250,9 +248,9 @@ func HasPermission(input HasPermissionInput) bool {
 	}
 
 	merged := make(Statements)
-	roleParts := strings.Split(roleStr, ",")
+	roleParts := strings.SplitSeq(roleStr, ",")
 
-	for _, rawPart := range roleParts {
+	for rawPart := range roleParts {
 		part := strings.TrimSpace(rawPart)
 		if part == "" {
 			continue

@@ -186,7 +186,7 @@ func TestTwoFactor_LockoutProtection(t *testing.T) {
 	}
 
 	// 3 consecutive failed attempts
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = p.VerifyTOTP(ctx, twofactor.VerifyTOTPParams{
 			UserID: userID,
 			Code:   "999999",

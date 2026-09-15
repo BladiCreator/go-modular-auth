@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -189,12 +190,7 @@ func (p *Plugin) ContinueAuthorize(ctx context.Context, params ContinueAuthorize
 }
 
 func isAllowedRedirectURI(candidate string, allowed []string) bool {
-	for _, u := range allowed {
-		if u == candidate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, candidate)
 }
 
 func parseScopes(scopeStr string) []string {

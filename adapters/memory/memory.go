@@ -289,10 +289,7 @@ func (s *Store) ListUsers(ctx context.Context, filter admin.ListUsersFilter) ([]
 	})
 
 	total := int64(len(matched))
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 	if offset > len(matched) {
 		return []*entity.User{}, total, nil
 	}
@@ -522,9 +519,7 @@ func (s *Store) SaveCustomSessionFields(ctx context.Context, sessionID string, f
 		s.customSessionFields = make(map[string]map[string]any)
 	}
 	cp := make(map[string]any, len(fields))
-	for k, v := range fields {
-		cp[k] = v
-	}
+	maps.Copy(cp, fields)
 	s.customSessionFields[sessionID] = cp
 	return nil
 }
@@ -534,9 +529,7 @@ func (s *Store) GetCustomSessionFields(ctx context.Context, sessionID string) (m
 	defer s.mu.RUnlock()
 	if fields, ok := s.customSessionFields[sessionID]; ok {
 		cp := make(map[string]any, len(fields))
-		for k, v := range fields {
-			cp[k] = v
-		}
+		maps.Copy(cp, fields)
 		return cp, nil
 	}
 	return make(map[string]any), nil

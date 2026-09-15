@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"strings"
 	"time"
@@ -63,9 +64,7 @@ func (p *Plugin) GenerateIDToken(ctx context.Context, user *entity.User, client 
 
 	if p.config.GetAdditionalClaims != nil {
 		additional := p.config.GetAdditionalClaims(ctx, user, scopesList, client)
-		for k, v := range additional {
-			claims[k] = v
-		}
+		maps.Copy(claims, additional)
 	}
 
 	return p.signJWT(claims)

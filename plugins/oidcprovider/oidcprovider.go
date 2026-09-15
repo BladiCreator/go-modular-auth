@@ -2,6 +2,7 @@ package oidcprovider
 
 import (
 	"context"
+	"maps"
 	"net/url"
 	"strings"
 	"time"
@@ -538,9 +539,7 @@ func (p *Plugin) GetUserInfo(ctx context.Context, accessToken string) (UserInfoC
 	if p.config.GetAdditionalClaims != nil {
 		client, _ := p.repo.FindByClientID(ctx, tokenRecord.ClientID)
 		additional := p.config.GetAdditionalClaims(ctx, user, scopesList, client)
-		for k, v := range additional {
-			claims[k] = v
-		}
+		maps.Copy(claims, additional)
 	}
 
 	return claims, nil

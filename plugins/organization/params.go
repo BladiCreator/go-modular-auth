@@ -1,7 +1,5 @@
 package organization
 
-import ()
-
 // Parameter and Result Structs
 
 // Organization Parameter & Result Structs

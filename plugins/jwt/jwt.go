@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -178,9 +180,7 @@ func (p *Plugin) Sign(ctx context.Context, params SignParams) (*SignResult, erro
 	now := time.Now()
 
 	claims := make(map[string]any)
-	for k, v := range params.Payload {
-		claims[k] = v
-	}
+	maps.Copy(claims, params.Payload)
 
 	subject := params.Subject
 	if subject != "" {
@@ -481,9 +481,7 @@ func (p *Plugin) GetToken(ctx context.Context, params GetTokenParams) (*GetToken
 		if err != nil {
 			return nil, fmt.Errorf("jwt: custom DefinePayload failed: %w", err)
 		}
-		for k, v := range customClaims {
-			payload[k] = v
-		}
+		maps.Copy(payload, customClaims)
 	}
 
 	signParams := SignParams{
@@ -816,27 +814,21 @@ func validateAudience(tokenAud any, expected []string) bool {
 	}
 	switch v := tokenAud.(type) {
 	case string:
-		for _, exp := range expected {
-			if v == exp {
-				return true
-			}
+		if slices.Contains(expected, v) {
+			return true
 		}
 	case []any:
 		for _, item := range v {
 			if strItem, ok := item.(string); ok {
-				for _, exp := range expected {
-					if strItem == exp {
-						return true
-					}
+				if slices.Contains(expected, strItem) {
+					return true
 				}
 			}
 		}
 	case []string:
 		for _, item := range v {
-			for _, exp := range expected {
-				if item == exp {
-					return true
-				}
+			if slices.Contains(expected, item) {
+				return true
 			}
 		}
 	}

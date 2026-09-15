@@ -207,7 +207,7 @@ func (p *Plugin) SyncSeats(ctx context.Context, referenceID string, seats int) e
 }
 
 // publishEvent dispatches events safely on the shared Hooks dispatcher.
-func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload interface{}) {
+func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload any) {
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}

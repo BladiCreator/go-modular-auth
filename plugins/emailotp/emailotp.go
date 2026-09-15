@@ -374,8 +374,8 @@ func (p *Plugin) SignInEmailOTP(ctx context.Context, params *SignInEmailOTPParam
 		// Provision new user
 		name := strings.TrimSpace(params.Name)
 		if name == "" {
-			if atIdx := strings.Index(email, "@"); atIdx != -1 {
-				name = email[:atIdx]
+			if before, _, ok := strings.Cut(email, "@"); ok {
+				name = before
 			} else {
 				name = email
 			}

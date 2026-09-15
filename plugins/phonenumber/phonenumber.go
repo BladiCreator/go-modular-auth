@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -388,12 +389,8 @@ func (p *Plugin) SignIn(ctx context.Context, params SignInParams, opts ...plugin
 	if p.ctx != nil && p.ctx.MFAProvider() != nil {
 		mfa := p.ctx.MFAProvider()
 		combinedExtra := make(map[string]any)
-		for k, v := range params.Extra {
-			combinedExtra[k] = v
-		}
-		for k, v := range optsData.Extra {
-			combinedExtra[k] = v
-		}
+		maps.Copy(combinedExtra, params.Extra)
+		maps.Copy(combinedExtra, optsData.Extra)
 		requiresMFA, err := mfa.RequiresMFA(ctx, user.ID, combinedExtra)
 		if err != nil {
 			return nil, fmt.Errorf("phonenumber: failed to evaluate 2FA: %w", err)

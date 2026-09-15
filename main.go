@@ -205,7 +205,7 @@ func generateTOTPCode(secret string, period int, digits int) string {
 		(int32(sum[offset+3] & 0xff))
 
 	mod := int32(1)
-	for i := 0; i < digits; i++ {
+	for range digits {
 		mod *= 10
 	}
 	return fmt.Sprintf("%0*d", digits, binCode%mod)

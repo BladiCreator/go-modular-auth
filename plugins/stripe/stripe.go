@@ -74,17 +74,17 @@ func (p *Plugin) CreateCheckoutSession(ctx context.Context, params CreateCheckou
 
 	lineItems := []*stripe.CheckoutSessionLineItemParams{
 		{
-			Price:    stripe.String(plan.PriceID),
-			Quantity: stripe.Int64(int64(seats)),
+			Price:    new(plan.PriceID),
+			Quantity: new(int64(seats)),
 		},
 	}
 
 	sessionParams := &stripe.CheckoutSessionParams{
 		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-		SuccessURL:        stripe.String(params.SuccessURL),
-		CancelURL:         stripe.String(params.CancelURL),
+		SuccessURL:        new(params.SuccessURL),
+		CancelURL:         new(params.CancelURL),
 		LineItems:         lineItems,
-		ClientReferenceID: stripe.String(params.ReferenceID),
+		ClientReferenceID: new(params.ReferenceID),
 		Metadata:          metadata,
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
 			Metadata: metadata,
@@ -92,11 +92,11 @@ func (p *Plugin) CreateCheckoutSession(ctx context.Context, params CreateCheckou
 	}
 
 	if params.CustomerEmail != "" {
-		sessionParams.CustomerEmail = stripe.String(params.CustomerEmail)
+		sessionParams.CustomerEmail = new(params.CustomerEmail)
 	}
 
 	if params.TrialDays > 0 {
-		sessionParams.SubscriptionData.TrialPeriodDays = stripe.Int64(int64(params.TrialDays))
+		sessionParams.SubscriptionData.TrialPeriodDays = new(int64(params.TrialDays))
 	}
 
 	sess, err := checkoutsession.New(sessionParams)
@@ -127,8 +127,8 @@ func (p *Plugin) UpgradeSubscription(ctx context.Context, params UpgradeSubscrip
 	var items []*stripe.SubscriptionItemsParams
 	if len(stripeSub.Items.Data) > 0 {
 		items = append(items, &stripe.SubscriptionItemsParams{
-			ID:    stripe.String(stripeSub.Items.Data[0].ID),
-			Price: stripe.String(plan.PriceID),
+			ID:    new(stripeSub.Items.Data[0].ID),
+			Price: new(plan.PriceID),
 		})
 	}
 
@@ -137,7 +137,7 @@ func (p *Plugin) UpgradeSubscription(ctx context.Context, params UpgradeSubscrip
 	}
 
 	if params.Seats > 0 {
-		subParams.Items[0].Quantity = stripe.Int64(int64(params.Seats))
+		subParams.Items[0].Quantity = new(int64(params.Seats))
 	}
 
 	updatedStripeSub, err := stripesubscription.Update(localSub.StripeSubscriptionID, subParams)
@@ -170,7 +170,7 @@ func (p *Plugin) CancelSubscription(ctx context.Context, params CancelSubscripti
 	var updatedStripeSub *stripe.Subscription
 	if params.CancelAtPeriodEnd {
 		subParams := &stripe.SubscriptionParams{
-			CancelAtPeriodEnd: stripe.Bool(true),
+			CancelAtPeriodEnd: new(true),
 		}
 		updatedStripeSub, err = stripesubscription.Update(localSub.StripeSubscriptionID, subParams)
 	} else {
@@ -203,7 +203,7 @@ func (p *Plugin) RestoreSubscription(ctx context.Context, subID string) (*Subscr
 	}
 
 	subParams := &stripe.SubscriptionParams{
-		CancelAtPeriodEnd: stripe.Bool(false),
+		CancelAtPeriodEnd: new(false),
 	}
 
 	updatedStripeSub, err := stripesubscription.Update(localSub.StripeSubscriptionID, subParams)
@@ -229,8 +229,8 @@ func (p *Plugin) RestoreSubscription(ctx context.Context, subID string) (*Subscr
 // CreateBillingPortalSession creates a new Stripe Customer Billing Portal session URL.
 func (p *Plugin) CreateBillingPortalSession(ctx context.Context, params BillingPortalParams) (string, error) {
 	portalParams := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(params.StripeCustomerID),
-		ReturnURL: stripe.String(params.ReturnURL),
+		Customer:  new(params.StripeCustomerID),
+		ReturnURL: new(params.ReturnURL),
 	}
 
 	sess, err := billingportalsession.New(portalParams)
@@ -282,8 +282,8 @@ func (p *Plugin) SyncSeats(ctx context.Context, referenceID string, seats int) e
 	subParams := &stripe.SubscriptionParams{
 		Items: []*stripe.SubscriptionItemsParams{
 			{
-				ID:       stripe.String(stripeSub.Items.Data[0].ID),
-				Quantity: stripe.Int64(int64(seats)),
+				ID:       new(stripeSub.Items.Data[0].ID),
+				Quantity: new(int64(seats)),
 			},
 		},
 	}
@@ -299,7 +299,7 @@ func (p *Plugin) SyncSeats(ctx context.Context, referenceID string, seats int) e
 }
 
 // publishEvent dispatches events safely on the shared Hooks dispatcher.
-func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload interface{}) {
+func (p *Plugin) publishEvent(eventName string, ctx context.Context, payload any) {
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(eventName, ctx, payload)
 	}

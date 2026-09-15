@@ -98,12 +98,12 @@ type CustomerMeter struct {
 
 // IngestEventParams represents a request to report usage event ingestion to Polar.
 type IngestEventParams struct {
-	EventName          string                 `json:"event_name"`
-	CustomerExternalID string                 `json:"customer_external_id,omitempty"`
-	PolarCustomerID    string                 `json:"polar_customer_id,omitempty"`
-	Timestamp          time.Time              `json:"timestamp,omitempty"`
-	Metadata           map[string]string      `json:"metadata,omitempty"`
-	Properties         map[string]interface{} `json:"properties,omitempty"`
+	EventName          string            `json:"event_name"`
+	CustomerExternalID string            `json:"customer_external_id,omitempty"`
+	PolarCustomerID    string            `json:"polar_customer_id,omitempty"`
+	Timestamp          time.Time         `json:"timestamp"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Properties         map[string]any    `json:"properties,omitempty"`
 }
 
 // IngestEventResult represents the response from Polar usage event ingestion.

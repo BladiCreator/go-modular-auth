@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -164,13 +165,7 @@ func TestMultiSession(t *testing.T) {
 		r.AddCookie(&http.Cookie{Name: p.GetMultiCookieName(s2.Token), Value: c2Val})
 
 		tokens := p.ExtractMultiSessionTokens(r)
-		foundTarget := false
-		for _, tok := range tokens {
-			if tok == s2.Token {
-				foundTarget = true
-				break
-			}
-		}
+		foundTarget := slices.Contains(tokens, s2.Token)
 		if !foundTarget {
 			t.Fatalf("target token %s not found in verified request cookies", s2.Token)
 		}

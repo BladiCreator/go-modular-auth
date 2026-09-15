@@ -450,9 +450,7 @@ func (p *Plugin) mintIDToken(ctx context.Context, client *OAuthClient, user *ent
 	if p.config.CustomIDTokenClaims != nil {
 		custom, err := p.config.CustomIDTokenClaims(ctx, client, user, scopes)
 		if err == nil && custom != nil {
-			for k, v := range custom {
-				claims[k] = v
-			}
+			maps.Copy(claims, custom)
 		}
 	}
 
@@ -488,21 +486,11 @@ func (p *Plugin) authenticateClient(client *OAuthClient, providedSecret string) 
 }
 
 func containsScope(scopes []string, target string) bool {
-	for _, s := range scopes {
-		if s == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(scopes, target)
 }
 
 func containsGrant(grants []GrantType, target GrantType) bool {
-	for _, g := range grants {
-		if g == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(grants, target)
 }
 
 func derefString(s *string) string {

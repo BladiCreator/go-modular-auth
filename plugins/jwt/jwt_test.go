@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -557,13 +558,7 @@ func TestPlugin_AuthEngineIntegrationAndEvents(t *testing.T) {
 	}
 
 	for _, exp := range expectedEvents {
-		found := false
-		for _, capEv := range eventsCaptured {
-			if capEv == exp {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(eventsCaptured, exp)
 		if !found {
 			t.Errorf("expected event %s to be fired, captured: %v", exp, eventsCaptured)
 		}

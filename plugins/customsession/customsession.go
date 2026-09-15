@@ -3,6 +3,7 @@ package customsession
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
@@ -162,9 +163,7 @@ func (p *Plugin) enrichWithRepositoryFields(ctx context.Context, sessionData *dt
 
 	if sessionData.User != nil && sessionData.User.ID != "" {
 		if uFields, err := p.repo.GetCustomUserFields(ctx, sessionData.User.ID); err == nil && len(uFields) > 0 {
-			for k, v := range uFields {
-				sessionData.Session.Extra[k] = v
-			}
+			maps.Copy(sessionData.Session.Extra, uFields)
 		}
 	}
 

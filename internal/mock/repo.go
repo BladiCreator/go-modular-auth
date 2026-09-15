@@ -207,10 +207,7 @@ func (m *MockRepo) ListUsers(ctx context.Context, filter admin.ListUsersFilter) 
 	})
 
 	total := int64(len(matched))
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 	if offset > len(matched) {
 		return []*entity.User{}, total, nil
 	}
