@@ -43,7 +43,7 @@ It is 100% compatible with standard **`net/http`**, **Gin**, **Fiber**, **Echo**
 ## 📦 Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth@v1.0.0
+go get github.com/BladiCreator/go-modular-auth@v1.1.0
 ```
 
 ---

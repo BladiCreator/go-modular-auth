@@ -1,9 +1,9 @@
 package emailpassword
 
 import (
-	"maps"
 	"context"
 	"fmt"
+	"maps"
 	"net/mail"
 	"strings"
 	"time"

@@ -550,4 +550,3 @@ func TestAuth_LoggerAndPluginsIterator(t *testing.T) {
 		t.Errorf("expected 1 plugin via iterator, got %d", count)
 	}
 }
-

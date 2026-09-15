@@ -106,7 +106,7 @@ func (p *Plugin) CreateInvitation(ctx context.Context, params CreateInvitationPa
 
 	// 8. Emit After Event
 	p.publishEvent(EventInvitationCreateAfter, &InvitationCreateAfterEventPayload{
-		Invitation:     invitation,
+		Invitation: invitation,
 	})
 
 	return &CreateInvitationResult{Invitation: invitation}, nil
@@ -177,8 +177,8 @@ func (p *Plugin) AcceptInvitation(ctx context.Context, params AcceptInvitationPa
 
 	// 5. Emit Before Event
 	p.publishEvent(EventInvitationAcceptBefore, &InvitationAcceptBeforeEventPayload{
-		InvitationID:   params.InvitationID,
-		UserID:         params.UserID,
+		InvitationID: params.InvitationID,
+		UserID:       params.UserID,
 	})
 
 	// 6. Update Invitation Status
@@ -212,9 +212,9 @@ func (p *Plugin) AcceptInvitation(ctx context.Context, params AcceptInvitationPa
 
 	// 9. Emit After Event
 	p.publishEvent(EventInvitationAcceptAfter, &InvitationAcceptAfterEventPayload{
-		Invitation:     invitation,
-		Member:         member,
-		Organization:   org,
+		Invitation:   invitation,
+		Member:       member,
+		Organization: org,
 	})
 
 	return &AcceptInvitationResult{
@@ -240,8 +240,8 @@ func (p *Plugin) RejectInvitation(ctx context.Context, params RejectInvitationPa
 	}
 
 	p.publishEvent(EventInvitationRejectBefore, &InvitationRejectBeforeEventPayload{
-		InvitationID:   params.InvitationID,
-		UserID:         params.UserID,
+		InvitationID: params.InvitationID,
+		UserID:       params.UserID,
 	})
 
 	invitation.Status = InvitationStatusRejected
@@ -250,7 +250,7 @@ func (p *Plugin) RejectInvitation(ctx context.Context, params RejectInvitationPa
 	}
 
 	p.publishEvent(EventInvitationRejectAfter, &InvitationRejectAfterEventPayload{
-		Invitation:     invitation,
+		Invitation: invitation,
 	})
 
 	return &RejectInvitationResult{Invitation: invitation}, nil
@@ -286,8 +286,8 @@ func (p *Plugin) CancelInvitation(ctx context.Context, params CancelInvitationPa
 	}
 
 	p.publishEvent(EventInvitationCancelBefore, &InvitationCancelBeforeEventPayload{
-		InvitationID:   params.InvitationID,
-		UserID:         params.UserID,
+		InvitationID: params.InvitationID,
+		UserID:       params.UserID,
 	})
 
 	invitation.Status = InvitationStatusCanceled
@@ -296,7 +296,7 @@ func (p *Plugin) CancelInvitation(ctx context.Context, params CancelInvitationPa
 	}
 
 	p.publishEvent(EventInvitationCancelAfter, &InvitationCancelAfterEventPayload{
-		Invitation:     invitation,
+		Invitation: invitation,
 	})
 
 	return &CancelInvitationResult{Invitation: invitation}, nil

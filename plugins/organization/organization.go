@@ -134,11 +134,11 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 
 	// 4. Emit Before Event
 	p.publishEvent(EventOrgCreateBefore, &OrgCreateBeforeEventPayload{
-		UserID:         params.UserID,
-		Name:           params.Name,
-		Slug:           slug,
-		Logo:           params.Logo,
-		Metadata:       params.Metadata,
+		UserID:   params.UserID,
+		Name:     params.Name,
+		Slug:     slug,
+		Logo:     params.Logo,
+		Metadata: params.Metadata,
 	})
 
 	// 5. Create Organization Entity
@@ -198,8 +198,8 @@ func (p *Plugin) CreateOrganization(ctx context.Context, params CreateOrganizati
 
 	// 9. Emit After Event
 	p.publishEvent(EventOrgCreateAfter, &OrgCreateAfterEventPayload{
-		Organization:   org,
-		Member:         member,
+		Organization: org,
+		Member:       member,
 	})
 
 	return &CreateOrganizationResult{
@@ -337,7 +337,7 @@ func (p *Plugin) UpdateOrganization(ctx context.Context, params UpdateOrganizati
 
 	// 6. Emit After Event
 	p.publishEvent(EventOrgUpdateAfter, &OrgUpdateAfterEventPayload{
-		Organization:   org,
+		Organization: org,
 	})
 
 	return &UpdateOrganizationResult{Organization: org}, nil

@@ -167,4 +167,3 @@ func TestExtractToken_NilRequest(t *testing.T) {
 		t.Errorf("expected ErrNilRequest, got %v", err)
 	}
 }
-

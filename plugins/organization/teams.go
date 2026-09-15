@@ -78,7 +78,7 @@ func (p *Plugin) CreateTeam(ctx context.Context, params CreateTeamParams) (*Crea
 
 	// 6. Emit After Event
 	p.publishEvent(EventTeamCreateAfter, &TeamCreateAfterEventPayload{
-		Team:           team,
+		Team: team,
 	})
 
 	return &CreateTeamResult{Team: team}, nil
@@ -130,8 +130,8 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 	}
 
 	p.publishEvent(EventTeamUpdateBefore, &TeamUpdateBeforeEventPayload{
-		TeamID:         team.ID,
-		Name:           params.Name,
+		TeamID: team.ID,
+		Name:   params.Name,
 	})
 
 	team.Name = strings.TrimSpace(params.Name)
@@ -143,7 +143,7 @@ func (p *Plugin) UpdateTeam(ctx context.Context, params UpdateTeamParams) (*Upda
 	}
 
 	p.publishEvent(EventTeamUpdateAfter, &TeamUpdateAfterEventPayload{
-		Team:           team,
+		Team: team,
 	})
 
 	return &UpdateTeamResult{Team: team}, nil
@@ -189,7 +189,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 	}
 
 	p.publishEvent(EventTeamDeleteBefore, &TeamDeleteBeforeEventPayload{
-		TeamID:         team.ID,
+		TeamID: team.ID,
 	})
 
 	if err := p.repo.DeleteTeam(ctx, params.TeamID); err != nil {
@@ -197,7 +197,7 @@ func (p *Plugin) DeleteTeam(ctx context.Context, params DeleteTeamParams) (*Dele
 	}
 
 	p.publishEvent(EventTeamDeleteAfter, &TeamDeleteAfterEventPayload{
-		TeamID:         team.ID,
+		TeamID: team.ID,
 	})
 
 	return &DeleteTeamResult{Success: true}, nil
@@ -286,8 +286,8 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 	}
 
 	p.publishEvent(EventTeamMemberAddBefore, &TeamMemberAddBeforeEventPayload{
-		TeamID:         params.TeamID,
-		UserID:         params.UserID,
+		TeamID: params.TeamID,
+		UserID: params.UserID,
 	})
 
 	teamMember := &TeamMember{
@@ -302,7 +302,7 @@ func (p *Plugin) AddTeamMember(ctx context.Context, params AddTeamMemberParams) 
 	}
 
 	p.publishEvent(EventTeamMemberAddAfter, &TeamMemberAddAfterEventPayload{
-		TeamMember:     teamMember,
+		TeamMember: teamMember,
 	})
 
 	return &AddTeamMemberResult{TeamMember: teamMember}, nil
@@ -343,8 +343,8 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	}
 
 	p.publishEvent(EventTeamMemberRemoveBefore, &TeamMemberRemoveBeforeEventPayload{
-		TeamID:         params.TeamID,
-		UserID:         params.UserID,
+		TeamID: params.TeamID,
+		UserID: params.UserID,
 	})
 
 	if err := p.repo.RemoveTeamMember(ctx, params.TeamID, params.UserID); err != nil {
@@ -352,8 +352,8 @@ func (p *Plugin) RemoveTeamMember(ctx context.Context, params RemoveTeamMemberPa
 	}
 
 	p.publishEvent(EventTeamMemberRemoveAfter, &TeamMemberRemoveAfterEventPayload{
-		TeamID:         params.TeamID,
-		UserID:         params.UserID,
+		TeamID: params.TeamID,
+		UserID: params.UserID,
 	})
 
 	return &RemoveTeamMemberResult{Success: true}, nil
@@ -396,8 +396,8 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 	}
 
 	p.publishEvent(EventTeamSetActiveBefore, &TeamSetActiveBeforeEventPayload{
-		UserID:         params.UserID,
-		TeamID:         params.TeamID,
+		UserID: params.UserID,
+		TeamID: params.TeamID,
 	})
 
 	if p.ctx != nil {
@@ -405,9 +405,9 @@ func (p *Plugin) SetActiveTeam(ctx context.Context, params SetActiveTeamParams) 
 	}
 
 	p.publishEvent(EventTeamSetActiveAfter, &TeamSetActiveAfterEventPayload{
-		UserID:         params.UserID,
-		TeamID:         params.TeamID,
-		Team:           team,
+		UserID: params.UserID,
+		TeamID: params.TeamID,
+		Team:   team,
 	})
 
 	return &SetActiveTeamResult{Team: team}, nil

@@ -78,7 +78,7 @@ func (p *Plugin) CreateRole(ctx context.Context, params CreateRoleParams) (*Crea
 
 	// 6. Emit After Event
 	p.publishEvent(EventRoleCreateAfter, &RoleCreateAfterEventPayload{
-		Role:           orgRole,
+		Role: orgRole,
 	})
 
 	return &CreateRoleResult{Role: orgRole}, nil
@@ -146,9 +146,9 @@ func (p *Plugin) UpdateRole(ctx context.Context, params UpdateRoleParams) (*Upda
 	role.UpdatedAt = &now
 
 	p.publishEvent(EventRoleUpdateBefore, &RoleUpdateBeforeEventPayload{
-		RoleID:         role.ID,
-		Role:           params.Role,
-		Permissions:    params.Permissions,
+		RoleID:      role.ID,
+		Role:        params.Role,
+		Permissions: params.Permissions,
 	})
 
 	if err := p.repo.UpdateRole(ctx, role); err != nil {
@@ -156,7 +156,7 @@ func (p *Plugin) UpdateRole(ctx context.Context, params UpdateRoleParams) (*Upda
 	}
 
 	p.publishEvent(EventRoleUpdateAfter, &RoleUpdateAfterEventPayload{
-		Role:           role,
+		Role: role,
 	})
 
 	return &UpdateRoleResult{Role: role}, nil
@@ -191,7 +191,7 @@ func (p *Plugin) DeleteRole(ctx context.Context, params DeleteRoleParams) (*Dele
 	}
 
 	p.publishEvent(EventRoleDeleteBefore, &RoleDeleteBeforeEventPayload{
-		RoleID:         role.ID,
+		RoleID: role.ID,
 	})
 
 	if err := p.repo.DeleteRole(ctx, params.RoleID); err != nil {
@@ -199,7 +199,7 @@ func (p *Plugin) DeleteRole(ctx context.Context, params DeleteRoleParams) (*Dele
 	}
 
 	p.publishEvent(EventRoleDeleteAfter, &RoleDeleteAfterEventPayload{
-		RoleID:         role.ID,
+		RoleID: role.ID,
 	})
 
 	return &DeleteRoleResult{Success: true}, nil

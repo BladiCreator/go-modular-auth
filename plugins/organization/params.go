@@ -1,7 +1,6 @@
 package organization
 
-import (
-)
+import ()
 
 // Parameter and Result Structs
 
