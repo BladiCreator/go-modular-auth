@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://pkg.go.dev/github.com/BladiCreator/go-modular-auth"><img src="https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth.svg" alt="Go Reference"></a>
   <a href="https://goreportcard.com/report/github.com/BladiCreator/go-modular-auth"><img src="https://goreportcard.com/badge/github.com/BladiCreator/go-modular-auth" alt="Go Report Card"></a>
-  <a href="https://github.com/BladiCreator/go-modular-auth/releases/tag/v1.1.0"><img src="https://img.shields.io/badge/Release-v1.1.0-007EC6.svg" alt="Release: v1.1.0"></a>
+  <a href="https://github.com/BladiCreator/go-modular-auth/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/Release-v1.2.0-007EC6.svg" alt="Release: v1.2.0"></a>
   <a href="https://github.com/BladiCreator/go-modular-auth/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
@@ -43,7 +43,7 @@ It is 100% compatible with standard **`net/http`**, **Gin**, **Fiber**, **Echo**
 ## 📦 Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth@v1.1.0
+go get github.com/BladiCreator/go-modular-auth@v1.2.0
 ```
 
 ---
