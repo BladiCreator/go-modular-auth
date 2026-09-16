@@ -22,72 +22,21 @@ import (
 // MockRepository implements phonenumber.Repository in memory with thread safety.
 type MockRepository struct {
 	*repository.MemorySessionRepository
-	mu            sync.RWMutex
-	verifications map[string]*phonenumber.VerificationRecord
-	users         map[string]*entity.User
-	usersByPhone  map[string]*entity.User
-	accounts      map[string]*entity.Account // key: userID:provider
+	*repository.MemoryVerificationRepository
+	mu           sync.RWMutex
+	users        map[string]*entity.User
+	usersByPhone map[string]*entity.User
+	accounts     map[string]*entity.Account // key: userID:provider
 }
 
 func NewMockRepository() *MockRepository {
 	return &MockRepository{
-		MemorySessionRepository: repository.NewMemorySessionRepository(),
-		verifications:           make(map[string]*phonenumber.VerificationRecord),
-		users:                   make(map[string]*entity.User),
-		usersByPhone:            make(map[string]*entity.User),
-		accounts:                make(map[string]*entity.Account),
+		MemorySessionRepository:      repository.NewMemorySessionRepository(),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
+		usersByPhone:                 make(map[string]*entity.User),
+		accounts:                     make(map[string]*entity.Account),
 	}
-}
-
-func (m *MockRepository) FindVerificationValue(ctx context.Context, identifier string) (*phonenumber.VerificationRecord, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	rec, ok := m.verifications[identifier]
-	if !ok {
-		return nil, phonenumber.ErrOTPNotFound
-	}
-	cp := *rec
-	return &cp, nil
-}
-
-func (m *MockRepository) CreateVerificationValue(ctx context.Context, record *phonenumber.VerificationRecord) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	cp := *record
-	m.verifications[record.Identifier] = &cp
-	return nil
-}
-
-func (m *MockRepository) UpdateVerificationValue(ctx context.Context, identifier, value string, expiresAt time.Time) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, ok := m.verifications[identifier]
-	if !ok {
-		return phonenumber.ErrOTPNotFound
-	}
-	rec.Value = value
-	rec.ExpiresAt = expiresAt
-	rec.UpdatedAt = time.Now()
-	return nil
-}
-
-func (m *MockRepository) DeleteVerificationValue(ctx context.Context, identifier string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.verifications, identifier)
-	return nil
-}
-
-func (m *MockRepository) ConsumeVerificationValue(ctx context.Context, identifier string) (*phonenumber.VerificationRecord, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, ok := m.verifications[identifier]
-	if !ok {
-		return nil, phonenumber.ErrOTPNotFound
-	}
-	delete(m.verifications, identifier)
-	cp := *rec
-	return &cp, nil
 }
 
 func (m *MockRepository) GetUserByID(ctx context.Context, userID string) (*entity.User, error) {

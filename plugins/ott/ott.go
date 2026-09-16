@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"uuid"
@@ -102,16 +103,15 @@ func (p *Plugin) GenerateToken(ctx context.Context, params GenerateTokenParams) 
 	expiresAt := now.Add(p.config.ExpiresIn)
 	identifier := ToOTTIdentifier(storedToken)
 
-	record := &VerificationRecord{
-		ID:         uuid.New().String(),
+	record := &entity.Verification{
+		ID:         uuid.NewV7().String(),
 		Identifier: identifier,
 		Value:      params.SessionToken,
 		ExpiresAt:  expiresAt,
 		CreatedAt:  now,
-		UpdatedAt:  now,
 	}
 
-	if err := p.repo.CreateVerificationValue(ctx, record); err != nil {
+	if err := p.repo.CreateVerification(ctx, record); err != nil {
 		return nil, err
 	}
 
@@ -151,8 +151,11 @@ func (p *Plugin) VerifyToken(ctx context.Context, params VerifyTokenParams) (*Ve
 	identifier := ToOTTIdentifier(storedToken)
 
 	// Atomically consume token from storage to prevent race conditions and single-use violations
-	record, err := p.repo.ConsumeVerificationValue(ctx, identifier)
+	record, err := p.repo.ConsumeVerification(ctx, identifier)
 	if err != nil || record == nil {
+		if errors.Is(err, repository.ErrVerificationExpired) {
+			return nil, ErrTokenExpired
+		}
 		return nil, ErrInvalidToken
 	}
 

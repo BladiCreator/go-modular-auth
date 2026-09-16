@@ -6,6 +6,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 var (
@@ -219,72 +220,26 @@ type Repository interface {
 	//
 	// Example SQL:
 	//   UPDATE accounts SET password = $1, updated_at = $2 WHERE id = $3;
+	// UpdateAccountPassword updates the hashed password for a specific account record.
+	//
+	// Function:
+	//   Called during ChangePassword and ResetPassword to overwrite the stored password hash.
+	//
+	// Storage:
+	//   Database (GORM / SQL) - Password hash update.
+	//
+	// Arguments:
+	//   - ctx: Request cancellation and deadline context.
+	//   - accountID: Primary key ID of the account record to update.
+	//   - hashedPassword: The newly computed password hash.
+	//
+	// Returns:
+	//   - error: Nil on success, ErrAccountNotFound if missing, or database error.
+	//
+	// Example SQL:
+	//   UPDATE accounts SET password = $1, updated_at = $2 WHERE id = $3;
 	UpdateAccountPassword(ctx context.Context, accountID, hashedPassword string) error
 
-	// CreateVerificationToken persists a short-lived token record for password resets or email confirmations.
-	//
-	// Function:
-	//   Called during ForgotPassword and SendVerificationEmail to save the generated token and expiration timestamp.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Short-lived verification token.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation and deadline context.
-	//   - token: The VerificationToken entity (Identifier/Email, Token, ExpiresAt).
-	//
-	// Returns:
-	//   - error: Nil on success, or database error on failure.
-	//
-	// Example SQL:
-	//   INSERT INTO verification_tokens (identifier, token, expires_at) VALUES ($1, $2, $3);
-	//
-	// Example Cache (Redis):
-	//   err := rdb.Set(ctx, "reset_token:" + token.Token, token.Identifier, ttl).Err()
-	CreateVerificationToken(ctx context.Context, token *entity.VerificationToken) error
-
-	// GetVerificationToken retrieves an active token record by its token string.
-	//
-	// Function:
-	//   Called during ResetPassword and VerifyEmail to validate token existence and verify whether it has expired.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Verification token lookup.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation and deadline context.
-	//   - token: The raw token string submitted by the user.
-	//
-	// Returns:
-	//   - *entity.VerificationToken: The matching token entity with its expiration timestamp.
-	//   - error: ErrInvalidToken if no record is found, or database error.
-	//
-	// Example SQL:
-	//   SELECT identifier, token, expires_at FROM verification_tokens WHERE token = $1 LIMIT 1;
-	//
-	// Example Cache (Redis):
-	//   val, err := rdb.Get(ctx, "reset_token:" + token).Bytes()
-	GetVerificationToken(ctx context.Context, token string) (*entity.VerificationToken, error)
-
-	// DeleteVerificationToken removes a consumed or invalidated token from storage.
-	//
-	// Function:
-	//   Called immediately upon successful password reset or email verification to guarantee single-use token consumption.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Verification token key eviction.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation and deadline context.
-	//   - token: The token string to delete.
-	//
-	// Returns:
-	//   - error: Nil on success, or database error on failure.
-	//
-	// Example SQL:
-	//   DELETE FROM verification_tokens WHERE token = $1;
-	//
-	// Example Cache (Redis):
-	//   err := rdb.Del(ctx, "reset_token:" + token).Err()
-	DeleteVerificationToken(ctx context.Context, token string) error
+	// VerificationRepository provides centralized ephemeral verification token operations.
+	repository.VerificationRepository
 }

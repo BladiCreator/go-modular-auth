@@ -18,9 +18,9 @@ type (
 	SessionCreatedHookFn       = func(ctx context.Context, session *entity.Session)
 	SessionRevokedHookFn       = func(ctx context.Context, token string, session *entity.Session)
 	SessionValidatedHookFn     = func(ctx context.Context, data *dto.SessionData)
-	PasswordResetReqHookFn     = func(ctx context.Context, email string, token *entity.VerificationToken)
+	PasswordResetReqHookFn     = func(ctx context.Context, email string, token *entity.Verification)
 	PasswordResetCompHookFn    = func(ctx context.Context, userID string)
-	EmailVerificationReqHookFn = func(ctx context.Context, email string, token *entity.VerificationToken)
+	EmailVerificationReqHookFn = func(ctx context.Context, email string, token *entity.Verification)
 	EmailVerifiedHookFn        = func(ctx context.Context, user *entity.User)
 	PasswordChangedHookFn      = func(ctx context.Context, user *entity.User)
 )
@@ -124,7 +124,7 @@ func (h *Hooks) OnSessionValidated(fn func(ctx context.Context, data *dto.Sessio
 }
 
 // OnPasswordResetRequested registers a callback invoked when a password reset token is generated.
-func (h *Hooks) OnPasswordResetRequested(fn func(ctx context.Context, email string, token *entity.VerificationToken)) *Hooks {
+func (h *Hooks) OnPasswordResetRequested(fn func(ctx context.Context, email string, token *entity.Verification)) *Hooks {
 	if fn == nil {
 		return h
 	}
@@ -146,7 +146,7 @@ func (h *Hooks) OnPasswordResetCompleted(fn func(ctx context.Context, userID str
 }
 
 // OnEmailVerificationRequested registers a callback invoked when an email verification token is generated.
-func (h *Hooks) OnEmailVerificationRequested(fn func(ctx context.Context, email string, token *entity.VerificationToken)) *Hooks {
+func (h *Hooks) OnEmailVerificationRequested(fn func(ctx context.Context, email string, token *entity.Verification)) *Hooks {
 	if fn == nil {
 		return h
 	}
@@ -302,7 +302,7 @@ func (h *Hooks) DispatchSessionValidated(ctx context.Context, data *dto.SessionD
 }
 
 // DispatchPasswordResetRequested dispatches password reset request notifications.
-func (h *Hooks) DispatchPasswordResetRequested(ctx context.Context, email string, token *entity.VerificationToken) {
+func (h *Hooks) DispatchPasswordResetRequested(ctx context.Context, email string, token *entity.Verification) {
 	if h == nil {
 		return
 	}
@@ -349,8 +349,8 @@ func (h *Hooks) DispatchPasswordResetCompleted(ctx context.Context, userID strin
 	}
 }
 
-// DispatchEmailVerificationRequested dispatches email verification token notifications.
-func (h *Hooks) DispatchEmailVerificationRequested(ctx context.Context, email string, token *entity.VerificationToken) {
+// DispatchEmailVerificationRequested dispatches email verification request notifications.
+func (h *Hooks) DispatchEmailVerificationRequested(ctx context.Context, email string, token *entity.Verification) {
 	if h == nil {
 		return
 	}

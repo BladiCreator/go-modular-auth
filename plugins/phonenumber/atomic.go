@@ -3,10 +3,13 @@ package phonenumber
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
+	"uuid"
 )
 
 // storeOTP converts a plain text OTP into its persistent representation according to StoreOTPMode.
@@ -75,7 +78,7 @@ func (p *Plugin) retrievePlainOTP(storedOtp string) (string, bool) {
 
 // tryReuseOTP attempts to reuse an existing unexpired active OTP if the storage mode permits.
 func (p *Plugin) tryReuseOTP(ctx context.Context, identifier string) (string, bool) {
-	record, err := p.repo.FindVerificationValue(ctx, identifier)
+	record, err := p.repo.FindVerification(ctx, identifier)
 	if err != nil || record == nil || record.ExpiresAt.Before(time.Now()) {
 		return "", false
 	}
@@ -92,8 +95,10 @@ func (p *Plugin) tryReuseOTP(ctx context.Context, identifier string) (string, bo
 	}
 
 	// Extend validity window on reuse
-	newExpiresAt := time.Now().Add(p.config.ExpiresIn)
-	_ = p.repo.UpdateVerificationValue(ctx, identifier, record.Value, newExpiresAt)
+	record.ExpiresAt = time.Now().Add(p.config.ExpiresIn)
+	now := time.Now()
+	record.UpdatedAt = &now
+	_ = p.repo.CreateVerification(ctx, record)
 	return plainOtp, true
 }
 
@@ -123,19 +128,18 @@ func (p *Plugin) resolveOTP(ctx context.Context, identifier, phoneNumber string,
 		return "", time.Time{}, err
 	}
 
-	record := &VerificationRecord{
-		ID:         uuid.NewString(),
+	record := &entity.Verification{
+		ID:         uuid.NewV7().String(),
 		Identifier: identifier,
 		Value:      storedValue + ":0",
 		ExpiresAt:  expiresAt,
 		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
 	}
 
-	if err := p.repo.CreateVerificationValue(ctx, record); err != nil {
+	if err := p.repo.CreateVerification(ctx, record); err != nil {
 		// Fallback for drivers without upsert support
-		_ = p.repo.DeleteVerificationValue(ctx, identifier)
-		if err := p.repo.CreateVerificationValue(ctx, record); err != nil {
+		_ = p.repo.DeleteVerification(ctx, identifier)
+		if err := p.repo.CreateVerification(ctx, record); err != nil {
 			return "", time.Time{}, err
 		}
 	}
@@ -146,9 +150,9 @@ func (p *Plugin) resolveOTP(ctx context.Context, identifier, phoneNumber string,
 // atomicVerifyOTP executes single-use OTP verification with strict race condition and attempt budget protection.
 func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP string, otpType OTPType, phoneNumber string, extra map[string]any) error {
 	// 1. Pre-check for expiration if record exists
-	existing, err := p.repo.FindVerificationValue(ctx, identifier)
+	existing, err := p.repo.FindVerification(ctx, identifier)
 	if err == nil && existing != nil && existing.ExpiresAt.Before(time.Now()) {
-		_ = p.repo.DeleteVerificationValue(ctx, identifier)
+		_ = p.repo.DeleteVerification(ctx, identifier)
 		p.publishEvent(EventPhoneNumberOTPExpired, &OTPFailedPayload{
 			PhoneNumber: phoneNumber,
 			Type:        otpType,
@@ -159,8 +163,17 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 	}
 
 	// 2. Atomic Single Gate: only one concurrent goroutine successfully consumes the record
-	consumed, err := p.repo.ConsumeVerificationValue(ctx, identifier)
+	consumed, err := p.repo.ConsumeVerification(ctx, identifier)
 	if err != nil || consumed == nil {
+		if errors.Is(err, repository.ErrVerificationExpired) {
+			p.publishEvent(EventPhoneNumberOTPExpired, &OTPFailedPayload{
+				PhoneNumber: phoneNumber,
+				Type:        otpType,
+				Reason:      "expired",
+				Extra:       extra,
+			})
+			return ErrOTPExpired
+		}
 		p.publishEvent(EventPhoneNumberOTPFailed, &OTPFailedPayload{
 			PhoneNumber: phoneNumber,
 			Type:        otpType,
@@ -201,13 +214,14 @@ func (p *Plugin) atomicVerifyOTP(ctx context.Context, identifier, providedOTP st
 		newAttempts := attempts + 1
 		if newAttempts < p.config.AllowedAttempts {
 			// Recreate record with incremented attempt budget
-			_ = p.repo.CreateVerificationValue(ctx, &VerificationRecord{
+			now := time.Now()
+			_ = p.repo.CreateVerification(ctx, &entity.Verification{
 				ID:         consumed.ID,
 				Identifier: identifier,
 				Value:      storedOtpValue + ":" + strconv.Itoa(newAttempts),
 				ExpiresAt:  consumed.ExpiresAt,
 				CreatedAt:  consumed.CreatedAt,
-				UpdatedAt:  time.Now(),
+				UpdatedAt:  &now,
 			})
 			p.publishEvent(EventPhoneNumberOTPFailed, &OTPFailedPayload{
 				PhoneNumber:       phoneNumber,

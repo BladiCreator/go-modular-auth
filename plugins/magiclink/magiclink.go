@@ -120,32 +120,30 @@ func (p *Plugin) SignInMagicLink(ctx context.Context, params SignInMagicLinkPara
 	}
 
 	identifier := ToMagicLinkIdentifier(email)
-	record := &VerificationRecord{
+	record := &entity.Verification{
 		ID:         uuid.NewV7().String(),
 		Identifier: identifier,
 		Value:      string(payloadBytes),
 		ExpiresAt:  expiresAt,
 		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
 	}
 
-	_ = p.repo.DeleteVerificationValue(ctx, identifier)
-	if err := p.repo.CreateVerificationValue(ctx, record); err != nil {
+	_ = p.repo.DeleteVerification(ctx, identifier)
+	if err := p.repo.CreateVerification(ctx, record); err != nil {
 		return nil, err
 	}
 
 	// Also store reverse token lookup mapping for token-only resolution
 	tokenLookupKey := ToMagicLinkTokenLookupKey(token)
-	lookupRecord := &VerificationRecord{
+	lookupRecord := &entity.Verification{
 		ID:         uuid.NewV7().String(),
 		Identifier: tokenLookupKey,
 		Value:      email,
 		ExpiresAt:  expiresAt,
 		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
 	}
-	_ = p.repo.DeleteVerificationValue(ctx, tokenLookupKey)
-	_ = p.repo.CreateVerificationValue(ctx, lookupRecord)
+	_ = p.repo.DeleteVerification(ctx, tokenLookupKey)
+	_ = p.repo.CreateVerification(ctx, lookupRecord)
 
 	// Build verification URL with query parameters
 	baseURL := p.config.DefaultCallbackURL
@@ -224,13 +222,13 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 	if email == "" {
 		// Reverse token lookup if email wasn't provided in params
 		tokenLookupKey := ToMagicLinkTokenLookupKey(token)
-		lookupRecord, err := p.repo.FindVerificationValue(ctx, tokenLookupKey)
+		lookupRecord, err := p.repo.FindVerification(ctx, tokenLookupKey)
 		if err == nil && lookupRecord != nil && !lookupRecord.ExpiresAt.Before(time.Now()) {
 			email = lookupRecord.Value
-			_ = p.repo.DeleteVerificationValue(ctx, tokenLookupKey)
+			_ = p.repo.DeleteVerification(ctx, tokenLookupKey)
 		}
 	} else {
-		_ = p.repo.DeleteVerificationValue(ctx, ToMagicLinkTokenLookupKey(token))
+		_ = p.repo.DeleteVerification(ctx, ToMagicLinkTokenLookupKey(token))
 	}
 
 	if email == "" {
@@ -248,7 +246,7 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 		return nil, err
 	}
 
-	user, err := p.repo.FindUserByEmail(ctx, email)
+	user, err := p.repo.GetUserByEmail(ctx, email)
 	isNewUser := false
 
 	if err != nil || user == nil {
@@ -268,24 +266,22 @@ func (p *Plugin) VerifyMagicLink(ctx context.Context, params VerifyMagicLinkPara
 			userName = parts[0]
 		}
 
-		newUser := &entity.User{
-			ID:            uuid.NewV7().String(),
-			Name:          userName,
-			Email:         email,
-			EmailVerified: true,
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+		createUserParams := &dto.CreateUserParams{
+			Name:  userName,
+			Email: email,
 		}
 
-		user, err = p.repo.CreateUser(ctx, newUser)
+		user, err = p.repo.CreateUser(ctx, createUserParams)
 		if err != nil {
 			return nil, err
 		}
+		user.EmailVerified = true
+		_ = p.repo.UpdateUser(ctx, user)
 		isNewUser = true
 	} else {
 		if !user.EmailVerified {
-			_ = p.repo.UpdateEmailVerified(ctx, user.ID, true)
 			user.EmailVerified = true
+			_ = p.repo.UpdateUser(ctx, user)
 		}
 	}
 

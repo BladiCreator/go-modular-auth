@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"time"
+
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // TokenPayload holds stored token data and metadata.
@@ -65,9 +68,9 @@ func (p *Plugin) verifyStoredToken(storedToken, providedToken string) bool {
 // atomicConsumeToken executes single-use token consumption with race condition protection.
 func (p *Plugin) atomicConsumeToken(ctx context.Context, identifier, providedToken string, extra map[string]any) (*TokenPayload, error) {
 	// 1. Pre-check for expiration if record exists
-	existing, err := p.repo.FindVerificationValue(ctx, identifier)
+	existing, err := p.repo.FindVerification(ctx, identifier)
 	if err == nil && existing != nil && existing.ExpiresAt.Before(time.Now()) {
-		_ = p.repo.DeleteVerificationValue(ctx, identifier)
+		_ = p.repo.DeleteVerification(ctx, identifier)
 		p.publishEvent(EventMagicLinkExpired, &MagicLinkFailedPayload{
 			Token:  providedToken,
 			Reason: "expired",
@@ -77,8 +80,16 @@ func (p *Plugin) atomicConsumeToken(ctx context.Context, identifier, providedTok
 	}
 
 	// 2. Atomic single gate consumption
-	consumed, err := p.repo.ConsumeVerificationValue(ctx, identifier)
+	consumed, err := p.repo.ConsumeVerification(ctx, identifier)
 	if err != nil || consumed == nil {
+		if errors.Is(err, repository.ErrVerificationExpired) {
+			p.publishEvent(EventMagicLinkExpired, &MagicLinkFailedPayload{
+				Token:  providedToken,
+				Reason: "expired",
+				Extra:  extra,
+			})
+			return nil, ErrTokenExpired
+		}
 		p.publishEvent(EventMagicLinkFailed, &MagicLinkFailedPayload{
 			Token:  providedToken,
 			Reason: "invalid_or_consumed",

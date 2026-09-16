@@ -471,10 +471,10 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
-	if tokenRecord.Token == "" {
+	if tokenRecord.Identifier == "" {
 		t.Error("Expected non-empty token string")
 	}
-	if !callbackFired || callbackToken != tokenRecord.Token {
+	if !callbackFired || callbackToken != tokenRecord.Identifier {
 		t.Error("Expected SendResetPasswordEmail callback to be executed with token")
 	}
 
@@ -498,7 +498,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 
 	// 7. Successful reset password
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
-		Token:       tokenRecord.Token,
+		Token:       tokenRecord.Identifier,
 		NewPassword: "brandNewPassword123",
 	})
 	if err != nil {
@@ -507,7 +507,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 
 	// 8. Single-use verification: retry with same token must fail
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
-		Token:       tokenRecord.Token,
+		Token:       tokenRecord.Identifier,
 		NewPassword: "anotherPassword123",
 	})
 	if err != emailpassword.ErrInvalidToken {
@@ -532,7 +532,7 @@ func TestForgotPasswordAndResetPassword(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
-		Token:       tokenRecordExpiry.Token,
+		Token:       tokenRecordExpiry.Identifier,
 		NewPassword: "anotherPassword123",
 	})
 	if err != emailpassword.ErrTokenExpired {
@@ -584,7 +584,7 @@ func TestSendVerificationEmailAndVerifyEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendVerificationEmail failed: %v", err)
 	}
-	if !callbackFired || callbackToken != tokenRecord.Token {
+	if !callbackFired || callbackToken != tokenRecord.Identifier {
 		t.Error("Expected SendVerificationEmail callback to be executed")
 	}
 
@@ -601,7 +601,7 @@ func TestSendVerificationEmailAndVerifyEmail(t *testing.T) {
 	}
 
 	// 7. Successful verification
-	verifiedUser, err := p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Token})
+	verifiedUser, err := p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Identifier})
 	if err != nil {
 		t.Fatalf("VerifyEmail failed: %v", err)
 	}
@@ -610,7 +610,7 @@ func TestSendVerificationEmailAndVerifyEmail(t *testing.T) {
 	}
 
 	// 8. Single-use token verification: second consumption must fail
-	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Token})
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecord.Identifier})
 	if err != emailpassword.ErrInvalidToken {
 		t.Errorf("Expected ErrInvalidToken on reusing consumed token, got %v", err)
 	}
@@ -623,7 +623,7 @@ func TestSendVerificationEmailAndVerifyEmail(t *testing.T) {
 
 	time.Sleep(150 * time.Millisecond)
 
-	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecordExpiry.Token})
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: tokenRecordExpiry.Identifier})
 	if err != emailpassword.ErrTokenExpired {
 		t.Errorf("Expected ErrTokenExpired, got %v", err)
 	}
@@ -813,7 +813,7 @@ func TestEventEmissions(t *testing.T) {
 		t.Fatalf("ForgotPassword failed: %v", err)
 	}
 	err = p.ResetPassword(ctx, dto.ResetPasswordParams{
-		Token:       resetToken.Token,
+		Token:       resetToken.Identifier,
 		NewPassword: "newerPassword789",
 	})
 	if err != nil {
@@ -825,7 +825,7 @@ func TestEventEmissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendVerificationEmail failed: %v", err)
 	}
-	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: verifToken.Token})
+	_, err = p.VerifyEmail(ctx, dto.VerifyEmailParams{Token: verifToken.Identifier})
 	if err != nil {
 		t.Fatalf("VerifyEmail failed: %v", err)
 	}

@@ -3,10 +3,10 @@ package phonenumber
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 )
 
 // Sentinel errors for the Phone Number plugin.
@@ -63,187 +63,11 @@ var (
 	ErrInvalidStoredFormat = errors.New("phonenumber: invalid stored OTP record format")
 )
 
-// VerificationRecord represents the persistent storage entity for an OTP verification value.
-type VerificationRecord struct {
-	// ID is the unique database record identifier.
-	ID string `json:"id"`
-
-	// Identifier is the composite lookup key (e.g. "phone-verification-otp-+1234567890").
-	Identifier string `json:"identifier"`
-
-	// Value stores the code and attempt counter formatted as "<stored_otp>:<attempts>".
-	Value string `json:"value"`
-
-	// ExpiresAt specifies the exact timestamp after which this verification value is invalid.
-	ExpiresAt time.Time `json:"expires_at"`
-
-	// CreatedAt records when the verification record was initialized.
-	CreatedAt time.Time `json:"created_at"`
-
-	// UpdatedAt records when the verification record was last modified.
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 // Repository defines the persistent storage contract required by the Phone Number plugin.
 // Implement this interface on your custom database adapter (e.g. PostgreSQL, MySQL, SQLite, MongoDB, GORM).
-//
-// # Implementation Example (GORM / database/sql):
-//
-//	type GormPhoneNumberRepository struct {
-//		db *gorm.DB
-//	}
-//
-//	func (r *GormPhoneNumberRepository) FindVerificationValue(ctx context.Context, identifier string) (*phonenumber.VerificationRecord, error) {
-//		var rec phonenumber.VerificationRecord
-//		if err := r.db.WithContext(ctx).Where("identifier = ?", identifier).First(&rec).Error; err != nil {
-//			if errors.Is(err, gorm.ErrRecordNotFound) {
-//				return nil, nil
-//			}
-//			return nil, err
-//		}
-//		return &rec, nil
-//	}
-//
-// # Storage and Caching Recommendation (Redis TTL Storage):
-//
-// SMS OTP codes (`VerificationRecord`) are short-lived, single-use credentials. Storing them in Redis
-// with automatic key expiration (TTL) guarantees auto-cleanup without periodic DB purges:
-//
-//	type RedisPhoneNumberRepository struct {
-//		redis *redis.Client
-//	}
-//
-//	func (r *RedisPhoneNumberRepository) CreateVerificationValue(ctx context.Context, record *phonenumber.VerificationRecord) error {
-//		bytes, _ := json.Marshal(record)
-//		ttl := time.Until(record.ExpiresAt)
-//		return r.redis.Set(ctx, "phoneotp:"+record.Identifier, bytes, ttl).Err()
-//	}
-//
-//	func (r *RedisPhoneNumberRepository) ConsumeVerificationValue(ctx context.Context, identifier string) (*phonenumber.VerificationRecord, error) {
-//		key := "phoneotp:" + identifier
-//		val, err := r.redis.GetDel(ctx, key).Bytes() // Atomic single-use retrieval & deletion
-//		if err != nil {
-//			return nil, phonenumber.ErrOTPNotFound
-//		}
-//		var rec phonenumber.VerificationRecord
-//		_ = json.Unmarshal(val, &rec)
-//		return &rec, nil
-//	}
 type Repository interface {
-	// FindVerificationValue retrieves an active verification record matching the given identifier.
-	//
-	// Function:
-	//   Queries storage for an active SMS OTP verification record.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Ephemeral short-lived SMS OTP token data.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - identifier: The composite OTP key (e.g. "phone-verification-otp-+1234567890").
-	//
-	// Returns:
-	//   - *VerificationRecord: The matching record if found.
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   SELECT id, identifier, value, expires_at, created_at, updated_at FROM verification_tokens WHERE identifier = $1 LIMIT 1;
-	//
-	// Example Cache (Redis):
-	//   val, err := rdb.Get(ctx, "phoneotp:" + identifier).Bytes()
-	FindVerificationValue(ctx context.Context, identifier string) (*VerificationRecord, error)
-
-	// CreateVerificationValue creates or replaces a verification record in storage.
-	//
-	// Function:
-	//   Persists a newly generated SMS OTP verification record.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Short-lived key-value with TTL equal to token validity.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - record: The VerificationRecord entity to persist.
-	//
-	// Returns:
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   INSERT INTO verification_tokens (id, identifier, value, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6);
-	//
-	// Example Cache (Redis):
-	//   err := rdb.Set(ctx, "phoneotp:" + record.Identifier, bytes, ttl).Err()
-	CreateVerificationValue(ctx context.Context, record *VerificationRecord) error
-
-	// UpdateVerificationValue updates the value and expiry of an existing verification record.
-	//
-	// Function:
-	//   Updates attempts counter or regenerates SMS OTP code.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Key update with adjusted TTL.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - identifier: The composite OTP key.
-	//   - value: The updated value payload (e.g. "<stored_otp>:<attempts>").
-	//   - expiresAt: The updated expiration timestamp.
-	//
-	// Returns:
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   UPDATE verification_tokens SET value = $1, expires_at = $2, updated_at = $3 WHERE identifier = $4;
-	//
-	// Example Cache (Redis):
-	//   err := rdb.Set(ctx, "phoneotp:" + identifier, bytes, ttl).Err()
-	UpdateVerificationValue(ctx context.Context, identifier, value string, expiresAt time.Time) error
-
-	// DeleteVerificationValue removes a verification record from storage by identifier.
-	//
-	// Function:
-	//   Explicit removal of an SMS OTP record upon invalidation.
-	//
-	// Storage:
-	//   Cache (Redis / In-Memory TTL) - Key eviction from memory/Redis.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - identifier: The composite OTP key.
-	//
-	// Returns:
-	//   - error: Nil on success, or database error.
-	//
-	// Example SQL:
-	//   DELETE FROM verification_tokens WHERE identifier = $1;
-	//
-	// Example Cache (Redis):
-	//   err := rdb.Del(ctx, "phoneotp:" + identifier).Err()
-	DeleteVerificationValue(ctx context.Context, identifier string) error
-
-	// ConsumeVerificationValue atomically retrieves and deletes a verification record in a single operation.
-	// This ensures strictly single-use anti-replay protection under high concurrency.
-	//
-	// Function:
-	//   Single-use SMS OTP verification and atomic consumption.
-	//
-	// Storage:
-	//   Cache (Redis GETDEL / Memory) - Atomic read-and-delete operation.
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - identifier: The composite OTP key.
-	//
-	// Returns:
-	//   - *VerificationRecord: The consumed record if it existed and was not expired.
-	//   - error: Nil on success, or database error if not found.
-	//
-	// Example SQL:
-	//   DELETE FROM verification_tokens WHERE identifier = $1 AND expires_at > $2 RETURNING id, identifier, value, expires_at, created_at, updated_at;
-	//
-	// Example Cache (Redis):
-	//   val, err := rdb.GetDel(ctx, "phoneotp:" + identifier).Bytes()
-	ConsumeVerificationValue(ctx context.Context, identifier string) (*VerificationRecord, error)
+	// VerificationRepository provides centralized ephemeral SMS OTP verification storage operations.
+	repository.VerificationRepository
 
 	// GetUserByID retrieves a user entity matching the provided unique identifier.
 	//

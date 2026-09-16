@@ -17,35 +17,17 @@ import (
 
 type mockRepository struct {
 	*repository.MemorySessionRepository
-	mu                  sync.RWMutex
-	verificationRecords map[string]*ott.VerificationRecord
-	users               map[string]*entity.User
+	*repository.MemoryVerificationRepository
+	mu    sync.RWMutex
+	users map[string]*entity.User
 }
 
 func newMockRepository() *mockRepository {
 	return &mockRepository{
-		MemorySessionRepository: repository.NewMemorySessionRepository(),
-		verificationRecords:     make(map[string]*ott.VerificationRecord),
-		users:                   make(map[string]*entity.User),
+		MemorySessionRepository:      repository.NewMemorySessionRepository(),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
 	}
-}
-
-func (m *mockRepository) CreateVerificationValue(ctx context.Context, record *ott.VerificationRecord) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.verificationRecords[record.Identifier] = record
-	return nil
-}
-
-func (m *mockRepository) ConsumeVerificationValue(ctx context.Context, identifier string) (*ott.VerificationRecord, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, exists := m.verificationRecords[identifier]
-	if !exists {
-		return nil, ott.ErrInvalidToken
-	}
-	delete(m.verificationRecords, identifier)
-	return rec, nil
 }
 
 func (m *mockRepository) GetUserByID(ctx context.Context, userID string) (*entity.User, error) {
@@ -197,15 +179,13 @@ func TestOTT_StoreTokenModeHashed(t *testing.T) {
 	rawIdentifier := ott.ToOTTIdentifier(genRes.Token)
 	hashedIdentifier := ott.ToOTTIdentifier(hashedKey)
 
-	repo.mu.RLock()
-	_, rawFound := repo.verificationRecords[rawIdentifier]
-	_, hashedFound := repo.verificationRecords[hashedIdentifier]
-	repo.mu.RUnlock()
+	rawRec, _ := repo.FindVerification(ctx, rawIdentifier)
+	hashedRec, _ := repo.FindVerification(ctx, hashedIdentifier)
 
-	if rawFound {
+	if rawRec != nil {
 		t.Error("expected raw token NOT to be found directly in repository when mode is hashed")
 	}
-	if !hashedFound {
+	if hashedRec == nil {
 		t.Error("expected hashed token key to be stored in repository")
 	}
 

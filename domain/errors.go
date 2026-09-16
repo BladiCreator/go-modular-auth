@@ -14,6 +14,10 @@ var (
 	ErrSessionNotFound = errors.New("AuthService: session not found")
 	ErrSessionExpired  = errors.New("AuthService: session expired")
 
+	// Verification domain errors
+	ErrVerificationNotFound = errors.New("AuthService: verification record not found")
+	ErrVerificationExpired  = errors.New("AuthService: verification record expired")
+
 	// 2FA domain errors
 	ErrTOTPNotFound       = errors.New("AuthService: totp secret not found")
 	ErrTOTPAlreadyEnabled = errors.New("AuthService: totp already enabled")

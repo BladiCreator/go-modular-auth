@@ -2,6 +2,7 @@ package emailpassword
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/mail"
@@ -10,8 +11,10 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
+	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
 	"golang.org/x/crypto/bcrypt"
+	"uuid"
 )
 
 // SessionOption represents a functional option for configuring session creation on SignIn.
@@ -486,7 +489,7 @@ func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordPar
 //   - Extra (map[string]any, optional): Dynamic metadata.
 //
 // Returns:
-//   - *entity.VerificationToken: The generated verification token entity (containing Token string and ExpiresAt).
+//   - *entity.Verification: The generated verification entity (containing Identifier token string, Value email, and ExpiresAt).
 //   - error: ErrInvalidEmail, ErrUserNotFound, or database error.
 //
 // Example:
@@ -497,8 +500,8 @@ func (p *Plugin) ChangePassword(ctx context.Context, input dto.ChangePasswordPar
 //	if err != nil {
 //		log.Fatalf("Forgot password failed: %v", err)
 //	}
-//	fmt.Printf("Reset token generated: %s (expires at %v)\n", token.Token, token.ExpiresAt)
-func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.VerificationToken, error) {
+//	fmt.Printf("Reset token generated: %s (expires at %v)\n", token.Identifier, token.ExpiresAt)
+func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.Verification, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if !isValidEmail(email) {
 		return nil, ErrInvalidEmail
@@ -515,13 +518,15 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordPar
 	}
 
 	expiresAt := time.Now().Add(p.config.ResetTokenExpiry)
-	token := &entity.VerificationToken{
-		Identifier: user.Email,
-		Token:      tokenStr,
+	verification := &entity.Verification{
+		ID:         uuid.NewV7().String(),
+		Identifier: tokenStr,
+		Value:      user.Email,
 		ExpiresAt:  expiresAt,
+		CreatedAt:  time.Now(),
 	}
 
-	if err := p.repo.CreateVerificationToken(ctx, token); err != nil {
+	if err := p.repo.CreateVerification(ctx, verification); err != nil {
 		return nil, err
 	}
 
@@ -546,10 +551,10 @@ func (p *Plugin) ForgotPassword(ctx context.Context, input dto.ForgotPasswordPar
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
 		})
-		p.ctx.Hooks().DispatchPasswordResetRequested(ctx, user.Email, token)
+		p.ctx.Hooks().DispatchPasswordResetRequested(ctx, user.Email, verification)
 	}
 
-	return token, nil
+	return verification, nil
 }
 
 // ResetPassword completes a password reset by consuming a single-use token and setting a new password.
@@ -594,17 +599,19 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 		return ErrPasswordTooLong
 	}
 
-	tokenRecord, err := p.repo.GetVerificationToken(ctx, input.Token)
-	if err != nil || tokenRecord == nil {
+	verification, err := p.repo.ConsumeVerification(ctx, input.Token)
+	if err != nil || verification == nil {
+		if errors.Is(err, repository.ErrVerificationExpired) {
+			return ErrTokenExpired
+		}
 		return ErrInvalidToken
 	}
 
-	if time.Now().After(tokenRecord.ExpiresAt) {
-		_ = p.repo.DeleteVerificationToken(ctx, input.Token)
+	if time.Now().After(verification.ExpiresAt) {
 		return ErrTokenExpired
 	}
 
-	user, err := p.repo.GetUserByEmail(ctx, tokenRecord.Identifier)
+	user, err := p.repo.GetUserByEmail(ctx, verification.Value)
 	if err != nil || user == nil {
 		return ErrUserNotFound
 	}
@@ -622,8 +629,6 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 	if err := p.repo.UpdateAccountPassword(ctx, account.ID, newHashedPassword); err != nil {
 		return err
 	}
-
-	_ = p.repo.DeleteVerificationToken(ctx, input.Token)
 
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventPasswordResetCompleted, ctx, &PasswordResetCompletedEventPayload{
@@ -653,7 +658,7 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 //   - Extra (map[string]any, optional): Dynamic metadata.
 //
 // Returns:
-//   - *entity.VerificationToken: The generated verification token entity.
+//   - *entity.Verification: The generated verification entity.
 //   - error: ErrInvalidEmail, ErrUserNotFound, or database error.
 //
 // Example:
@@ -664,8 +669,8 @@ func (p *Plugin) ResetPassword(ctx context.Context, input dto.ResetPasswordParam
 //	if err != nil {
 //		log.Fatalf("Send verification failed: %v", err)
 //	}
-//	fmt.Printf("Verification token: %s\n", token.Token)
-func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerificationEmailParams) (*entity.VerificationToken, error) {
+//	fmt.Printf("Verification token: %s\n", token.Identifier)
+func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerificationEmailParams) (*entity.Verification, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if !isValidEmail(email) {
 		return nil, ErrInvalidEmail
@@ -682,13 +687,15 @@ func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerifi
 	}
 
 	expiresAt := time.Now().Add(p.config.VerificationTokenExpiry)
-	token := &entity.VerificationToken{
-		Identifier: user.Email,
-		Token:      tokenStr,
+	verification := &entity.Verification{
+		ID:         uuid.NewV7().String(),
+		Identifier: tokenStr,
+		Value:      user.Email,
 		ExpiresAt:  expiresAt,
+		CreatedAt:  time.Now(),
 	}
 
-	if err := p.repo.CreateVerificationToken(ctx, token); err != nil {
+	if err := p.repo.CreateVerification(ctx, verification); err != nil {
 		return nil, err
 	}
 
@@ -713,10 +720,10 @@ func (p *Plugin) SendVerificationEmail(ctx context.Context, input dto.SendVerifi
 			Token:     tokenStr,
 			ExpiresAt: expiresAt,
 		})
-		p.ctx.Hooks().DispatchEmailVerificationRequested(ctx, user.Email, token)
+		p.ctx.Hooks().DispatchEmailVerificationRequested(ctx, user.Email, verification)
 	}
 
-	return token, nil
+	return verification, nil
 }
 
 // VerifyEmail completes the email confirmation process by consuming a valid verification token.
@@ -754,17 +761,19 @@ func (p *Plugin) VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (
 		return nil, ErrInvalidParameter
 	}
 
-	tokenRecord, err := p.repo.GetVerificationToken(ctx, input.Token)
-	if err != nil || tokenRecord == nil {
+	verification, err := p.repo.ConsumeVerification(ctx, input.Token)
+	if err != nil || verification == nil {
+		if errors.Is(err, repository.ErrVerificationExpired) {
+			return nil, ErrTokenExpired
+		}
 		return nil, ErrInvalidToken
 	}
 
-	if time.Now().After(tokenRecord.ExpiresAt) {
-		_ = p.repo.DeleteVerificationToken(ctx, input.Token)
+	if time.Now().After(verification.ExpiresAt) {
 		return nil, ErrTokenExpired
 	}
 
-	user, err := p.repo.GetUserByEmail(ctx, tokenRecord.Identifier)
+	user, err := p.repo.GetUserByEmail(ctx, verification.Value)
 	if err != nil || user == nil {
 		return nil, ErrUserNotFound
 	}
@@ -774,8 +783,6 @@ func (p *Plugin) VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (
 		return nil, err
 	}
 
-	_ = p.repo.DeleteVerificationToken(ctx, input.Token)
-
 	if p.ctx != nil && p.ctx.Hooks() != nil {
 		p.ctx.Hooks().Publish(EventEmailVerified, ctx, &EmailVerifiedEventPayload{
 			User: user,
@@ -784,7 +791,6 @@ func (p *Plugin) VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (
 	}
 
 	return user, nil
-
 }
 
 // VerifyPassword validates whether the provided password matches the user's stored credential password.

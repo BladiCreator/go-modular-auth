@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/domain/dto"
 	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/domain/repository"
 	"github.com/BladiCreator/go-modular-auth/plugin"
@@ -21,57 +22,22 @@ import (
 // mockRepository implements magiclink.Repository for unit tests
 type mockRepository struct {
 	*repository.MemorySessionRepository
+	*repository.MemoryVerificationRepository
 	mu           sync.Mutex
-	records      map[string]*magiclink.VerificationRecord
 	users        map[string]*entity.User
 	usersByEmail map[string]*entity.User
 }
 
 func newMockRepository() *mockRepository {
 	return &mockRepository{
-		MemorySessionRepository: repository.NewMemorySessionRepository(),
-		records:                 make(map[string]*magiclink.VerificationRecord),
-		users:                   make(map[string]*entity.User),
-		usersByEmail:            make(map[string]*entity.User),
+		MemorySessionRepository:      repository.NewMemorySessionRepository(),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
+		usersByEmail:                 make(map[string]*entity.User),
 	}
 }
 
-func (m *mockRepository) CreateVerificationValue(ctx context.Context, record *magiclink.VerificationRecord) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.records[record.Identifier] = record
-	return nil
-}
-
-func (m *mockRepository) FindVerificationValue(ctx context.Context, identifier string) (*magiclink.VerificationRecord, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, ok := m.records[identifier]
-	if !ok {
-		return nil, nil
-	}
-	return rec, nil
-}
-
-func (m *mockRepository) ConsumeVerificationValue(ctx context.Context, identifier string) (*magiclink.VerificationRecord, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, ok := m.records[identifier]
-	if !ok {
-		return nil, magiclink.ErrInvalidToken
-	}
-	delete(m.records, identifier)
-	return rec, nil
-}
-
-func (m *mockRepository) DeleteVerificationValue(ctx context.Context, identifier string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.records, identifier)
-	return nil
-}
-
-func (m *mockRepository) FindUserByEmail(ctx context.Context, email string) (*entity.User, error) {
+func (m *mockRepository) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u, ok := m.usersByEmail[email]
@@ -81,24 +47,27 @@ func (m *mockRepository) FindUserByEmail(ctx context.Context, email string) (*en
 	return u, nil
 }
 
-func (m *mockRepository) CreateUser(ctx context.Context, user *entity.User) (*entity.User, error) {
+func (m *mockRepository) CreateUser(ctx context.Context, params *dto.CreateUserParams) (*entity.User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if user.ID == "" {
-		user.ID = uuid.NewV7().String()
+	user := &entity.User{
+		ID:            uuid.NewV7().String(),
+		Email:         params.Email,
+		Name:          params.Name,
+		EmailVerified: false,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 	m.users[user.ID] = user
 	m.usersByEmail[user.Email] = user
 	return user, nil
 }
 
-func (m *mockRepository) UpdateEmailVerified(ctx context.Context, userID string, verified bool) error {
+func (m *mockRepository) UpdateUser(ctx context.Context, user *entity.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	u, ok := m.users[userID]
-	if ok {
-		u.EmailVerified = verified
-	}
+	m.users[user.ID] = user
+	m.usersByEmail[user.Email] = user
 	return nil
 }
 

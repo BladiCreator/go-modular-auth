@@ -201,7 +201,7 @@ func (p *Plugin) Verify(ctx context.Context, params VerifyParams) (*VerifyResult
 			})
 			return nil, ErrInvalidOTP
 		}
-		_ = p.repo.DeleteVerificationValue(ctx, identifier)
+		_ = p.repo.DeleteVerification(ctx, identifier)
 	} else {
 		if err := p.atomicVerifyOTP(ctx, identifier, params.Code, OTPTypeVerification, params.PhoneNumber, params.Extra); err != nil {
 			return nil, err
@@ -604,7 +604,7 @@ func (p *Plugin) GetVerificationOTP(ctx context.Context, params GetVerificationO
 		identifier = ToPasswordResetOTPIdentifier(params.PhoneNumber)
 	}
 
-	record, err := p.repo.FindVerificationValue(ctx, identifier)
+	record, err := p.repo.FindVerification(ctx, identifier)
 	if err != nil || record == nil || record.ExpiresAt.Before(time.Now()) {
 		return nil, ErrOTPNotFound
 	}
@@ -629,7 +629,7 @@ func (p *Plugin) CheckVerificationOTP(ctx context.Context, params CheckVerificat
 		identifier = ToPasswordResetOTPIdentifier(params.PhoneNumber)
 	}
 
-	record, err := p.repo.FindVerificationValue(ctx, identifier)
+	record, err := p.repo.FindVerification(ctx, identifier)
 	if err != nil || record == nil || record.ExpiresAt.Before(time.Now()) {
 		return &CheckVerificationOTPResult{Success: false}, nil
 	}

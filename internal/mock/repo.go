@@ -21,20 +21,21 @@ import (
 )
 
 var (
-	_ repository.SessionRepository = (*MockRepo)(nil)
-	_ emailpassword.Repository     = (*MockRepo)(nil)
-	_ twofactor.Repository         = (*MockRepo)(nil)
-	_ admin.Repository             = (*MockRepo)(nil)
-	_ passkey.Repository           = (*MockRepo)(nil)
+	_ repository.SessionRepository      = (*MockRepo)(nil)
+	_ repository.VerificationRepository = (*MockRepo)(nil)
+	_ emailpassword.Repository          = (*MockRepo)(nil)
+	_ twofactor.Repository              = (*MockRepo)(nil)
+	_ admin.Repository                  = (*MockRepo)(nil)
+	_ passkey.Repository                = (*MockRepo)(nil)
 )
 
 type MockRepo struct {
 	*repository.MemorySessionRepository
-	mu                     sync.RWMutex
-	users                  map[string]*entity.User
-	accounts               map[string]*entity.Account            // key: accountID
-	userAccounts           map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens                 map[string]*entity.VerificationToken  // key: token string
+	*repository.MemoryVerificationRepository
+	mu           sync.RWMutex
+	users        map[string]*entity.User
+	accounts     map[string]*entity.Account            // key: accountID
+	userAccounts map[string]map[string]*entity.Account // key: userID -> provider -> Account
 	totpSecrets            map[string]string
 	twoFactors             map[string]*twofactor.TwoFactor         // key: userID
 	otpChallenges          map[string]*twofactor.OTPChallenge      // key: challenge key
@@ -47,12 +48,12 @@ type MockRepo struct {
 
 func NewMockRepo() *MockRepo {
 	return &MockRepo{
-		MemorySessionRepository: repository.NewMemorySessionRepository(),
-		users:                   make(map[string]*entity.User),
-		accounts:                make(map[string]*entity.Account),
-		userAccounts:            make(map[string]map[string]*entity.Account),
-		tokens:                  make(map[string]*entity.VerificationToken),
-		totpSecrets:             make(map[string]string),
+		MemorySessionRepository:      repository.NewMemorySessionRepository(),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
+		accounts:                     make(map[string]*entity.Account),
+		userAccounts:                 make(map[string]map[string]*entity.Account),
+		totpSecrets:                  make(map[string]string),
 		twoFactors:              make(map[string]*twofactor.TwoFactor),
 		otpChallenges:           make(map[string]*twofactor.OTPChallenge),
 		trustedDevices:          make(map[string]*twofactor.TrustDeviceRecord),
@@ -291,33 +292,6 @@ func (m *MockRepo) UpdateAccountPassword(ctx context.Context, accountID, hashedP
 	}
 	acc.Password = hashedPassword
 	acc.UpdatedAt = time.Now()
-	return nil
-}
-
-// Verification Token Methods
-func (m *MockRepo) CreateVerificationToken(ctx context.Context, token *entity.VerificationToken) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.tokens[token.Token] = token
-	return nil
-}
-
-func (m *MockRepo) GetVerificationToken(ctx context.Context, token string) (*entity.VerificationToken, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if t, ok := m.tokens[token]; ok {
-		return t, nil
-	}
-	return nil, emailpassword.ErrInvalidToken
-}
-
-func (m *MockRepo) DeleteVerificationToken(ctx context.Context, token string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	delete(m.tokens, token)
 	return nil
 }
 

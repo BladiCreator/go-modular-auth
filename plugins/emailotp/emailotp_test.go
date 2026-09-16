@@ -19,77 +19,21 @@ import (
 // In-Memory Test Repository implementing emailotp.Repository
 type testRepo struct {
 	*repository.MemorySessionRepository
-	mu            sync.Mutex
-	users         map[string]*entity.User
-	accounts      map[string]*entity.Account
-	userAccounts  map[string]map[string]*entity.Account // userID -> providerID -> Account
-	verifications map[string]*emailotp.VerificationRecord
+	*repository.MemoryVerificationRepository
+	mu           sync.Mutex
+	users        map[string]*entity.User
+	accounts     map[string]*entity.Account
+	userAccounts map[string]map[string]*entity.Account // userID -> providerID -> Account
 }
 
 func newTestRepo() *testRepo {
 	return &testRepo{
-		MemorySessionRepository: repository.NewMemorySessionRepository(),
-		users:                   make(map[string]*entity.User),
-		accounts:                make(map[string]*entity.Account),
-		userAccounts:            make(map[string]map[string]*entity.Account),
-		verifications:           make(map[string]*emailotp.VerificationRecord),
+		MemorySessionRepository:      repository.NewMemorySessionRepository(),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
+		accounts:                     make(map[string]*entity.Account),
+		userAccounts:                 make(map[string]map[string]*entity.Account),
 	}
-}
-
-func (r *testRepo) FindVerificationValue(ctx context.Context, identifier string) (*emailotp.VerificationRecord, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	rec, ok := r.verifications[identifier]
-	if !ok {
-		return nil, nil
-	}
-	cloned := *rec
-	return &cloned, nil
-}
-
-func (r *testRepo) CreateVerificationValue(ctx context.Context, record *emailotp.VerificationRecord) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	cloned := *record
-	r.verifications[record.Identifier] = &cloned
-	return nil
-}
-
-func (r *testRepo) UpdateVerificationValue(ctx context.Context, identifier, value string, expiresAt time.Time) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	rec, ok := r.verifications[identifier]
-	if !ok {
-		return nil
-	}
-	rec.Value = value
-	rec.ExpiresAt = expiresAt
-	rec.UpdatedAt = time.Now()
-	return nil
-}
-
-func (r *testRepo) DeleteVerificationValue(ctx context.Context, identifier string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	delete(r.verifications, identifier)
-	return nil
-}
-
-func (r *testRepo) ConsumeVerificationValue(ctx context.Context, identifier string) (*emailotp.VerificationRecord, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	rec, ok := r.verifications[identifier]
-	if !ok {
-		return nil, nil
-	}
-	delete(r.verifications, identifier)
-	cloned := *rec
-	return &cloned, nil
 }
 
 func (r *testRepo) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {

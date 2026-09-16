@@ -42,9 +42,9 @@ import (
 //   - SignIn(ctx context.Context, input dto.SignInParams, opts ...plugin.SessionOption) (*dto.AuthResult, error): Authenticate an existing user with email and password credentials, emitting an active session or MFA challenge.
 //   - VerifyCredentials(ctx context.Context, email, password string) (*entity.User, error): Authenticate user credentials without emitting a session.
 //   - ChangePassword(ctx context.Context, input dto.ChangePasswordParams) error: Update the password for an authenticated user.
-//   - ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.VerificationToken, error): Generate a secure password reset token and dispatch email.
+//   - ForgotPassword(ctx context.Context, input dto.ForgotPasswordParams) (*entity.Verification, error): Generate a secure password reset token and dispatch email.
 //   - ResetPassword(ctx context.Context, input dto.ResetPasswordParams) error: Reset a user password using a valid reset token.
-//   - SendVerificationEmail(ctx context.Context, input dto.SendVerificationEmailParams) (*entity.VerificationToken, error): Issue and send an email verification token.
+//   - SendVerificationEmail(ctx context.Context, input dto.SendVerificationEmailParams) (*entity.Verification, error): Issue and send an email verification token.
 //   - VerifyEmail(ctx context.Context, input dto.VerifyEmailParams) (*entity.User, error): Confirm user email address using a verification token.
 //   - VerifyPassword(ctx context.Context, input dto.VerifyPasswordParams) (bool, error): Verify if a given plaintext password matches user hash.
 //

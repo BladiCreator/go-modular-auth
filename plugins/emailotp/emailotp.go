@@ -218,7 +218,7 @@ func (p *Plugin) GetVerificationOTP(ctx context.Context, params *GetVerification
 	}
 
 	identifier := ToOTPIdentifier(params.Type, email)
-	record, err := p.repo.FindVerificationValue(ctx, identifier)
+	record, err := p.repo.FindVerification(ctx, identifier)
 	if err != nil || record == nil || record.ExpiresAt.Before(time.Now()) {
 		return nil, ErrOTPExpired
 	}
@@ -250,7 +250,7 @@ func (p *Plugin) CheckVerificationOTP(ctx context.Context, params *CheckVerifica
 	}
 
 	identifier := ToOTPIdentifier(params.Type, email)
-	record, err := p.repo.FindVerificationValue(ctx, identifier)
+	record, err := p.repo.FindVerification(ctx, identifier)
 	if err != nil || record == nil || record.ExpiresAt.Before(time.Now()) {
 		return nil, ErrOTPExpired
 	}

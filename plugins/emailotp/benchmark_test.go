@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/domain/dto"
+	"github.com/BladiCreator/go-modular-auth/domain/entity"
 	"github.com/BladiCreator/go-modular-auth/plugins/emailotp"
 )
 
@@ -72,13 +73,12 @@ func BenchmarkAtomicVerifyOTP(b *testing.B) {
 
 	for b.Loop() {
 		identifier := emailotp.ToOTPIdentifier(emailotp.OTPTypeEmailVerification, user.Email)
-		_ = repo.CreateVerificationValue(ctx, &emailotp.VerificationRecord{
+		_ = repo.CreateVerification(ctx, &entity.Verification{
 			ID:         "bench_id",
 			Identifier: identifier,
 			Value:      "123456:0",
 			ExpiresAt:  time.Now().Add(5 * time.Minute),
 			CreatedAt:  time.Now(),
-			UpdatedAt:  time.Now(),
 		})
 
 		_, _ = p.VerifyEmailOTP(ctx, &emailotp.VerifyEmailOTPParams{
@@ -106,13 +106,12 @@ func BenchmarkConcurrentAtomicVerifyOTP(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			identifier := emailotp.ToOTPIdentifier(emailotp.OTPTypeEmailVerification, user.Email)
-			_ = repo.CreateVerificationValue(ctx, &emailotp.VerificationRecord{
+			_ = repo.CreateVerification(ctx, &entity.Verification{
 				ID:         "bench_conc_id",
 				Identifier: identifier,
 				Value:      "654321:0",
 				ExpiresAt:  time.Now().Add(5 * time.Minute),
 				CreatedAt:  time.Now(),
-				UpdatedAt:  time.Now(),
 			})
 
 			_, _ = p.VerifyEmailOTP(ctx, &emailotp.VerifyEmailOTPParams{

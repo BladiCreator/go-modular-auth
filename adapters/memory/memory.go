@@ -21,34 +21,40 @@ import (
 	"github.com/BladiCreator/go-modular-auth/plugins/emailpassword"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/lastloginmethod"
+	"github.com/BladiCreator/go-modular-auth/plugins/magiclink"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth2"
 	"github.com/BladiCreator/go-modular-auth/plugins/organization"
+	"github.com/BladiCreator/go-modular-auth/plugins/ott"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkey"
+	"github.com/BladiCreator/go-modular-auth/plugins/phonenumber"
 	"github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
 var (
-	_ repository.SessionRepository = (*Store)(nil)
-	_ emailpassword.Repository     = (*Store)(nil)
-	_ twofactor.Repository         = (*Store)(nil)
-	_ bearer.Repository            = (*Store)(nil)
-	_ jwt.Repository               = (*Store)(nil)
-	_ organization.Repository      = (*Store)(nil)
-	_ admin.Repository             = (*Store)(nil)
-	_ passkey.Repository           = (*Store)(nil)
-	_ oauth2.Repository            = (*Store)(nil)
-	_ multisession.Repository      = (*Store)(nil)
-	_ lastloginmethod.Repository   = (*Store)(nil)
+	_ repository.SessionRepository      = (*Store)(nil)
+	_ repository.VerificationRepository = (*Store)(nil)
+	_ emailpassword.Repository          = (*Store)(nil)
+	_ magiclink.Repository              = (*Store)(nil)
+	_ ott.Repository                    = (*Store)(nil)
+	_ twofactor.Repository              = (*Store)(nil)
+	_ bearer.Repository                 = (*Store)(nil)
+	_ jwt.Repository                    = (*Store)(nil)
+	_ organization.Repository           = (*Store)(nil)
+	_ admin.Repository                  = (*Store)(nil)
+	_ passkey.Repository                = (*Store)(nil)
+	_ oauth2.Repository                 = (*Store)(nil)
+	_ multisession.Repository           = (*Store)(nil)
+	_ lastloginmethod.Repository        = (*Store)(nil)
 )
 
 // Store is a thread-safe in-memory implementation of authentication storage interfaces.
 type Store struct {
+	*repository.MemoryVerificationRepository
 	mu                  sync.RWMutex
 	users               map[string]*entity.User
 	accounts            map[string]*entity.Account            // key: accountID
 	userAccounts        map[string]map[string]*entity.Account // key: userID -> provider -> Account
-	tokens              map[string]*entity.VerificationToken  // key: token string
 	sessions            map[string]*entity.Session            // key: token string
 	sessionsByID        map[string]*entity.Session            // key: session.ID
 	customSessionFields map[string]map[string]any             // key: session.ID -> fields
@@ -83,11 +89,11 @@ type Store struct {
 // New instantiates a new thread-safe in-memory Store.
 func New() *Store {
 	return &Store{
-		users:                  make(map[string]*entity.User),
-		accounts:               make(map[string]*entity.Account),
-		userAccounts:           make(map[string]map[string]*entity.Account),
-		tokens:                 make(map[string]*entity.VerificationToken),
-		sessions:               make(map[string]*entity.Session),
+		MemoryVerificationRepository: repository.NewMemoryVerificationRepository(),
+		users:                        make(map[string]*entity.User),
+		accounts:                     make(map[string]*entity.Account),
+		userAccounts:                 make(map[string]map[string]*entity.Account),
+		sessions:                     make(map[string]*entity.Session),
 		sessionsByID:           make(map[string]*entity.Session),
 		customSessionFields:    make(map[string]map[string]any),
 		totpSecrets:            make(map[string]string),
@@ -154,6 +160,17 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (*entity.User, error
 		return u, nil
 	}
 	return nil, domain.ErrUserNotFound
+}
+
+func (s *Store) GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*entity.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.users {
+		if u.PhoneNumber != nil && *u.PhoneNumber == phoneNumber {
+			return u, nil
+		}
+	}
+	return nil, phonenumber.ErrUserNotFound
 }
 
 func (s *Store) UpdateUser(ctx context.Context, user *entity.User) error {
@@ -369,6 +386,14 @@ func (s *Store) UpdateAccountPassword(ctx context.Context, accountID, hashedPass
 
 	acc, ok := s.accounts[accountID]
 	if !ok {
+		// Also check if accountID was supplied as userID
+		if providers, ok2 := s.userAccounts[accountID]; ok2 {
+			if credAcc, ok3 := providers["credential"]; ok3 {
+				credAcc.Password = hashedPassword
+				credAcc.UpdatedAt = time.Now()
+				return nil
+			}
+		}
 		return emailpassword.ErrAccountNotFound
 	}
 	acc.Password = hashedPassword
@@ -376,30 +401,16 @@ func (s *Store) UpdateAccountPassword(ctx context.Context, accountID, hashedPass
 	return nil
 }
 
-// Verification Token Methods
-func (s *Store) CreateVerificationToken(ctx context.Context, token *entity.VerificationToken) error {
+func (s *Store) DeleteCredentialAccount(ctx context.Context, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.tokens[token.Token] = token
-	return nil
-}
-
-func (s *Store) GetVerificationToken(ctx context.Context, token string) (*entity.VerificationToken, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if t, ok := s.tokens[token]; ok {
-		return t, nil
+	if providers, ok := s.userAccounts[userID]; ok {
+		if acc, ok := providers["credential"]; ok {
+			delete(s.accounts, acc.ID)
+			delete(providers, "credential")
+		}
 	}
-	return nil, emailpassword.ErrInvalidToken
-}
-
-func (s *Store) DeleteVerificationToken(ctx context.Context, token string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	delete(s.tokens, token)
 	return nil
 }
 
