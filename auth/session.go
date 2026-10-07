@@ -3,392 +3,206 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
-	"github.com/BladiCreator/go-modular-auth/config"
-	"github.com/BladiCreator/go-modular-auth/domain"
-	"github.com/BladiCreator/go-modular-auth/domain/dto"
-	"github.com/BladiCreator/go-modular-auth/domain/entity"
-	"github.com/BladiCreator/go-modular-auth/domain/repository"
-	"github.com/BladiCreator/go-modular-auth/plugin"
+	"github.com/BladiCreator/go-modular-auth/internal/secure"
+	"github.com/BladiCreator/go-modular-auth/session"
+	"github.com/BladiCreator/go-modular-auth/store"
+	"github.com/BladiCreator/go-modular-auth/user"
 )
 
-const (
-	// EventSessionCreated is published when a new authenticated session is created.
-	EventSessionCreated = "auth:session:created"
-
-	// EventSessionRevoked is published when an active session is explicitly revoked.
-	EventSessionRevoked = "auth:session:revoked"
-
-	// EventSessionValidated is published when a session token is successfully validated.
-	EventSessionValidated = "auth:session:validated"
-)
-
-var (
-	// ErrSessionRepositoryRequired is returned when session operations are invoked without configuring a SessionRepository.
-	ErrSessionRepositoryRequired = errors.New("auth: session repository is required")
-
-	// ErrSessionManagerRequired is returned when session operations are invoked without an active SessionManager in context.
-	ErrSessionManagerRequired = plugin.ErrSessionManagerRequired
-
-	// ErrInvalidUserID is returned when an empty user ID is provided to session creation.
-	ErrInvalidUserID = errors.New("auth: user ID cannot be empty")
-
-	// ErrMFAEngineNotConfigured is returned when attempting MFA challenge verification without a registered MFAProvider plugin.
-	ErrMFAEngineNotConfigured = domain.ErrMFAEngineNotConfigured
-
-	// ErrInvalidChallengeToken is returned when an invalid challenge token is submitted.
-	ErrInvalidChallengeToken = domain.ErrInvalidChallengeToken
-
-	// ErrChallengeExpired is returned when a challenge token has exceeded its validity time.
-	ErrChallengeExpired = domain.ErrChallengeExpired
-)
-
-// SessionCreatedPayload defines the payload published on EventSessionCreated.
-type SessionCreatedPayload struct {
-	Session *entity.Session
-	Extra   map[string]any
+// SessionResult is a validated session together with its user.
+type SessionResult struct {
+	Session *session.Session
+	User    *user.User
 }
 
-// GetSession returns the Session entity from the payload.
-func (p *SessionCreatedPayload) GetSession() *entity.Session {
-	if p == nil {
-		return nil
-	}
-	return p.Session
+// Principal returns the authenticated identity of the session.
+func (r *SessionResult) Principal() Principal {
+	return Principal{Subject: r.User.ID, Type: PrincipalUser}
 }
 
-// GetExtra returns the dynamic extra metadata map from the payload.
-func (p *SessionCreatedPayload) GetExtra() map[string]any {
-	if p == nil {
-		return nil
-	}
-	return p.Extra
+// SessionOptions carries optional metadata recorded with a new session.
+type SessionOptions struct {
+	IPAddress string
+	UserAgent string
 }
 
-// SessionRevokedPayload defines the payload published on EventSessionRevoked.
-type SessionRevokedPayload struct {
-	Token     string
-	SessionID string
-	UserID    string
-	Extra     map[string]any
+// IssuedSession is a newly created session and its plaintext token. The
+// token is returned exactly once: hand it to the client and discard it.
+type IssuedSession struct {
+	Session *session.Session
+	Token   string
 }
 
-// GetToken returns the revoked session token string.
-func (p *SessionRevokedPayload) GetToken() string {
-	if p == nil {
-		return ""
-	}
-	return p.Token
-}
-
-// Type aliases for seamless DX.
-type (
-	SessionConfig  = config.SessionConfig
-	SessionOptions = plugin.SessionOptions
-	SessionOption  = plugin.SessionOption
-)
-
-var (
-	// DefaultSessionConfig returns default session lifetime settings.
-	DefaultSessionConfig = config.DefaultSessionConfig
-
-	// WithDuration configures a custom expiration duration for the session.
-	WithDuration = plugin.WithDuration
-
-	// WithRememberMe configures extended session lifetime for remember-me requests.
-	WithRememberMe = plugin.WithRememberMe
-
-	// WithIPAddress sets the client IP address initiating the session.
-	WithIPAddress = plugin.WithIPAddress
-
-	// WithUserAgent sets the client User-Agent initiating the session.
-	WithUserAgent = plugin.WithUserAgent
-
-	// WithDeviceID sets the physical device identifier for the session.
-	WithDeviceID = plugin.WithDeviceID
-
-	// WithExtra sets a single dynamic metadata key-value in the session.
-	WithExtra = plugin.WithExtra
-
-	// WithExtraMap copies dynamic metadata key-value pairs into the session.
-	WithExtraMap = plugin.WithExtraMap
-)
-
-// UserResolver allows resolving user profiles by ID during session validation.
-type UserResolver interface {
-	GetUserByID(ctx context.Context, userID string) (*entity.User, error)
-}
-
-// SessionManager coordinates session lifecycle, cryptographic generation, persistence, and event dispatching.
-type SessionManager struct {
-	repo         repository.SessionRepository
-	cfg          config.SessionConfig
-	crypto       plugin.CryptoUtils
-	pipeline     *plugin.Pipeline
-	hooks        *plugin.Hooks
-	userResolver UserResolver
-}
-
-var _ plugin.SessionManager = (*SessionManager)(nil)
-
-// NewSessionManager creates a new central SessionManager instance.
-func NewSessionManager(repo repository.SessionRepository, cfg config.SessionConfig, crypto plugin.CryptoUtils, pipeline *plugin.Pipeline, hooks *plugin.Hooks, userResolver ...UserResolver) *SessionManager {
-	var ur UserResolver
-	if len(userResolver) > 0 {
-		ur = userResolver[0]
-	}
-	return &SessionManager{
-		repo:         repo,
-		cfg:          cfg,
-		crypto:       crypto,
-		pipeline:     pipeline,
-		hooks:        hooks,
-		userResolver: ur,
-	}
-}
-
-// CreateSession creates and persists a new authenticated user session with cryptographic token generation,
-// pipeline interceptor execution (with immediate abort and rollback capability), and typed lifecycle hook dispatching.
-func (sm *SessionManager) CreateSession(ctx context.Context, userID string, opts ...SessionOption) (*entity.Session, error) {
-	if sm == nil || sm.repo == nil {
-		return nil, ErrSessionRepositoryRequired
-	}
-	if userID == "" {
-		return nil, ErrInvalidUserID
-	}
-
-	optsData := SessionOptions{}
-	for _, opt := range opts {
-		opt(&optsData)
-	}
-
-	duration := sm.cfg.DefaultDuration
-	if duration <= 0 {
-		duration = 24 * time.Hour
-	}
-
-	if optsData.Duration != 0 {
-		duration = optsData.Duration
-	} else if optsData.RememberMe {
-		remDur := sm.cfg.RememberMeDuration
-		if remDur <= 0 {
-			remDur = 30 * 24 * time.Hour
+// CreateSession issues a session for an existing user. It is the entry point
+// for plugins that authenticate by other means (OAuth, passkeys, magic link).
+func (a *Auth) CreateSession(ctx context.Context, userID string, opts SessionOptions) (*IssuedSession, error) {
+	var issued *IssuedSession
+	err := a.store.Transaction(ctx, func(ctx context.Context) error {
+		if _, err := a.store.Users().GetByID(ctx, userID); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return ErrUserNotFound
+			}
+			return err
 		}
-		duration = remDur
-	}
-
-	now := time.Now()
-	expiresAt := now.Add(duration)
-
-	token, err := sm.crypto.GenerateRandomToken(32)
-	if err != nil {
-		return nil, fmt.Errorf("auth: failed to generate session token: %w", err)
-	}
-
-	params := &dto.CreateSessionParams{
-		UserID:    userID,
-		Token:     token,
-		ExpiresAt: expiresAt,
-		CreatedAt: now,
-		IPAddress: optsData.IPAddress,
-		UserAgent: optsData.UserAgent,
-		DeviceID:  optsData.DeviceID,
-	}
-	if optsData.Extra != nil {
-		params.Extra = optsData.Extra
-	}
-
-	// 1. Run BeforeCreateSession interceptors (global + per-call options)
-	if sm.pipeline != nil {
-		if err := sm.pipeline.ExecuteBeforeCreateSession(ctx, params, optsData.Interceptors...); err != nil {
-			return nil, err // Abort immediately without persisting
-		}
-	}
-
-	sess, err := sm.repo.CreateSession(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("auth: failed to persist session: %w", err)
-	}
-	if sess.Extra == nil && optsData.Extra != nil {
-		sess.Extra = optsData.Extra
-	}
-
-	// 2. Run AfterCreateSession interceptors (global + per-call options)
-	if sm.pipeline != nil {
-		if err := sm.pipeline.ExecuteAfterCreateSession(ctx, sess, optsData.Interceptors...); err != nil {
-			// Rollback session from repository to prevent orphaned database records
-			_ = sm.repo.DeleteSession(ctx, sess.Token)
-			return nil, err
-		}
-	}
-
-	// 3. Dispatch typed lifecycle hooks
-	if sm.hooks != nil {
-		sm.hooks.DispatchSessionCreated(ctx, sess)
-	}
-
-	return sess, nil
-}
-
-// ValidateSession validates an active session token, returning combined user and session data in *dto.SessionData.
-func (sm *SessionManager) ValidateSession(ctx context.Context, token string) (*dto.SessionData, error) {
-	if sm == nil || sm.repo == nil {
-		return nil, ErrSessionRepositoryRequired
-	}
-	if token == "" {
-		return nil, repository.ErrInvalidSessionToken
-	}
-
-	if sm.pipeline != nil {
-		if err := sm.pipeline.ExecuteBeforeValidateSession(ctx, token); err != nil {
-			return nil, err
-		}
-	}
-
-	sess, err := sm.repo.GetSessionByToken(ctx, token)
+		var err error
+		issued, err = a.newSession(ctx, userID, opts)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	if !sess.ExpiresAt.IsZero() && time.Now().After(sess.ExpiresAt) {
-		return nil, repository.ErrSessionExpired
-	}
-
-	var user *entity.User
-	resolver := sm.userResolver
-	if resolver == nil {
-		if r, ok := sm.repo.(UserResolver); ok {
-			resolver = r
-		}
-	}
-
-	if resolver != nil {
-		u, err := resolver.GetUserByID(ctx, sess.UserID)
-		if err == nil {
-			user = u
-		} else if !errors.Is(err, domain.ErrUserNotFound) {
-			return nil, fmt.Errorf("auth: failed to resolve user for session: %w", err)
-		}
-	}
-
-	sessionData := &dto.SessionData{
-		Session: sess,
-		User:    user,
-	}
-	if sess.Extra == nil {
-		if customRepo, ok := sm.repo.(interface {
-			GetCustomSessionFields(ctx context.Context, sessionID string) (map[string]any, error)
-		}); ok {
-			if fields, err := customRepo.GetCustomSessionFields(ctx, sess.ID); err == nil && len(fields) > 0 {
-				sess.Extra = fields
-			}
-		}
-	}
-
-	if sm.pipeline != nil {
-		if err := sm.pipeline.ExecuteAfterValidateSession(ctx, sessionData); err != nil {
-			return nil, err
-		}
-	}
-
-	if sm.hooks != nil {
-		sm.hooks.DispatchSessionValidated(ctx, sessionData)
-	}
-
-	return sessionData, nil
+	a.afterSessionCreated(ctx, issued.Session)
+	return issued, nil
 }
 
-// RevokeSession revokes an active session by token, removing it from storage and publishing EventSessionRevoked.
-func (sm *SessionManager) RevokeSession(ctx context.Context, token string) error {
-	if sm == nil || sm.repo == nil {
-		return ErrSessionRepositoryRequired
+// newSession persists a session. It must run inside a Store transaction and
+// must be followed by afterSessionCreated once the transaction commits.
+func (a *Auth) newSession(ctx context.Context, userID string, opts SessionOptions) (*IssuedSession, error) {
+	now := a.Now()
+	token := secure.NewToken()
+	s := &session.Session{
+		ID:        secure.NewID(),
+		UserID:    userID,
+		TokenHash: secure.HashToken(token),
+		IPAddress: opts.IPAddress,
+		UserAgent: opts.UserAgent,
+		ExpiresAt: now.Add(a.cfg.Session.TTL),
+		CreatedAt: now,
 	}
+	if err := a.hooks.beforeSessionCreate.run(ctx, s); err != nil {
+		return nil, err
+	}
+	if err := a.store.Sessions().Create(ctx, s); err != nil {
+		return nil, err
+	}
+	return &IssuedSession{Session: s, Token: token}, nil
+}
+
+func (a *Auth) afterSessionCreated(ctx context.Context, s *session.Session) {
+	a.cacheSession(ctx, s)
+	a.publish(ctx, EventSessionCreated, s.UserID, s)
+}
+
+// GetSession resolves an opaque token. It returns (nil, nil) when the token
+// does not identify a valid (existing, unexpired, unrevoked) session.
+func (a *Auth) GetSession(ctx context.Context, token string) (*SessionResult, error) {
 	if token == "" {
-		return repository.ErrInvalidSessionToken
+		return nil, nil
+	}
+	hash := secure.HashToken(token)
+	now := a.Now()
+
+	s := a.cachedSession(ctx, hash)
+	if s == nil {
+		var err error
+		s, err = a.store.Sessions().GetByTokenHash(ctx, hash)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if s.Valid(now) {
+			a.cacheSession(ctx, s)
+		}
+	}
+	if !s.Valid(now) {
+		a.invalidateSessions(ctx, s)
+		return nil, nil
 	}
 
-	sess, _ := sm.repo.GetSessionByToken(ctx, token)
-
-	if err := sm.repo.DeleteSession(ctx, token); err != nil {
-		return fmt.Errorf("auth: failed to revoke session: %w", err)
+	u, err := a.GetUser(ctx, s.UserID)
+	if err != nil {
+		return nil, err
 	}
-
-	if sm.hooks != nil {
-		sm.hooks.DispatchSessionRevoked(ctx, token, sess)
+	if u == nil { // user deleted: the session is orphaned
+		a.invalidateSessions(ctx, s)
+		return nil, nil
 	}
+	return &SessionResult{Session: s, User: u}, nil
+}
 
+// RequireSession is like GetSession but returns ErrUnauthenticated when no
+// valid session exists.
+func (a *Auth) RequireSession(ctx context.Context, token string) (*SessionResult, error) {
+	res, err := a.GetSession(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, ErrUnauthenticated
+	}
+	return res, nil
+}
+
+// RevokeSession revokes a session by ID: Store first, then cache invalidation.
+// Revoking an already revoked session is a no-op.
+func (a *Auth) RevokeSession(ctx context.Context, sessionID string) error {
+	s, err := a.store.Sessions().GetByID(ctx, sessionID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if s.Revoked() {
+		a.invalidateSessions(ctx, s)
+		return nil
+	}
+	now := a.Now()
+	if err := a.store.Sessions().Revoke(ctx, s.ID, now); err != nil {
+		return err
+	}
+	s.RevokedAt = &now
+	a.invalidateSessions(ctx, s)
+	a.publish(ctx, EventSessionRevoked, s.UserID, s)
 	return nil
 }
 
-// GetSessionByToken retrieves an active session by its unique token without loading the user.
-func (sm *SessionManager) GetSessionByToken(ctx context.Context, token string) (*entity.Session, error) {
-	if sm == nil || sm.repo == nil {
-		return nil, ErrSessionRepositoryRequired
+// RevokeUserSessions revokes every active session of a user except the one
+// with ID exceptSessionID (pass "" to revoke all).
+func (a *Auth) RevokeUserSessions(ctx context.Context, userID, exceptSessionID string) error {
+	var revoked []*session.Session
+	err := a.store.Transaction(ctx, func(ctx context.Context) error {
+		var err error
+		revoked, err = a.revokeUserSessions(ctx, userID, exceptSessionID)
+		return err
+	})
+	if err != nil {
+		return err
 	}
-	if token == "" {
-		return nil, repository.ErrInvalidSessionToken
-	}
+	a.afterSessionsRevoked(ctx, revoked)
+	return nil
+}
 
-	sess, err := sm.repo.GetSessionByToken(ctx, token)
+// revokeUserSessions runs inside a transaction; call afterSessionsRevoked after commit.
+func (a *Auth) revokeUserSessions(ctx context.Context, userID, except string) ([]*session.Session, error) {
+	now := a.Now()
+	if except == "" {
+		return a.store.Sessions().RevokeByUser(ctx, userID, now)
+	}
+	all, err := a.store.Sessions().ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	if !sess.ExpiresAt.IsZero() && time.Now().After(sess.ExpiresAt) {
-		return nil, repository.ErrSessionExpired
-	}
-
-	return sess, nil
-}
-
-// GetSessionByID retrieves an active session by its primary key ID.
-func (sm *SessionManager) GetSessionByID(ctx context.Context, id string) (*entity.Session, error) {
-	if sm == nil || sm.repo == nil {
-		return nil, ErrSessionRepositoryRequired
-	}
-	if id == "" {
-		return nil, repository.ErrSessionNotFound
-	}
-	return sm.repo.GetSessionByID(ctx, id)
-}
-
-// RevokeSessionsByUserID deletes all active sessions for the specified user.
-func (sm *SessionManager) RevokeSessionsByUserID(ctx context.Context, userID string) error {
-	if sm == nil || sm.repo == nil {
-		return ErrSessionRepositoryRequired
-	}
-	if userID == "" {
-		return ErrInvalidUserID
-	}
-	return sm.repo.DeleteSessionsByUserID(ctx, userID)
-}
-
-// ListSessionsByUserID retrieves all active sessions for the specified user.
-func (sm *SessionManager) ListSessionsByUserID(ctx context.Context, userID string) ([]*entity.Session, error) {
-	if sm == nil || sm.repo == nil {
-		return nil, ErrSessionRepositoryRequired
-	}
-	if userID == "" {
-		return nil, ErrInvalidUserID
-	}
-	return sm.repo.ListSessionsByUserID(ctx, userID)
-}
-
-// ResolveUser retrieves the user entity associated with a user ID using the configured UserResolver or SessionRepository.
-func (sm *SessionManager) ResolveUser(ctx context.Context, userID string) (*entity.User, error) {
-	if sm == nil {
-		return nil, ErrSessionRepositoryRequired
-	}
-	resolver := sm.userResolver
-	if resolver == nil {
-		if r, ok := sm.repo.(UserResolver); ok {
-			resolver = r
+	var revoked []*session.Session
+	for _, s := range all {
+		if s.ID == except || s.Revoked() {
+			continue
 		}
+		if err := a.store.Sessions().Revoke(ctx, s.ID, now); err != nil {
+			return nil, err
+		}
+		s.RevokedAt = &now
+		revoked = append(revoked, s)
 	}
-	if resolver != nil {
-		return resolver.GetUserByID(ctx, userID)
+	return revoked, nil
+}
+
+func (a *Auth) afterSessionsRevoked(ctx context.Context, revoked []*session.Session) {
+	a.invalidateSessions(ctx, revoked...)
+	for _, s := range revoked {
+		a.publish(ctx, EventSessionRevoked, s.UserID, s)
 	}
-	return nil, nil
 }
