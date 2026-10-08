@@ -1,0 +1,33 @@
+go 1.27.1
+
+use (
+	./core
+	./plugin-sdk
+	./plugins/admin
+	./plugins/agent
+	./plugins/anonymous
+	./plugins/api-keys
+	./plugins/audit
+	./plugins/bearer
+	./plugins/device-authorization
+	./plugins/email-otp
+	./plugins/jwt
+	./plugins/lastlogin
+	./plugins/magic-link
+	./plugins/multisession
+	./plugins/oauth
+	./plugins/oauth-provider
+	./plugins/oidc-provider
+	./plugins/one-time-token
+	./plugins/openapi
+	./plugins/organizations
+	./plugins/passkeys
+	./plugins/phone
+	./plugins/rate-limit
+	./plugins/saml-provider
+	./plugins/scim
+	./plugins/service-accounts
+	./plugins/sso
+	./plugins/twofactor
+	./plugins/username
+)
