@@ -6,7 +6,7 @@ import (
 )
 
 // JWT defines the capability contract exposed by the JWT plugin module.
-// Applications access it via auth.Get[plugins.JWT]().
+// Applications access it via auth.Get[plugins.JWT](app).
 type JWT interface {
 	// Issue signs and issues a new JWT token using the active signing key.
 	Issue(ctx context.Context, claims Claims) (string, error)

@@ -1,0 +1,30 @@
+// Package memory provides in-memory implementations of GoModularAuth infrastructure adapters:
+// Store, Cache, and Email.
+//
+// These adapters are intended for unit tests, development, and standalone testing
+// of plugins without requiring external database or cache services.
+package memory
+
+import (
+	"github.com/BladiCreator/go-modular-auth/cache"
+	cachemem "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"github.com/BladiCreator/go-modular-auth/email"
+	emailmem "github.com/BladiCreator/go-modular-auth/email/memory"
+	"github.com/BladiCreator/go-modular-auth/store"
+	storemem "github.com/BladiCreator/go-modular-auth/store/memory"
+)
+
+// NewStore creates a thread-safe in-memory Store adapter satisfying store.Store.
+func NewStore() store.Store {
+	return storemem.New()
+}
+
+// NewCache creates an in-memory Cache adapter satisfying cache.Cache.
+func NewCache() cache.Cache {
+	return cachemem.New()
+}
+
+// NewEmail creates an in-memory transactional email sender satisfying email.Sender.
+func NewEmail() email.Sender {
+	return emailmem.New()
+}

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -94,7 +95,7 @@ func (c Config) withDefaults() (Config, error) {
 		c.Hasher = password.NewArgon2id(password.DefaultArgon2idParams)
 	}
 	if c.Logger == nil {
-		c.Logger = slog.New(slog.DiscardHandler)
+		c.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	if c.Now == nil {
 		c.Now = time.Now

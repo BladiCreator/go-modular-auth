@@ -8,6 +8,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-username/cache"
 	"github.com/BladiCreator/go-modular-auth-username/store"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // AuthenticateInput holds credentials for username-based sign in.
@@ -26,7 +27,7 @@ type RegisterInput struct {
 }
 
 // Capability defines the typed contract for username operations.
-// Applications access it via auth.Get[username.Capability]() or auth.Get[username.Username]().
+// Applications access it via auth.Get[username.Capability](a) or auth.Get[username.Username](a).
 type Capability interface {
 	// Authenticate validates the username and password, issuing an opaque session.
 	// Applies timing equalization to prevent username enumeration if user does not exist.
@@ -60,13 +61,13 @@ type Capability interface {
 	Normalize(rawUsername string) (string, error)
 }
 
-// Username is a type alias for Capability, supporting both auth.Get[username.Username]()
-// and auth.Get[username.Capability]().
+// Username is a type alias for Capability, supporting both auth.Get[username.Username](a)
+// and auth.Get[username.Capability](a).
 type Username = Capability
 
 type service struct {
 	cfg   Config
-	host  *auth.Host
+	ctx   *sdk.Context
 	store store.Store
 	cache *cache.Cache
 }
@@ -97,7 +98,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 		return nil, err
 	}
 
-	u, err := s.host.Auth().GetUser(ctx, rec.UserID)
+	u, err := s.ctx.Core().GetUser(ctx, rec.UserID)
 	if errors.Is(err, auth.ErrUserNotFound) {
 		// User was removed from Core: equalize timing
 		s.dummyTimingVerification(ctx, in.Password, in.Session)
@@ -109,7 +110,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 
 	// Delegate to Core SignIn: verifies password against Core credential,
 	// evaluates email verification rules, issues session, and publishes Core events.
-	res, err := s.host.Auth().SignIn(ctx, auth.SignInInput{
+	res, err := s.ctx.Core().SignIn(ctx, auth.SignInInput{
 		Email:    u.Email,
 		Password: in.Password,
 		Session:  in.Session,
@@ -143,7 +144,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 	var res *auth.AuthResult
 	cleanUsername := strings.TrimSpace(in.Username)
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		// Re-check inside transaction to prevent TOCTOU race
 		if _, err := s.store.GetByNormalized(txCtx, norm); err == nil {
 			return ErrTaken
@@ -152,7 +153,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 		}
 
 		var err error
-		res, err = s.host.Auth().SignUp(txCtx, auth.SignUpInput{
+		res, err = s.ctx.Core().SignUp(txCtx, auth.SignUpInput{
 			Email:    in.Email,
 			Password: in.Password,
 			Session:  in.Session,
@@ -161,7 +162,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 			return err
 		}
 
-		now := s.host.Now()
+		now := s.ctx.Now()
 		rec := &store.Record{
 			UserID:     res.User.ID,
 			Username:   cleanUsername,
@@ -182,7 +183,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec := &store.Record{
 		UserID:     res.User.ID,
 		Username:   cleanUsername,
@@ -191,7 +192,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 		UpdatedAt:  now,
 	}
 	s.cache.Set(ctx, rec)
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventCreated,
 		Time:    now,
 		Subject: res.User.ID,
@@ -215,14 +216,14 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 	}
 
 	// Verify user exists in Core
-	if _, err := s.host.Auth().GetUser(ctx, userID); err != nil {
+	if _, err := s.ctx.Core().GetUser(ctx, userID); err != nil {
 		if errors.Is(err, auth.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	cleanUsername := strings.TrimSpace(rawUsername)
 	rec := &store.Record{
 		UserID:     userID,
@@ -232,7 +233,7 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 		UpdatedAt:  now,
 	}
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		// Ensure user doesn't already have an assigned username
 		if _, err := s.store.GetByUserID(txCtx, userID); err == nil {
 			return ErrAlreadyAssigned
@@ -253,7 +254,7 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 	}
 
 	s.cache.Set(ctx, rec)
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventCreated,
 		Time:    now,
 		Subject: userID,
@@ -277,10 +278,10 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 
 	var oldRec *store.Record
 	var updatedRec *store.Record
-	now := s.host.Now()
+	now := s.ctx.Now()
 	cleanUsername := strings.TrimSpace(newRawUsername)
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		existing, err := s.store.GetByUserID(txCtx, userID)
 		if errors.Is(err, store.ErrNotFound) {
 			return ErrNotFound
@@ -321,7 +322,7 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 	s.cache.Invalidate(ctx, oldRec.Normalized, userID)
 	s.cache.Set(ctx, updatedRec)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventUpdated,
 		Time:    now,
 		Subject: userID,
@@ -338,7 +339,7 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 
 func (s *service) Delete(ctx context.Context, userID string) error {
 	var oldRec *store.Record
-	err := s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err := s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		existing, err := s.store.GetByUserID(txCtx, userID)
 		if errors.Is(err, store.ErrNotFound) {
 			return ErrNotFound
@@ -355,9 +356,9 @@ func (s *service) Delete(ctx context.Context, userID string) error {
 	}
 
 	s.cache.Invalidate(ctx, oldRec.Normalized, userID)
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventDeleted,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: userID,
 		Payload: DeletedPayload{
 			UserID:     userID,
@@ -421,7 +422,7 @@ func (s *service) getNormalized(ctx context.Context, norm string) (*Record, erro
 // dummyTimingVerification calls Core's SignIn with an impossible email address to trigger
 // password hasher verification against the Core dummy hash, equalizing response timing.
 func (s *service) dummyTimingVerification(ctx context.Context, password string, opts auth.SessionOptions) {
-	_, _ = s.host.Auth().SignIn(ctx, auth.SignInInput{
+	_, _ = s.ctx.Core().SignIn(ctx, auth.SignInInput{
 		Email:    "nonexistent-timing-equalizer@gomodularauth.local",
 		Password: password,
 		Session:  opts,

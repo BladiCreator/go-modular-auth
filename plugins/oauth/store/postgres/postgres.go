@@ -134,10 +134,10 @@ func (s *Store) DeleteExpiredStates(ctx context.Context, before time.Time) (int,
 
 func (s *Store) scanRow(row *sql.Row) (*store.StateSession, error) {
 	var (
-		st                   store.StateSession
-		actionStr            string
-		userIDNull           sql.NullString
-		metaJSON             []byte
+		st         store.StateSession
+		actionStr  string
+		userIDNull sql.NullString
+		metaJSON   []byte
 	)
 
 	err := row.Scan(

@@ -1,8 +1,11 @@
-go 1.27.1
+go 1.22.0
 
 use (
+	./adapters/memory
+	./adapters/postgres
 	./core
 	./plugin-sdk
+	./plugins/account-linking
 	./plugins/admin
 	./plugins/agent
 	./plugins/anonymous
@@ -17,13 +20,18 @@ use (
 	./plugins/multisession
 	./plugins/oauth
 	./plugins/oauth-provider
+	./plugins/oidc
 	./plugins/oidc-provider
 	./plugins/one-time-token
 	./plugins/openapi
 	./plugins/organizations
-	./plugins/passkeys
+//	./plugins/passkeys
+	./plugins/password-policy
 	./plugins/phone
+	./plugins/policy
 	./plugins/rate-limit
+	./plugins/rbac
+	./plugins/saml
 	./plugins/saml-provider
 	./plugins/scim
 	./plugins/service-accounts

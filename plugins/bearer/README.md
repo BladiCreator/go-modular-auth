@@ -93,7 +93,7 @@ func main() {
     }
 
     // 2. Retrieve strongly typed capability
-    bearerPlugin, err := authApp.Get[plugins.Bearer]()
+    bearerPlugin, err := auth.Get[plugins.Bearer](authApp)
     if err != nil {
         log.Fatalf("bearer plugin missing: %v", err)
     }

@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	jwt "github.com/BladiCreator/go-modular-auth-jwt"
 	"github.com/BladiCreator/go-modular-auth-jwt/plugins"
 	"github.com/BladiCreator/go-modular-auth-jwt/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
 	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -37,7 +37,7 @@ func setupTestAuth(t *testing.T, opts ...jwt.Option) (*auth.Auth, jwt.JWT) {
 		t.Fatalf("failed to initialize auth core: %v", err)
 	}
 
-	plugin, err := app.Get[plugins.JWT]()
+	plugin, err := auth.Get[plugins.JWT](app)
 	if err != nil {
 		t.Fatalf("failed to retrieve plugins.JWT: %v", err)
 	}

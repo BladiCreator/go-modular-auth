@@ -65,7 +65,7 @@ func main() {
 	}
 
 	// Consume capability using strong typing:
-	apiKeyService, err := engine.Get[plugins.APIKeys]()
+	apiKeyService, err := auth.Get[plugins.APIKeys](engine)
 	if err != nil {
 		log.Fatal(err)
 	}

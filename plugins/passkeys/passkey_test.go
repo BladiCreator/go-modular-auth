@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
 	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
 	"github.com/BladiCreator/go-modular-auth-passkeys/plugins"
 	passkeystore "github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 	"github.com/go-webauthn/webauthn/protocol"
@@ -36,7 +36,7 @@ func setupTestAuth(t *testing.T, opts ...passkey.Option) (*auth.Auth, passkey.Pa
 		t.Fatalf("failed to initialize auth engine: %v", err)
 	}
 
-	pk, err := a.Get[plugins.Passkeys]()
+	pk, err := auth.Get[plugins.Passkeys](a)
 	if err != nil {
 		t.Fatalf("failed to lookup plugins.Passkeys capability: %v", err)
 	}
@@ -63,7 +63,7 @@ func createTestUser(t *testing.T, a *auth.Auth, email string) *user.User {
 func TestCapabilityLookup(t *testing.T) {
 	a, pk1 := setupTestAuth(t)
 
-	pk2, err := a.Get[passkey.Passkeys]()
+	pk2, err := auth.Get[passkey.Passkeys](a)
 	if err != nil {
 		t.Fatalf("failed to lookup passkey.Passkeys: %v", err)
 	}
@@ -210,7 +210,9 @@ func TestCredentialManagementAndOwnership(t *testing.T) {
 	}
 
 	// Save to plugin store
-	cfgField, ok := pk.(interface{ ListCredentials(ctx context.Context, userID string) ([]*passkey.Passkey, error) })
+	cfgField, ok := pk.(interface {
+		ListCredentials(ctx context.Context, userID string) ([]*passkey.Passkey, error)
+	})
 	if !ok {
 		t.Fatal("pk does not implement ListCredentials")
 	}

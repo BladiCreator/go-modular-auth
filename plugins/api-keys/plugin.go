@@ -2,12 +2,13 @@ package apikeys
 
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // PluginID is the unique identifier for this plugin module in GoModularAuth.
 const PluginID = "apikeys"
 
-// Module implements auth.PluginModule for API key authentication and lifecycle management.
+// Module implements auth.PluginModule for API key authentication using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -34,7 +35,8 @@ func (m *Module) Init(h *auth.Host) error {
 		return ErrStoreRequired
 	}
 
-	svc := newService(h, m.cfg)
+	ctx := sdk.NewContext(h)
+	svc := newService(ctx, m.cfg)
 
-	return auth.Provide[APIKeys](h, svc)
+	return sdk.Provide[APIKeys](ctx, svc)
 }

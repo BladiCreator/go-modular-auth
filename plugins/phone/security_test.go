@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	phone "github.com/BladiCreator/go-modular-auth-phone"
 	phonemem "github.com/BladiCreator/go-modular-auth-phone/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
@@ -34,7 +34,7 @@ func TestSecurity_ConcurrencyAndReplay(t *testing.T) {
 		t.Fatalf("failed to initialize auth: %v", err)
 	}
 
-	p, err := a.Get[phone.Phone]()
+	p, err := auth.Get[phone.Phone](a)
 	if err != nil {
 		t.Fatalf("failed to retrieve phone capability: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestSecurity_ConcurrencyAndReplay(t *testing.T) {
 	const concurrentAttempts = 30
 
 	var (
-		successCount atomic.Int64
+		successCount  atomic.Int64
 		conflictCount atomic.Int64
 		otherErrors   atomic.Int64
 		wg            sync.WaitGroup
@@ -116,7 +116,7 @@ func TestSecurity_BruteForceAndAttemptLimits(t *testing.T) {
 		t.Fatalf("failed to init auth: %v", err)
 	}
 
-	p, _ := a.Get[phone.Phone]()
+	p, _ := auth.Get[phone.Phone](a)
 	targetPhone := "+12025550288"
 
 	_ = p.RequestOTP(ctx, phone.RequestOTPInput{PhoneNumber: targetPhone})
@@ -167,7 +167,7 @@ func TestSecurity_EnumerationProtection(t *testing.T) {
 		t.Fatalf("failed to init auth: %v", err)
 	}
 
-	p, _ := a.Get[phone.Phone]()
+	p, _ := auth.Get[phone.Phone](a)
 	unknownPhone := "+12025559999"
 
 	// RequestOTP for unknown phone should return nil without error
@@ -200,7 +200,7 @@ func TestSecurity_Expiration(t *testing.T) {
 		},
 	})
 
-	p, _ := a.Get[phone.Phone]()
+	p, _ := auth.Get[phone.Phone](a)
 	targetPhone := "+12025550777"
 
 	_ = p.RequestOTP(ctx, phone.RequestOTPInput{PhoneNumber: targetPhone})

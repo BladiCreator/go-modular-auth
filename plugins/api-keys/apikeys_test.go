@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
 	"github.com/BladiCreator/go-modular-auth-apikeys/plugins"
 	"github.com/BladiCreator/go-modular-auth-apikeys/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -38,7 +38,7 @@ func setupTestAuth(t *testing.T, opts ...apikeys.Option) (*auth.Auth, plugins.AP
 		t.Fatalf("failed to initialize GoModularAuth core: %v", err)
 	}
 
-	cap, err := engine.Get[plugins.APIKeys]()
+	cap, err := auth.Get[plugins.APIKeys](engine)
 	if err != nil {
 		t.Fatalf("failed to retrieve APIKeys capability: %v", err)
 	}
@@ -250,11 +250,11 @@ func TestAPIKeys_EventsAndHooks(t *testing.T) {
 	engine, apiKeys, _ := setupTestAuth(t)
 
 	var (
-		mu              sync.Mutex
-		eventsReceived  []auth.EventName
-		hookCreateRan   bool
-		hookAuthRan     bool
-		hookRevokeRan   bool
+		mu             sync.Mutex
+		eventsReceived []auth.EventName
+		hookCreateRan  bool
+		hookAuthRan    bool
+		hookRevokeRan  bool
 	)
 
 	engine.Events().SubscribeAll(func(ctx context.Context, e auth.Event) {

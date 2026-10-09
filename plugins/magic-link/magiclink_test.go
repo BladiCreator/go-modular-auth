@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-magiclink"
 	"github.com/BladiCreator/go-modular-auth-magiclink/plugins"
-	auth "github.com/BladiCreator/go-modular-auth"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
@@ -42,9 +42,9 @@ func setupTestAuth(t *testing.T, opts ...magiclink.Option) (*auth.Auth, *mememai
 		t.Fatalf("auth.New failed: %v", err)
 	}
 
-	cap, err := a.Get[magiclink.MagicLink]()
+	cap, err := auth.Get[magiclink.MagicLink](a)
 	if err != nil {
-		t.Fatalf("a.Get[magiclink.MagicLink]() failed: %v", err)
+		t.Fatalf("auth.Get[magiclink.MagicLink](a) failed: %v", err)
 	}
 
 	return a, emailSender, cap
@@ -68,9 +68,9 @@ func TestPluginRegistration(t *testing.T) {
 	}
 
 	// Verify lookup with plugins alias works
-	pluginsCap, err := a.Get[plugins.MagicLink]()
+	pluginsCap, err := auth.Get[plugins.MagicLink](a)
 	if err != nil {
-		t.Fatalf("a.Get[plugins.MagicLink]() failed: %v", err)
+		t.Fatalf("auth.Get[plugins.MagicLink](a) failed: %v", err)
 	}
 	if pluginsCap == nil {
 		t.Fatal("expected non-nil capability via plugins alias")
@@ -245,7 +245,7 @@ func TestExpirationEnforcement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ml, _ := a.Get[magiclink.MagicLink]()
+	ml, _ := auth.Get[magiclink.MagicLink](a)
 
 	_, err = a.SignUp(ctx, auth.SignUpInput{
 		Email:    "charlie@example.com",

@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-phone/cache"
 	phonestore "github.com/BladiCreator/go-modular-auth-phone/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	host     *auth.Host
+	ctx      *sdk.Context
 	cfg      Config
 	store    phonestore.Store
 	provider PhoneProvider
@@ -24,14 +25,14 @@ type service struct {
 
 var _ Phone = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		host:     h,
+		ctx:      ctx,
 		cfg:      cfg,
 		store:    cfg.Store,
 		provider: cfg.Provider,
-		limiter:  cache.NewLimiter(h.Cache(), cfg.RateLimit.FailurePolicy, h.Now),
-		cache:    cache.NewPhoneCache(h.Cache(), cfg.CacheTTL),
+		limiter:  cache.NewLimiter(ctx.Cache(), cfg.RateLimit.FailurePolicy, ctx.Now),
+		cache:    cache.NewPhoneCache(ctx.Cache(), cfg.CacheTTL),
 		hooks:    cfg.Hooks,
 	}
 }
@@ -120,7 +121,7 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec, err := s.store.GetActiveOTP(ctx, normPhone, PurposeAuthenticate, now)
 	if errors.Is(err, phonestore.ErrNotFound) {
 		s.publishRejected(ctx, normPhone, "not_found", 0)
@@ -183,7 +184,7 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 		return nil, err
 	}
 
-	issued, err := s.host.Auth().CreateSession(ctx, u.ID, in.Session)
+	issued, err := s.ctx.Core().CreateSession(ctx, u.ID, in.Session)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +195,7 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 		Token:   issued.Token,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneOTPVerified,
 		Time:    now,
 		Subject: u.ID,
@@ -227,7 +228,7 @@ func (s *service) RequestVerification(ctx context.Context, in RequestVerificatio
 	}
 	in.PhoneNumber = normPhone
 
-	if _, err := s.host.Auth().RequireUser(ctx, in.UserID); err != nil {
+	if _, err := s.ctx.Core().RequireUser(ctx, in.UserID); err != nil {
 		return ErrUserNotFound
 	}
 
@@ -239,7 +240,7 @@ func (s *service) RequestVerification(ctx context.Context, in RequestVerificatio
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	userPhone, err := s.store.GetPhoneByUserID(ctx, in.UserID)
 	if errors.Is(err, phonestore.ErrNotFound) {
 		id, err := GenerateID()
@@ -290,7 +291,7 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 		return nil, ErrInvalidPhone
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec, err := s.store.GetActiveOTP(ctx, normPhone, PurposeVerify, now)
 	if errors.Is(err, phonestore.ErrNotFound) {
 		s.publishRejected(ctx, normPhone, "not_found", 0)
@@ -353,10 +354,10 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 	}
 
 	// Link Account in Core if not already linked
-	_, err = s.host.Store().Accounts().GetByProvider(ctx, AccountProvider, normPhone)
+	_, err = s.ctx.Store().Accounts().GetByProvider(ctx, AccountProvider, normPhone)
 	if errors.Is(err, store.ErrNotFound) {
 		accID, _ := GenerateID()
-		_ = s.host.Store().Accounts().Create(ctx, &account.Account{
+		_ = s.ctx.Store().Accounts().Create(ctx, &account.Account{
 			ID:         accID,
 			UserID:     in.UserID,
 			Provider:   AccountProvider,
@@ -368,7 +369,7 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 
 	s.cache.Invalidate(ctx, in.UserID, normPhone)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneVerified,
 		Time:    now,
 		Subject: in.UserID,
@@ -404,7 +405,7 @@ func (s *service) RequestChange(ctx context.Context, in RequestChangeInput) erro
 		return err
 	}
 
-	if _, err := s.host.Auth().RequireUser(ctx, in.UserID); err != nil {
+	if _, err := s.ctx.Core().RequireUser(ctx, in.UserID); err != nil {
 		return ErrUserNotFound
 	}
 
@@ -450,7 +451,7 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 		return nil, ErrInvalidPhone
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec, err := s.store.GetActiveOTP(ctx, normNew, PurposeChange, now)
 	if errors.Is(err, phonestore.ErrNotFound) {
 		s.publishRejected(ctx, normNew, "not_found", 0)
@@ -515,12 +516,12 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 	}
 
 	// Update or create Core account mapping
-	acc, err := s.host.Store().Accounts().GetByProvider(ctx, AccountProvider, oldPhone)
+	acc, err := s.ctx.Store().Accounts().GetByProvider(ctx, AccountProvider, oldPhone)
 	if err == nil {
-		_ = s.host.Store().Accounts().Delete(ctx, acc.ID)
+		_ = s.ctx.Store().Accounts().Delete(ctx, acc.ID)
 	}
 	newAccID, _ := GenerateID()
-	_ = s.host.Store().Accounts().Create(ctx, &account.Account{
+	_ = s.ctx.Store().Accounts().Create(ctx, &account.Account{
 		ID:         newAccID,
 		UserID:     in.UserID,
 		Provider:   AccountProvider,
@@ -532,7 +533,7 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 	s.cache.Invalidate(ctx, in.UserID, oldPhone)
 	s.cache.Invalidate(ctx, in.UserID, normNew)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneChanged,
 		Time:    now,
 		Subject: in.UserID,
@@ -571,21 +572,21 @@ func (s *service) Remove(ctx context.Context, in RemoveInput) error {
 	}
 
 	// Clean up Core account if present
-	acc, err := s.host.Store().Accounts().GetByProvider(ctx, AccountProvider, phoneNum)
+	acc, err := s.ctx.Store().Accounts().GetByProvider(ctx, AccountProvider, phoneNum)
 	if err == nil {
-		_ = s.host.Store().Accounts().Delete(ctx, acc.ID)
+		_ = s.ctx.Store().Accounts().Delete(ctx, acc.ID)
 	}
 
 	s.cache.Invalidate(ctx, in.UserID, phoneNum)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneRemoved,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: in.UserID,
 		Payload: PhoneRemovedPayload{
 			UserID:      in.UserID,
 			PhoneNumber: phoneNum,
-			RemovedAt:   s.host.Now(),
+			RemovedAt:   s.ctx.Now(),
 		},
 	})
 
@@ -657,7 +658,7 @@ func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose strin
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec := &phonestore.OTPRecord{
 		ID:          id,
 		PhoneNumber: phone,
@@ -684,7 +685,7 @@ func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose strin
 		return err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneOTPRequested,
 		Time:    now,
 		Subject: subject,
@@ -700,8 +701,8 @@ func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose strin
 }
 
 func (s *service) publishRejected(ctx context.Context, phone, reason string, attempts int) {
-	now := s.host.Now()
-	s.host.Events().Publish(ctx, auth.Event{
+	now := s.ctx.Now()
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneOTPRejected,
 		Time:    now,
 		Subject: phone,
@@ -715,11 +716,11 @@ func (s *service) publishRejected(ctx context.Context, phone, reason string, att
 }
 
 func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalEmail string) (*user.User, error) {
-	now := s.host.Now()
+	now := s.ctx.Now()
 
 	phoneRec, err := s.store.GetPhoneByNumber(ctx, normPhone)
 	if err == nil {
-		u, err := s.host.Store().Users().GetByID(ctx, phoneRec.UserID)
+		u, err := s.ctx.Store().Users().GetByID(ctx, phoneRec.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -729,7 +730,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 			phoneRec.UpdatedAt = now
 			_ = s.store.UpdatePhone(ctx, phoneRec)
 			s.cache.Invalidate(ctx, u.ID, normPhone)
-			s.host.Events().Publish(ctx, auth.Event{
+			s.ctx.Events().Publish(ctx, auth.Event{
 				Name:    EventPhoneVerified,
 				Time:    now,
 				Subject: u.ID,
@@ -752,7 +753,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 	}
 
 	var newUser *user.User
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		uID, err := GenerateID()
 		if err != nil {
 			return err
@@ -775,7 +776,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
-		if err := s.host.Store().Users().Create(txCtx, newUser); err != nil {
+		if err := s.ctx.Store().Users().Create(txCtx, newUser); err != nil {
 			return err
 		}
 
@@ -791,7 +792,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		if err := s.host.Store().Accounts().Create(txCtx, acc); err != nil {
+		if err := s.ctx.Store().Accounts().Create(txCtx, acc); err != nil {
 			return err
 		}
 
@@ -814,14 +815,14 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 		return nil, err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    auth.EventUserCreated,
 		Time:    now,
 		Subject: newUser.ID,
 		Payload: newUser,
 	})
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneVerified,
 		Time:    now,
 		Subject: newUser.ID,

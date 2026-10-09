@@ -2,12 +2,13 @@ package multisession
 
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
 const PluginID = "multisession"
 
-// Module implements auth.PluginModule.
+// Module implements auth.PluginModule using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -28,14 +29,15 @@ func (m *Module) ID() string {
 	return PluginID
 }
 
-// Init configures infrastructure, registers hooks, and provides the typed Capability into GoModularAuth.
+// Init configures infrastructure, registers hooks, and provides the typed Capability into GoModularAuth via plugin-sdk.
 func (m *Module) Init(h *auth.Host) error {
-	svc := newService(h, m.cfg)
+	ctx := sdk.NewContext(h)
+	svc := newService(ctx, m.cfg)
 
 	// Register hook to enforce maximum concurrent sessions before session creation
 	if m.cfg.MaxConcurrentSessions > 0 {
-		h.Hooks().BeforeSessionCreate(svc.onBeforeSessionCreate)
+		ctx.Hooks().BeforeSessionCreate(svc.onBeforeSessionCreate)
 	}
 
-	return auth.Provide[MultiSession](h, svc)
+	return sdk.Provide[MultiSession](ctx, svc)
 }

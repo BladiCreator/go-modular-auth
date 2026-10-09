@@ -87,7 +87,7 @@ func main() {
 	}
 
 	// Retrieve typed Capability via GoModularAuth
-	otpAuth, err := engine.Get[plugins.EmailOTP]()
+	otpAuth, err := auth.Get[plugins.EmailOTP](engine)
 	if err != nil {
 		log.Fatalf("failed to resolve capability: %v", err)
 	}

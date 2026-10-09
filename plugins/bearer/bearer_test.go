@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	bearer "github.com/BladiCreator/go-modular-auth-bearer"
 	"github.com/BladiCreator/go-modular-auth-bearer/plugins"
 	"github.com/BladiCreator/go-modular-auth-bearer/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
 	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -32,7 +32,7 @@ func setupTestAuth(t *testing.T, opts ...bearer.Option) (*auth.Auth, bearer.Bear
 		t.Fatalf("failed to initialize auth core: %v", err)
 	}
 
-	plugin, err := app.Get[plugins.Bearer]()
+	plugin, err := auth.Get[plugins.Bearer](app)
 	if err != nil {
 		t.Fatalf("failed to retrieve plugins.Bearer: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestBearer_RegistrationAndLookup(t *testing.T) {
 		t.Fatal("expected non-nil Bearer capability")
 	}
 
-	mustPlugin := app.MustGet[plugins.Bearer]()
+	mustPlugin := auth.MustGet[plugins.Bearer](app)
 	if mustPlugin == nil {
 		t.Fatal("expected non-nil MustGet Bearer capability")
 	}
@@ -407,7 +407,7 @@ func TestBearer_Events(t *testing.T) {
 		mu.Unlock()
 	})
 
-	plugin := app.MustGet[plugins.Bearer]()
+	plugin := auth.MustGet[plugins.Bearer](app)
 	res, err := plugin.Issue(ctx, bearer.IssueInput{Subject: "events-user"})
 	if err != nil {
 		t.Fatalf("issue error: %v", err)

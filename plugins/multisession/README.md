@@ -83,7 +83,7 @@ func main() {
 	}
 
 	// 2. Retrieve the typed MultiSession capability
-	sessionMgr, err := app.Get[plugins.MultiSession]()
+	sessionMgr, err := auth.Get[plugins.MultiSession](app)
 	if err != nil {
 		log.Fatalf("failed to resolve capability: %v", err)
 	}
@@ -148,7 +148,7 @@ mod := multisession.New(
 
 ### Capability Interface
 
-Applications access the capability via `app.Get[plugins.MultiSession]()` or `app.Get[multisession.MultiSession]()`:
+Applications access the capability via `auth.Get[plugins.MultiSession](app)` or `auth.Get[multisession.MultiSession](app)`:
 
 ```go
 type MultiSession interface {

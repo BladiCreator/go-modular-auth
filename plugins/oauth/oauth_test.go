@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth"
 	"github.com/BladiCreator/go-modular-auth-oauth/plugins"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
-	auth "github.com/BladiCreator/go-modular-auth"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
@@ -93,7 +93,7 @@ func setupTestAuth(t *testing.T, opts ...oauth.Option) (*auth.Auth, plugins.OAut
 		t.Fatalf("failed to create core auth: %v", err)
 	}
 
-	oauthPlugin, err := a.Get[plugins.OAuth]()
+	oauthPlugin, err := auth.Get[plugins.OAuth](a)
 	if err != nil {
 		t.Fatalf("failed to retrieve plugins.OAuth capability: %v", err)
 	}

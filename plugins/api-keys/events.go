@@ -52,15 +52,15 @@ type RotatedPayload struct {
 
 // AuthenticatedPayload is the payload published on EventAPIKeyAuthenticated.
 type AuthenticatedPayload struct {
-	ID             string         `json:"id"`
-	Prefix         string         `json:"prefix"`
-	UserID         string         `json:"user_id,omitempty"`
-	OrganizationID string         `json:"organization_id,omitempty"`
-	ServiceID      string         `json:"service_id,omitempty"`
-	IPAddress      string         `json:"ip_address,omitempty"`
-	UserAgent      string         `json:"user_agent,omitempty"`
-	PrincipalType  string         `json:"principal_type"`
-	Subject        string         `json:"subject"`
+	ID             string `json:"id"`
+	Prefix         string `json:"prefix"`
+	UserID         string `json:"user_id,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
+	ServiceID      string `json:"service_id,omitempty"`
+	IPAddress      string `json:"ip_address,omitempty"`
+	UserAgent      string `json:"user_agent,omitempty"`
+	PrincipalType  string `json:"principal_type"`
+	Subject        string `json:"subject"`
 }
 
 // DeletedPayload is the payload published on EventAPIKeyDeleted.

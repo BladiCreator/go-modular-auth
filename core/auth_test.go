@@ -232,9 +232,11 @@ func TestSessionCacheTTLNeverExceedsSessionLifetime(t *testing.T) {
 
 type brokenCache struct{}
 
-func (brokenCache) Get(context.Context, string, any) error                  { return errors.New("redis down") }
-func (brokenCache) Set(context.Context, string, any, time.Duration) error { return errors.New("redis down") }
-func (brokenCache) Delete(context.Context, string) error                    { return errors.New("redis down") }
+func (brokenCache) Get(context.Context, string, any) error { return errors.New("redis down") }
+func (brokenCache) Set(context.Context, string, any, time.Duration) error {
+	return errors.New("redis down")
+}
+func (brokenCache) Delete(context.Context, string) error { return errors.New("redis down") }
 
 func TestCacheFailureDegradesToStore(t *testing.T) {
 	ctx := context.Background()

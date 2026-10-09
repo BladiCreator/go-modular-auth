@@ -4,54 +4,120 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/cache"
+	"github.com/BladiCreator/go-modular-auth/email"
+	"github.com/BladiCreator/go-modular-auth/store"
 )
 
 // Context provides the host runtime environment and services to a plugin module.
+// It acts as the isolation boundary so plugins only interact with public
+// infrastructure contracts and never private core internals.
 type Context struct {
-	module string
-	logger *slog.Logger
-	now    func() time.Time
+	host   *auth.Host
 	values map[string]any
 }
 
-// NewContext creates a new plugin context for a module.
-func NewContext(module string, logger *slog.Logger, now func() time.Time) *Context {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	if now == nil {
-		now = time.Now
-	}
+// NewContext creates a new plugin context wrapping the host runtime.
+func NewContext(host *auth.Host) *Context {
 	return &Context{
-		module: module,
-		logger: logger.With("plugin", module),
-		now:    now,
+		host:   host,
 		values: make(map[string]any),
 	}
 }
 
+// Host returns the underlying core Host instance.
+func (c *Context) Host() *auth.Host {
+	return c.host
+}
+
 // ModuleID returns the ID of the plugin module.
 func (c *Context) ModuleID() string {
-	return c.module
+	if c.host == nil {
+		return ""
+	}
+	return c.host.ModuleID()
 }
 
-// Logger returns the logger scoped to this plugin module.
+// Core returns the Auth engine instance.
+func (c *Context) Core() *auth.Auth {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Auth()
+}
+
+// Store returns the core store adapter (authoritative source of truth).
+func (c *Context) Store() store.Store {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Store()
+}
+
+// Cache returns the shared cache adapter, or nil when none is configured.
+// Plugins must namespace their cache keys.
+func (c *Context) Cache() cache.Cache {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Cache()
+}
+
+// Email returns the transactional email sender, or nil when none is configured.
+func (c *Context) Email() email.Sender {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Email()
+}
+
+// Hooks returns the workflow hooks registry for intercepting auth workflows.
+func (c *Context) Hooks() *auth.Hooks {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Hooks()
+}
+
+// Events returns the event dispatcher for subscribing to or emitting events.
+func (c *Context) Events() *auth.Events {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Events()
+}
+
+// Logger returns a structured logger scoped and tagged with the module ID.
 func (c *Context) Logger() *slog.Logger {
-	return c.logger
+	if c.host == nil {
+		return slog.Default()
+	}
+	return c.host.Logger()
 }
 
-// Now returns the current time from the host clock.
+// Now returns the current time according to the host clock.
 func (c *Context) Now() time.Time {
-	return c.now()
+	if c.host == nil {
+		return time.Now()
+	}
+	return c.host.Now()
 }
 
-// Set stores a key-value pair in the context.
+// Set stores a key-value pair in the contextual execution bag.
 func (c *Context) Set(key string, val any) {
+	if c.values == nil {
+		c.values = make(map[string]any)
+	}
 	c.values[key] = val
 }
 
-// Get retrieves a value by key from the context.
+// Get retrieves a value by key from the contextual execution bag.
 func (c *Context) Get(key string) (any, bool) {
+	if c.values == nil {
+		return nil, false
+	}
 	v, ok := c.values[key]
 	return v, ok
 }

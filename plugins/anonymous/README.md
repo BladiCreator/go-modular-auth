@@ -121,7 +121,7 @@ func main() {
 	}
 
 	// Retrieve capability
-	anon, err := engine.Get[plugins.Anonymous]()
+	anon, err := auth.Get[plugins.Anonymous](engine)
 	if err != nil {
 		log.Fatalf("failed to retrieve Anonymous plugin: %v", err)
 	}

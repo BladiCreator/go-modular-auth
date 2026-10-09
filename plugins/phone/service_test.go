@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	phone "github.com/BladiCreator/go-modular-auth-phone"
 	"github.com/BladiCreator/go-modular-auth-phone/plugins"
 	phonemem "github.com/BladiCreator/go-modular-auth-phone/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
@@ -32,7 +32,7 @@ func setupTestAuth(t *testing.T, opts ...phone.Option) (*auth.Auth, phone.Phone,
 		t.Fatalf("failed to create core Auth: %v", err)
 	}
 
-	cap, err := a.Get[phone.Phone]()
+	cap, err := auth.Get[phone.Phone](a)
 	if err != nil {
 		t.Fatalf("failed to retrieve phone capability: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestPhone_PluginRegistrationAndCapabilityLookup(t *testing.T) {
 	}
 
 	// Also verify retrieval through plugins.Phone alias
-	aliasCap, err := a.Get[plugins.Phone]()
+	aliasCap, err := auth.Get[plugins.Phone](a)
 	if err != nil || aliasCap == nil {
 		t.Fatalf("failed to retrieve via plugins.Phone: %v", err)
 	}

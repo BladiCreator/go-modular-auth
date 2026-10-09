@@ -63,7 +63,7 @@ func main() {
     }
 
     // Strongly typed capability retrieval
-    mfa, err := authEngine.Get[plugins.TwoFactor]()
+    mfa, err := auth.Get[plugins.TwoFactor](authEngine)
     if err != nil {
         log.Fatalf("failed to get twofactor capability: %v", err)
     }

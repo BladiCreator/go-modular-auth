@@ -23,12 +23,12 @@ func TestPostgresStoreInterface(t *testing.T) {
 	// StateSession model validation
 	now := time.Now()
 	s := &store.StateSession{
-		State:        "pg_state",
-		Provider:     "google",
-		RedirectURI:  "https://example.com/callback",
-		Action:       store.ActionSignIn,
-		ExpiresAt:    now.Add(5 * time.Minute),
-		CreatedAt:    now,
+		State:       "pg_state",
+		Provider:    "google",
+		RedirectURI: "https://example.com/callback",
+		Action:      store.ActionSignIn,
+		ExpiresAt:   now.Add(5 * time.Minute),
+		CreatedAt:   now,
 	}
 
 	if s.Expired(now) {

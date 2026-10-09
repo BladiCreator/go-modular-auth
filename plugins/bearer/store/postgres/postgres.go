@@ -199,7 +199,7 @@ func (s *Store) ListBySubject(ctx context.Context, subject string) ([]*store.Tok
 	var results []*store.TokenRecord
 	for rows.Next() {
 		var (
-			rec                   store.TokenRecord
+			rec                  store.TokenRecord
 			scopesJSON, metaJSON []byte
 		)
 		if err := rows.Scan(
@@ -222,7 +222,7 @@ func (s *Store) ListBySubject(ctx context.Context, subject string) ([]*store.Tok
 
 func (s *Store) scanRow(row *sql.Row) (*store.TokenRecord, error) {
 	var (
-		rec                   store.TokenRecord
+		rec                  store.TokenRecord
 		scopesJSON, metaJSON []byte
 	)
 	err := row.Scan(

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	emailotp "github.com/BladiCreator/go-modular-auth-email-otp"
 	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
 	"github.com/BladiCreator/go-modular-auth-email-otp/plugins"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/email"
@@ -57,7 +57,7 @@ func setupTest(t *testing.T, opts ...emailotp.Option) *testHarness {
 		t.Fatalf("failed to create auth engine: %v", err)
 	}
 
-	svc, err := a.Get[plugins.EmailOTP]()
+	svc, err := auth.Get[plugins.EmailOTP](a)
 	if err != nil {
 		t.Fatalf("failed to retrieve EmailOTP capability: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestEmailOTP_PluginRegistration(t *testing.T) {
 	}
 
 	// Verify both alias and direct package lookup resolve
-	directSvc, err := h.auth.Get[emailotp.EmailOTP]()
+	directSvc, err := auth.Get[emailotp.EmailOTP](h.auth)
 	if err != nil {
 		t.Fatalf("failed to retrieve direct EmailOTP capability: %v", err)
 	}

@@ -192,10 +192,10 @@ func (p *MyPlugin) Init(h *auth.Host) error {
 }
 ```
 
-Applications retrieve plugin capabilities in a strongly typed manner using Go generic methods:
+Applications retrieve plugin capabilities in a strongly typed manner using Go generics:
 
 ```go
-capability, err := app.Get[MyCapability]()
+capability, err := auth.Get[MyCapability](app)
 ```
 
 ---

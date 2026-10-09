@@ -2,12 +2,13 @@ package passkey
 
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // PluginID is the unique identifier for this plugin module in GoModularAuth.
 const PluginID = "passkey"
 
-// Module implements auth.PluginModule for WebAuthn passkey authentication.
+// Module implements auth.PluginModule for WebAuthn passkey authentication using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -35,10 +36,11 @@ func (m *Module) Init(h *auth.Host) error {
 		return err
 	}
 
-	svc, err := newService(h, cfg)
+	ctx := sdk.NewContext(h)
+	svc, err := newService(ctx, cfg)
 	if err != nil {
 		return err
 	}
 
-	return auth.Provide[Passkeys](h, svc)
+	return sdk.Provide[Passkeys](ctx, svc)
 }

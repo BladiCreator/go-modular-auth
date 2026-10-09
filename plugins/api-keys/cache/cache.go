@@ -15,9 +15,9 @@ import (
 
 // Default settings for caching and abuse mitigation.
 const (
-	DefaultKeyTTL            = 5 * time.Minute
-	DefaultBruteForceLimit   = 10
-	DefaultBruteForceWindow  = 1 * time.Minute
+	DefaultKeyTTL           = 5 * time.Minute
+	DefaultBruteForceLimit  = 10
+	DefaultBruteForceWindow = 1 * time.Minute
 )
 
 // Limiter coordinates cached key resolution and brute-force mitigation using the shared cache.

@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-passkeys/store"
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -132,7 +132,7 @@ type DeleteCredentialInput struct {
 }
 
 // Passkeys is the strongly typed public capability exposed by this plugin.
-// Applications consume it via auth.Get[plugins.Passkeys]() or auth.Get[passkey.Passkeys]().
+// Applications consume it via auth.Get[plugins.Passkeys](a) or auth.Get[passkey.Passkeys](a).
 type Passkeys interface {
 	// BeginRegistration generates the public key options required by navigator.credentials.create().
 	BeginRegistration(ctx context.Context, in BeginRegistrationInput) (*RegistrationOptions, error)

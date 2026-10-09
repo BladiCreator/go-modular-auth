@@ -9,16 +9,17 @@ import (
 	"fmt"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
 	"github.com/BladiCreator/go-modular-auth-oauth/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	host      *auth.Host
+	ctx       *sdk.Context
 	cfg       Config
 	store     store.Store
 	providers map[string]provider.Provider
@@ -27,9 +28,9 @@ type service struct {
 
 var _ OAuth = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		host:      h,
+		ctx:       ctx,
 		cfg:       cfg,
 		store:     cfg.Store,
 		providers: cfg.Providers,
@@ -38,15 +39,15 @@ func newService(h *auth.Host, cfg Config) *service {
 }
 
 func (s *service) now() time.Time {
-	if s.host != nil {
-		return s.host.Now()
+	if s.ctx != nil {
+		return s.ctx.Now()
 	}
 	return time.Now()
 }
 
 func (s *service) publish(ctx context.Context, name auth.EventName, subject string, payload any) {
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    name,
 			Time:    s.now(),
 			Subject: subject,
@@ -85,7 +86,7 @@ func (s *service) BeginAuth(ctx context.Context, in BeginAuthInput) (*BeginAuthR
 	}
 
 	var (
-		codeVerifier string
+		codeVerifier  string
 		codeChallenge string
 		codeMethod    string
 	)
@@ -158,7 +159,7 @@ func (s *service) BeginLink(ctx context.Context, in BeginLinkInput) (*BeginAuthR
 	}
 
 	// Verify user exists in Core
-	if _, err := s.host.Auth().RequireUser(ctx, in.UserID); err != nil {
+	if _, err := s.ctx.Core().RequireUser(ctx, in.UserID); err != nil {
 		return nil, err
 	}
 
@@ -337,14 +338,14 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 	}
 
 	// 1. Check if an account already exists for (Provider, ProviderID)
-	acc, err := s.host.Store().Accounts().GetByProvider(ctx, in.Provider, profile.ProviderID)
+	acc, err := s.ctx.Store().Accounts().GetByProvider(ctx, in.Provider, profile.ProviderID)
 	if err != nil && !errors.Is(err, corestore.ErrNotFound) {
 		return nil, fmt.Errorf("oauth: lookup account: %w", err)
 	}
 
 	if acc != nil {
 		// Existing account found: Authenticate user directly
-		u, err := s.host.Auth().GetUser(ctx, acc.UserID)
+		u, err := s.ctx.Core().GetUser(ctx, acc.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("oauth: get user: %w", err)
 		}
@@ -352,7 +353,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 			return nil, auth.ErrUserNotFound
 		}
 
-		issued, err := s.host.Auth().CreateSession(ctx, u.ID, in.Session)
+		issued, err := s.ctx.Core().CreateSession(ctx, u.ID, in.Session)
 		if err != nil {
 			return nil, fmt.Errorf("oauth: create session: %w", err)
 		}
@@ -387,7 +388,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 
 	var existingUser *user.User
 	if normalizedEmail != "" {
-		existingUser, err = s.host.Store().Users().GetByEmail(ctx, normalizedEmail)
+		existingUser, err = s.ctx.Store().Users().GetByEmail(ctx, normalizedEmail)
 		if err != nil && !errors.Is(err, corestore.ErrNotFound) {
 			return nil, fmt.Errorf("oauth: check existing user by email: %w", err)
 		}
@@ -416,7 +417,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 				newAcc *account.Account
 				issued *auth.IssuedSession
 			)
-			err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+			err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 				newAcc = &account.Account{
 					ID:         newID(),
 					UserID:     existingUser.ID,
@@ -425,11 +426,11 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 					CreatedAt:  now,
 					UpdatedAt:  now,
 				}
-				if err := s.host.Store().Accounts().Create(txCtx, newAcc); err != nil {
+				if err := s.ctx.Store().Accounts().Create(txCtx, newAcc); err != nil {
 					return err
 				}
 
-				issued, err = s.host.Auth().CreateSession(txCtx, existingUser.ID, in.Session)
+				issued, err = s.ctx.Core().CreateSession(txCtx, existingUser.ID, in.Session)
 				return err
 			})
 			if err != nil {
@@ -480,7 +481,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 		issued  *auth.IssuedSession
 	)
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		newUser = &user.User{
 			ID:            newID(),
 			Email:         normalizedEmail,
@@ -488,7 +489,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
-		if err := s.host.Store().Users().Create(txCtx, newUser); err != nil {
+		if err := s.ctx.Store().Users().Create(txCtx, newUser); err != nil {
 			return err
 		}
 
@@ -500,11 +501,11 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		if err := s.host.Store().Accounts().Create(txCtx, newAcc); err != nil {
+		if err := s.ctx.Store().Accounts().Create(txCtx, newAcc); err != nil {
 			return err
 		}
 
-		issued, err = s.host.Auth().CreateSession(txCtx, newUser.ID, in.Session)
+		issued, err = s.ctx.Core().CreateSession(txCtx, newUser.ID, in.Session)
 		return err
 	})
 	if err != nil {
@@ -579,7 +580,7 @@ func (s *service) CompleteLink(ctx context.Context, in CompleteLinkInput) (*Link
 		return nil, fmt.Errorf("%w: %q", ErrProviderNotFound, stateSess.Provider)
 	}
 
-	u, err := s.host.Auth().RequireUser(ctx, stateSess.UserID)
+	u, err := s.ctx.Core().RequireUser(ctx, stateSess.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +607,7 @@ func (s *service) CompleteLink(ctx context.Context, in CompleteLinkInput) (*Link
 	}
 
 	// Verify that this external identity is not already linked to another user
-	existingAcc, err := s.host.Store().Accounts().GetByProvider(ctx, stateSess.Provider, profile.ProviderID)
+	existingAcc, err := s.ctx.Store().Accounts().GetByProvider(ctx, stateSess.Provider, profile.ProviderID)
 	if err != nil && !errors.Is(err, corestore.ErrNotFound) {
 		return nil, fmt.Errorf("oauth: check account uniqueness: %w", err)
 	}
@@ -627,7 +628,7 @@ func (s *service) CompleteLink(ctx context.Context, in CompleteLinkInput) (*Link
 		UpdatedAt:  now,
 	}
 
-	if err := s.host.Store().Accounts().Create(ctx, newAcc); err != nil {
+	if err := s.ctx.Store().Accounts().Create(ctx, newAcc); err != nil {
 		return nil, fmt.Errorf("oauth: create linked account: %w", err)
 	}
 
@@ -651,7 +652,7 @@ func (s *service) UnlinkAccount(ctx context.Context, userID, providerName string
 		return fmt.Errorf("%w: user_id and provider are required", ErrInvalidInput)
 	}
 
-	accounts, err := s.host.Store().Accounts().ListByUser(ctx, userID)
+	accounts, err := s.ctx.Store().Accounts().ListByUser(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("oauth: list accounts: %w", err)
 	}
@@ -669,7 +670,7 @@ func (s *service) UnlinkAccount(ctx context.Context, userID, providerName string
 
 	// Safeguard: Prevent orphaning the user if this is their sole auth method
 	if !s.cfg.AllowOrphanUser {
-		creds, err := s.host.Store().Credentials().ListByUser(ctx, userID)
+		creds, err := s.ctx.Store().Credentials().ListByUser(ctx, userID)
 		if err != nil {
 			return fmt.Errorf("oauth: list credentials: %w", err)
 		}
@@ -678,7 +679,7 @@ func (s *service) UnlinkAccount(ctx context.Context, userID, providerName string
 		}
 	}
 
-	if err := s.host.Store().Accounts().Delete(ctx, target.ID); err != nil {
+	if err := s.ctx.Store().Accounts().Delete(ctx, target.ID); err != nil {
 		return fmt.Errorf("oauth: delete account: %w", err)
 	}
 
@@ -696,7 +697,7 @@ func (s *service) ListAccounts(ctx context.Context, userID string) ([]*account.A
 	if userID == "" {
 		return nil, fmt.Errorf("%w: user_id is required", ErrInvalidInput)
 	}
-	return s.host.Store().Accounts().ListByUser(ctx, userID)
+	return s.ctx.Store().Accounts().ListByUser(ctx, userID)
 }
 
 // GetProvider returns a registered provider by name.

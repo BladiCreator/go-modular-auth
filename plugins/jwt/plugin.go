@@ -2,9 +2,10 @@ package jwt
 
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
-// Module implements auth.PluginModule for GoModularAuth JWT stateless tokens.
+// Module implements auth.PluginModule for GoModularAuth JWT stateless tokens using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -27,6 +28,7 @@ func (m *Module) ID() string {
 
 // Init initializes the plugin module on the host and registers its capability.
 func (m *Module) Init(h *auth.Host) error {
-	svc := newService(h, m.cfg)
-	return auth.Provide[JWT](h, svc)
+	ctx := sdk.NewContext(h)
+	svc := newService(ctx, m.cfg)
+	return sdk.Provide[JWT](ctx, svc)
 }

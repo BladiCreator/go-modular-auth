@@ -90,7 +90,7 @@ func main() {
 	}
 
 	// Retrieve typed capability
-	pk, err := authEngine.Get[plugins.Passkeys]()
+	pk, err := auth.Get[plugins.Passkeys](authEngine)
 	if err != nil {
 		log.Fatalf("failed to retrieve passkey capability: %v", err)
 	}

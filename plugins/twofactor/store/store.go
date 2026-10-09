@@ -16,17 +16,17 @@ var (
 
 // FactorRecord is the persistent model for an MFA factor.
 type FactorRecord struct {
-	ID                string     `json:"id"`
-	UserID            string     `json:"user_id"`
-	Type              string     `json:"type"`
-	Label             string     `json:"label,omitempty"`
-	EncryptedSecret   string     `json:"encrypted_secret"`
-	Confirmed         bool       `json:"confirmed"`
-	ConfirmedAt       *time.Time `json:"confirmed_at,omitempty"`
-	LastUsedAt        *time.Time `json:"last_used_at,omitempty"`
-	LastUsedTimeStep  int64      `json:"last_used_time_step"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID               string     `json:"id"`
+	UserID           string     `json:"user_id"`
+	Type             string     `json:"type"`
+	Label            string     `json:"label,omitempty"`
+	EncryptedSecret  string     `json:"encrypted_secret"`
+	Confirmed        bool       `json:"confirmed"`
+	ConfirmedAt      *time.Time `json:"confirmed_at,omitempty"`
+	LastUsedAt       *time.Time `json:"last_used_at,omitempty"`
+	LastUsedTimeStep int64      `json:"last_used_time_step"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // RecoveryCodeRecord is the persistent model for a hashed backup recovery code.

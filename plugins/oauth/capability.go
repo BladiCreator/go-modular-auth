@@ -10,9 +10,9 @@ import (
 // OAuth is the strongly typed capability provided by the OAuth plugin.
 // Applications and transport adapters retrieve this capability via:
 //
-//	oauthAuth, err := auth.Get[plugins.OAuth]()
+//	oauthAuth, err := auth.Get[plugins.OAuth](engine)
 //	// or
-//	oauthAuth := auth.MustGet[plugins.OAuth]()
+//	oauthAuth := auth.MustGet[plugins.OAuth](engine)
 type OAuth interface {
 	// BeginAuth initiates an OAuth authorization code flow for sign-in or account registration.
 	// It validates the redirect URI, generates state and PKCE verifier, persists state, and returns the authorization URL.

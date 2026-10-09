@@ -72,8 +72,8 @@ var (
 
 // CeremonyError provides rich contextual error details around WebAuthn failures.
 type CeremonyError struct {
-	Op       string
-	Reason   string
+	Op         string
+	Reason     string
 	Underlying error
 }
 

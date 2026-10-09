@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth-username"
+	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func TestPluginModuleRegistration(t *testing.T) {
@@ -26,18 +26,18 @@ func TestPluginModuleRegistration(t *testing.T) {
 	}
 
 	// Verify typed lookup via username.Capability
-	cap, err := a.Get[username.Capability]()
+	cap, err := auth.Get[username.Capability](a)
 	if err != nil {
-		t.Fatalf("a.Get[username.Capability]() failed: %v", err)
+		t.Fatalf("auth.Get[username.Capability](a) failed: %v", err)
 	}
 	if cap == nil {
 		t.Fatal("expected non-nil capability")
 	}
 
 	// Verify typed lookup via username.Username alias
-	uCap, err := a.Get[username.Username]()
+	uCap, err := auth.Get[username.Username](a)
 	if err != nil {
-		t.Fatalf("a.Get[username.Username]() failed: %v", err)
+		t.Fatalf("auth.Get[username.Username](a) failed: %v", err)
 	}
 	if uCap == nil {
 		t.Fatal("expected non-nil capability via alias")
@@ -59,7 +59,7 @@ func TestCaseSensitiveConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cap, err := a.Get[username.Capability]()
+	cap, err := auth.Get[username.Capability](a)
 	if err != nil {
 		t.Fatal(err)
 	}

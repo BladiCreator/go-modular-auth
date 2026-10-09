@@ -3,10 +3,10 @@ package oauth
 import (
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
 	"github.com/BladiCreator/go-modular-auth-oauth/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
 )

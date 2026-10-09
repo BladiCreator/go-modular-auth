@@ -4,9 +4,10 @@ import (
 	"context"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
-// Module implements auth.PluginModule for GoModularAuth.
+// Module implements auth.PluginModule for GoModularAuth using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -29,11 +30,12 @@ func (m *Module) ID() string {
 
 // Init initializes the plugin module on the host and registers its capability.
 func (m *Module) Init(h *auth.Host) error {
-	svc := newService(h, m.cfg)
+	ctx := sdk.NewContext(h)
+	svc := newService(ctx, m.cfg)
 
 	// Intercept core sign-in attempts:
 	// Prevent signing in directly with synthetic anonymous placeholder emails.
-	h.Hooks().BeforeSignIn(func(ctx context.Context, in *auth.SignInInput) error {
+	ctx.Hooks().BeforeSignIn(func(hCtx context.Context, in *auth.SignInInput) error {
 		if in.Email != "" && m.cfg.EmailDomain != "" {
 			if len(in.Email) > len(m.cfg.EmailDomain) && in.Email[len(in.Email)-len(m.cfg.EmailDomain):] == m.cfg.EmailDomain {
 				return auth.ErrInvalidCredentials
@@ -42,5 +44,5 @@ func (m *Module) Init(h *auth.Host) error {
 		return nil
 	})
 
-	return auth.Provide[Anonymous](h, svc)
+	return sdk.Provide[Anonymous](ctx, svc)
 }

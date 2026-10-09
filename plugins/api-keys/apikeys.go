@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 )
 
 // APIKey represents the persistent, non-secret state of an issued API key.

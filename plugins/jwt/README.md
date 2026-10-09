@@ -87,7 +87,7 @@ func main() {
 	}
 
 	// Retrieve the strongly typed JWT capability
-	jwtService, err := app.Get[plugins.JWT]()
+	jwtService, err := auth.Get[plugins.JWT](app)
 	if err != nil {
 		log.Fatal(err)
 	}

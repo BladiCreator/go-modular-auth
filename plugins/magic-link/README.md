@@ -70,7 +70,7 @@ func main() {
     }
 
     // Retrieve capability
-    ml, err := a.Get[magiclink.MagicLink]()
+    ml, err := auth.Get[magiclink.MagicLink](a)
     if err != nil {
         log.Fatalf("magiclink plugin not installed: %v", err)
     }

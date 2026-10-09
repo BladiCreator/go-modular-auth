@@ -48,15 +48,15 @@ func TestDefaultValidator(t *testing.T) {
 		{"a_b", nil},
 		{"al", username.ErrTooShort},
 		{"very_long_username_exceeding_limit", username.ErrTooLong},
-		{"-alice", username.ErrInvalidFormat}, // leading hyphen
-		{"alice-", username.ErrInvalidFormat}, // trailing hyphen
-		{"_alice", username.ErrInvalidFormat}, // leading underscore
-		{"alice_", username.ErrInvalidFormat}, // trailing underscore
+		{"-alice", username.ErrInvalidFormat},     // leading hyphen
+		{"alice-", username.ErrInvalidFormat},     // trailing hyphen
+		{"_alice", username.ErrInvalidFormat},     // leading underscore
+		{"alice_", username.ErrInvalidFormat},     // trailing underscore
 		{"alice--doe", username.ErrInvalidFormat}, // consecutive hyphens
 		{"alice__doe", username.ErrInvalidFormat}, // consecutive underscores
 		{"alice@doe", username.ErrInvalidFormat},  // invalid character
-		{"admin", username.ErrReserved},       // reserved name
-		{"ADMIN", username.ErrReserved},       // reserved name case-insensitive
+		{"admin", username.ErrReserved},           // reserved name
+		{"ADMIN", username.ErrReserved},           // reserved name case-insensitive
 		{"root", username.ErrReserved},
 		{"api", username.ErrReserved},
 	}

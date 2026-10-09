@@ -87,7 +87,7 @@ func (m *Module) Init(h *auth.Host) error {
 Applications consume plugin capabilities in a type-safe manner without type casts:
 
 ```go
-orgs, err := app.Get[organization.Capability]()
+orgs, err := auth.Get[organization.Capability](app)
 if err != nil {
     log.Fatalf("organization plugin not installed: %v", err)
 }
@@ -95,9 +95,9 @@ if err != nil {
 org, err := orgs.CreateOrganization(ctx, "Acme Corp", currentUserID)
 ```
 
-If a capability is mandatory during initialization, `app.MustGet[T]()` panics if missing:
+If a capability is mandatory during initialization, `auth.MustGet[T]()` panics if missing:
 ```go
-orgs := app.MustGet[organization.Capability]()
+orgs := auth.MustGet[organization.Capability](app)
 ```
 
 ---

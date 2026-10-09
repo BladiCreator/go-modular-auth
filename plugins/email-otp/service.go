@@ -4,17 +4,18 @@ import (
 	"context"
 	"errors"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
 	otpstore "github.com/BladiCreator/go-modular-auth-email-otp/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/email"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	host    *auth.Host
+	ctx     *sdk.Context
 	cfg     Config
 	store   otpstore.Store
 	sender  email.Sender
@@ -24,13 +25,13 @@ type service struct {
 
 var _ EmailOTP = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config, sender email.Sender) *service {
+func newService(ctx *sdk.Context, cfg Config, sender email.Sender) *service {
 	return &service{
-		host:    h,
+		ctx:     ctx,
 		cfg:     cfg,
 		store:   cfg.Store,
 		sender:  sender,
-		limiter: cache.NewLimiter(h.Cache(), cfg.RateLimit.FailurePolicy, h.Now),
+		limiter: cache.NewLimiter(ctx.Cache(), cfg.RateLimit.FailurePolicy, ctx.Now),
 		hooks:   cfg.Hooks,
 	}
 }
@@ -71,7 +72,7 @@ func (s *service) Request(ctx context.Context, in RequestInput) error {
 		}
 	}
 
-	u, err := s.host.Store().Users().GetByEmail(ctx, normEmail)
+	u, err := s.ctx.Store().Users().GetByEmail(ctx, normEmail)
 	if errors.Is(err, store.ErrNotFound) {
 		if !s.cfg.AllowSignUp {
 			// PREVENT USER ENUMERATION:
@@ -109,7 +110,7 @@ func (s *service) dispatchOTP(ctx context.Context, emailAddress, subject string)
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec := &otpstore.Record{
 		ID:          id,
 		Email:       emailAddress,
@@ -132,7 +133,7 @@ func (s *service) dispatchOTP(ctx context.Context, emailAddress, subject string)
 		return err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventOTPRequested,
 		Time:    now,
 		Subject: subject,
@@ -165,7 +166,7 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec, err := s.store.GetActiveByEmail(ctx, normEmail, now)
 	if errors.Is(err, otpstore.ErrNotFound) {
 		s.publishRejected(ctx, normEmail, "not_found", 0)
@@ -226,10 +227,10 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 	if !u.EmailVerified {
 		u.EmailVerified = true
 		u.UpdatedAt = now
-		_ = s.host.Store().Users().Update(ctx, u)
+		_ = s.ctx.Store().Users().Update(ctx, u)
 	}
 
-	issued, err := s.host.Auth().CreateSession(ctx, u.ID, in.Session)
+	issued, err := s.ctx.Core().CreateSession(ctx, u.ID, in.Session)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +241,7 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 		Token:   issued.Token,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventOTPVerified,
 		Time:    now,
 		Subject: u.ID,
@@ -256,21 +257,21 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 }
 
 func (s *service) publishRejected(ctx context.Context, email, reason string, attempts int) {
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventOTPRejected,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: email,
 		Payload: OTPRejectedPayload{
 			Email:    email,
 			Reason:   reason,
 			Attempts: attempts,
-			Time:     s.host.Now(),
+			Time:     s.ctx.Now(),
 		},
 	})
 }
 
 func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, error) {
-	u, err := s.host.Store().Users().GetByID(ctx, subject)
+	u, err := s.ctx.Store().Users().GetByID(ctx, subject)
 	if err == nil {
 		return u, nil
 	}
@@ -278,7 +279,7 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 		return nil, err
 	}
 
-	u, err = s.host.Store().Users().GetByEmail(ctx, subject)
+	u, err = s.ctx.Store().Users().GetByEmail(ctx, subject)
 	if err == nil {
 		return u, nil
 	}
@@ -291,8 +292,8 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 	}
 
 	var newUser *user.User
-	now := s.host.Now()
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	now := s.ctx.Now()
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		uID, err := GenerateID()
 		if err != nil {
 			return err
@@ -304,7 +305,7 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
-		if err := s.host.Store().Users().Create(txCtx, newUser); err != nil {
+		if err := s.ctx.Store().Users().Create(txCtx, newUser); err != nil {
 			return err
 		}
 
@@ -320,13 +321,13 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		return s.host.Store().Accounts().Create(txCtx, acc)
+		return s.ctx.Store().Accounts().Create(txCtx, acc)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    auth.EventUserCreated,
 		Time:    now,
 		Subject: newUser.ID,

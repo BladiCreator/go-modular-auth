@@ -65,7 +65,7 @@ func TestTypedPluginAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := a.Get[Greeter]()
+	g, err := auth.Get[Greeter](a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestTypedPluginAccess(t *testing.T) {
 		t.Fatalf("got %q", msg)
 	}
 	type missing interface{ X() }
-	if _, err := a.Get[missing](); !errors.Is(err, plugin.ErrNotFound) {
+	if _, err := auth.Get[missing](a); !errors.Is(err, plugin.ErrNotFound) {
 		t.Fatalf("want plugin.ErrNotFound, got %v", err)
 	}
 }

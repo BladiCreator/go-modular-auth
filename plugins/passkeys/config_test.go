@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
 	auth "github.com/BladiCreator/go-modular-auth"
+	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
 	"github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/go-webauthn/webauthn/protocol"
 )

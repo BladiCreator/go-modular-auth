@@ -66,7 +66,7 @@ func (h *Host) Now() time.Time { return h.a.Now() }
 
 // Provide registers impl as the capability T exposed by the module. T is
 // usually an interface exported by the plugin; applications retrieve it with
-// a.Get[T]().
+// auth.Get[T](a).
 func Provide[T any](h *Host, impl T) error {
 	return plugin.Provide(h.a.registry, h.module, impl)
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth-multisession/store"
+	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 
 // KeyMetadata returns the namespaced cache key for session metadata.

@@ -6,14 +6,15 @@ import (
 	"log/slog"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-bearer/cache"
 	"github.com/BladiCreator/go-modular-auth-bearer/store"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // service implements the Bearer capability interface.
 type service struct {
-	host   *auth.Host
+	ctx    *sdk.Context
 	cfg    Config
 	store  store.Store
 	cache  *cache.Cache
@@ -23,19 +24,19 @@ type service struct {
 var _ Bearer = (*service)(nil)
 var _ TransportAuthenticator = (*service)(nil)
 
-func newService(host *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		host:   host,
+		ctx:    ctx,
 		cfg:    cfg,
 		store:  cfg.Store,
-		cache:  cache.New(host.Cache()),
-		logger: host.Logger(),
+		cache:  cache.New(ctx.Cache()),
+		logger: ctx.Logger(),
 	}
 }
 
 func (s *service) now() time.Time {
-	if s.host != nil {
-		return s.host.Now()
+	if s.ctx != nil {
+		return s.ctx.Now()
 	}
 	return time.Now().UTC()
 }
@@ -324,8 +325,8 @@ func (s *service) PurgeExpired(ctx context.Context) (int, error) {
 }
 
 func (s *service) publishEvent(ctx context.Context, name auth.EventName, subject string, payload any) {
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    name,
 			Time:    s.now(),
 			Subject: subject,

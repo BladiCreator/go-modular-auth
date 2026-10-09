@@ -10,10 +10,11 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	jwtcache "github.com/BladiCreator/go-modular-auth-jwt/cache"
 	"github.com/BladiCreator/go-modular-auth-jwt/store"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 type service struct {
-	host  *auth.Host
+	ctx   *sdk.Context
 	cfg   Config
 	km    KeyManager
 	store store.Store
@@ -23,9 +24,9 @@ type service struct {
 
 var _ JWT = (*service)(nil)
 
-func newService(host *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	s := &service{
-		host:  host,
+		ctx:   ctx,
 		cfg:   cfg,
 		km:    cfg.KeyManager,
 		store: cfg.Store,
@@ -34,23 +35,23 @@ func newService(host *auth.Host, cfg Config) *service {
 	}
 
 	// Auto-wire store/cache from host if not explicitly configured in Config
-	if s.cache == nil && host != nil && host.Cache() != nil {
-		s.cache = jwtcache.New(host.Cache())
+	if s.cache == nil && ctx != nil && ctx.Cache() != nil {
+		s.cache = jwtcache.New(ctx.Cache())
 	}
 
 	return s
 }
 
 func (s *service) now() time.Time {
-	if s.host != nil {
-		return s.host.Now()
+	if s.ctx != nil {
+		return s.ctx.Now()
 	}
 	return time.Now()
 }
 
 func (s *service) publish(ctx context.Context, name auth.EventName, subject string, payload any) {
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    name,
 			Time:    s.now(),
 			Subject: subject,

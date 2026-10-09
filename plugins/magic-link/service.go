@@ -6,16 +6,17 @@ import (
 	"encoding/hex"
 	"errors"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-magiclink/cache"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/email"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	host    *auth.Host
+	ctx     *sdk.Context
 	cfg     Config
 	sender  email.Sender
 	limiter *cache.Limiter
@@ -24,12 +25,12 @@ type service struct {
 
 var _ MagicLink = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config, sender email.Sender) *service {
+func newService(ctx *sdk.Context, cfg Config, sender email.Sender) *service {
 	return &service{
-		host:    h,
+		ctx:     ctx,
 		cfg:     cfg,
 		sender:  sender,
-		limiter: cache.NewLimiter(h.Cache(), h.Now),
+		limiter: cache.NewLimiter(ctx.Cache(), ctx.Now),
 		hooks:   cfg.Hooks,
 	}
 }
@@ -68,7 +69,7 @@ func (s *service) Request(ctx context.Context, in RequestInput) error {
 		}
 	}
 
-	u, err := s.host.Store().Users().GetByEmail(ctx, normEmail)
+	u, err := s.ctx.Store().Users().GetByEmail(ctx, normEmail)
 	if errors.Is(err, store.ErrNotFound) {
 		if !s.cfg.AllowSignUp {
 			// AVOID USER ENUMERATION:
@@ -89,10 +90,10 @@ func (s *service) Request(ctx context.Context, in RequestInput) error {
 
 func (s *service) sendToken(ctx context.Context, emailAddress, subject string) error {
 	if s.cfg.RevokePreviousOnRequest {
-		_ = s.host.Auth().RevokeTokens(ctx, Purpose, subject)
+		_ = s.ctx.Core().RevokeTokens(ctx, Purpose, subject)
 	}
 
-	rawToken, err := s.host.Auth().IssueToken(ctx, Purpose, subject, s.cfg.TTL)
+	rawToken, err := s.ctx.Core().IssueToken(ctx, Purpose, subject, s.cfg.TTL)
 	if err != nil {
 		return err
 	}
@@ -103,8 +104,8 @@ func (s *service) sendToken(ctx context.Context, emailAddress, subject string) e
 		return err
 	}
 
-	now := s.host.Now()
-	s.host.Events().Publish(ctx, auth.Event{
+	now := s.ctx.Now()
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventMagicLinkRequested,
 		Time:    now,
 		Subject: subject,
@@ -129,7 +130,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 	}
 
 	// Core ConsumeToken performs atomic verification and single-use consumption.
-	tok, err := s.host.Auth().ConsumeToken(ctx, Purpose, in.Token)
+	tok, err := s.ctx.Core().ConsumeToken(ctx, Purpose, in.Token)
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
@@ -143,12 +144,12 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 	// Ensure email is marked verified since possession of the email account was proven.
 	if !u.EmailVerified {
 		u.EmailVerified = true
-		u.UpdatedAt = s.host.Now()
-		_ = s.host.Store().Users().Update(ctx, u)
+		u.UpdatedAt = s.ctx.Now()
+		_ = s.ctx.Store().Users().Update(ctx, u)
 	}
 
 	// Establish session through Core
-	issued, err := s.host.Auth().CreateSession(ctx, u.ID, in.Session)
+	issued, err := s.ctx.Core().CreateSession(ctx, u.ID, in.Session)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +160,15 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 		Token:   issued.Token,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventMagicLinkConsumed,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: u.ID,
 		Payload: MagicLinkConsumedPayload{
 			UserID:     u.ID,
 			Email:      u.Email,
 			SessionID:  issued.Session.ID,
-			ConsumedAt: s.host.Now(),
+			ConsumedAt: s.ctx.Now(),
 		},
 	})
 
@@ -176,7 +177,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 
 func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, error) {
 	// First check by ID
-	u, err := s.host.Store().Users().GetByID(ctx, subject)
+	u, err := s.ctx.Store().Users().GetByID(ctx, subject)
 	if err == nil {
 		return u, nil
 	}
@@ -185,7 +186,7 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 	}
 
 	// Subject was an email (signup flow)
-	u, err = s.host.Store().Users().GetByEmail(ctx, subject)
+	u, err = s.ctx.Store().Users().GetByEmail(ctx, subject)
 	if err == nil {
 		return u, nil
 	}
@@ -200,8 +201,8 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 
 	// Create user atomically
 	var newUser *user.User
-	now := s.host.Now()
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	now := s.ctx.Now()
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		uID := newID()
 		newUser = &user.User{
 			ID:            uID,
@@ -210,7 +211,7 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
-		if err := s.host.Store().Users().Create(txCtx, newUser); err != nil {
+		if err := s.ctx.Store().Users().Create(txCtx, newUser); err != nil {
 			return err
 		}
 
@@ -222,13 +223,13 @@ func (s *service) resolveUser(ctx context.Context, subject string) (*user.User, 
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		return s.host.Store().Accounts().Create(txCtx, acc)
+		return s.ctx.Store().Accounts().Create(txCtx, acc)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    auth.EventUserCreated,
 		Time:    now,
 		Subject: newUser.ID,
@@ -246,11 +247,11 @@ func (s *service) Revoke(ctx context.Context, email string) error {
 	}
 
 	// Revoke tokens issued with email as subject
-	_ = s.host.Auth().RevokeTokens(ctx, Purpose, normEmail)
+	_ = s.ctx.Core().RevokeTokens(ctx, Purpose, normEmail)
 
 	// If a user exists with this email, also revoke tokens issued with User ID
-	if u, err := s.host.Store().Users().GetByEmail(ctx, normEmail); err == nil {
-		_ = s.host.Auth().RevokeTokens(ctx, Purpose, u.ID)
+	if u, err := s.ctx.Store().Users().GetByEmail(ctx, normEmail); err == nil {
+		_ = s.ctx.Core().RevokeTokens(ctx, Purpose, u.ID)
 	}
 
 	return nil

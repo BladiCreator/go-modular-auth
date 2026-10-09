@@ -10,17 +10,18 @@ import (
 	"strings"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-anonymous/cache"
 	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/credential"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	host  *auth.Host
+	ctx   *sdk.Context
 	cfg   Config
 	store store.Store
 	cache *cache.Cache
@@ -29,12 +30,12 @@ type service struct {
 
 var _ Anonymous = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		host:  h,
+		ctx:   ctx,
 		cfg:   cfg,
 		store: cfg.Store,
-		cache: cache.New(h.Cache()),
+		cache: cache.New(ctx.Cache()),
 		hooks: cfg.Hooks,
 	}
 }
@@ -46,7 +47,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	anonID, err := generateID()
 	if err != nil {
 		return nil, err
@@ -91,11 +92,11 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 
 	var issuedSession *auth.IssuedSession
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
-		if err := s.host.Store().Users().Create(txCtx, u); err != nil {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
+		if err := s.ctx.Store().Users().Create(txCtx, u); err != nil {
 			return fmt.Errorf("anonymous: create core user: %w", err)
 		}
-		if err := s.host.Store().Accounts().Create(txCtx, acc); err != nil {
+		if err := s.ctx.Store().Accounts().Create(txCtx, acc); err != nil {
 			return fmt.Errorf("anonymous: create core account: %w", err)
 		}
 		if err := s.store.Create(txCtx, ident); err != nil {
@@ -103,7 +104,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		}
 
 		var sessionErr error
-		issuedSession, sessionErr = s.host.Auth().CreateSession(txCtx, userID, in.Session)
+		issuedSession, sessionErr = s.ctx.Core().CreateSession(txCtx, userID, in.Session)
 		if sessionErr != nil {
 			return fmt.Errorf("anonymous: create session: %w", sessionErr)
 		}
@@ -122,7 +123,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		Identity: ident,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAnonymousCreated,
 		Time:    now,
 		Subject: userID,
@@ -171,7 +172,7 @@ func (s *service) IsAnonymous(ctx context.Context, userID string) (bool, error) 
 		return false, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	return ident.IsActive(now), nil
 }
 
@@ -196,7 +197,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 
 	userID := in.AnonymousUserID
 	if in.AnonymousToken != "" {
-		res, err := s.host.Auth().GetSession(ctx, in.AnonymousToken)
+		res, err := s.ctx.Core().GetSession(ctx, in.AnonymousToken)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +224,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 	}
 
 	// Verify email is not already claimed by an existing user
-	existingUser, err := s.host.Store().Users().GetByEmail(ctx, normEmail)
+	existingUser, err := s.ctx.Store().Users().GetByEmail(ctx, normEmail)
 	if err != nil && !errors.Is(err, corestore.ErrNotFound) {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 	if err != nil {
 		return nil, err
 	}
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if ident.Converted() {
 		return nil, ErrAlreadyConverted
 	}
@@ -260,14 +261,14 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 
 	var updatedUser *user.User
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
-		u, err := s.host.Store().Users().GetByID(txCtx, userID)
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
+		u, err := s.ctx.Store().Users().GetByID(txCtx, userID)
 		if err != nil {
 			return err
 		}
 		u.Email = normEmail
 		u.UpdatedAt = now
-		if err := s.host.Store().Users().Update(txCtx, u); err != nil {
+		if err := s.ctx.Store().Users().Update(txCtx, u); err != nil {
 			if errors.Is(err, corestore.ErrConflict) {
 				return ErrUserAlreadyExists
 			}
@@ -284,7 +285,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		if err := s.host.Store().Accounts().Create(txCtx, pwdAcc); err != nil && !errors.Is(err, corestore.ErrConflict) {
+		if err := s.ctx.Store().Accounts().Create(txCtx, pwdAcc); err != nil && !errors.Is(err, corestore.ErrConflict) {
 			return err
 		}
 
@@ -298,7 +299,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
-		if err := s.host.Store().Credentials().Create(txCtx, pwdCred); err != nil {
+		if err := s.ctx.Store().Credentials().Create(txCtx, pwdCred); err != nil {
 			return err
 		}
 
@@ -321,7 +322,7 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 		Identity: ident,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAnonymousConverted,
 		Time:    now,
 		Subject: userID,
@@ -348,7 +349,7 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 
 	userID := in.AnonymousUserID
 	if in.AnonymousToken != "" {
-		res, err := s.host.Auth().GetSession(ctx, in.AnonymousToken)
+		res, err := s.ctx.Core().GetSession(ctx, in.AnonymousToken)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +370,7 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 	if err != nil {
 		return nil, err
 	}
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if ident.Converted() {
 		return nil, ErrAlreadyConverted
 	}
@@ -384,8 +385,8 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 
 	var updatedUser *user.User
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
-		u, err := s.host.Store().Users().GetByID(txCtx, userID)
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
+		u, err := s.ctx.Store().Users().GetByID(txCtx, userID)
 		if err != nil {
 			return err
 		}
@@ -397,7 +398,7 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 			}
 			u.Email = normEmail
 			u.UpdatedAt = now
-			if err := s.host.Store().Users().Update(txCtx, u); err != nil {
+			if err := s.ctx.Store().Users().Update(txCtx, u); err != nil {
 				if errors.Is(err, corestore.ErrConflict) {
 					return ErrUserAlreadyExists
 				}
@@ -414,7 +415,7 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		if err := s.host.Store().Accounts().Create(txCtx, acc); err != nil {
+		if err := s.ctx.Store().Accounts().Create(txCtx, acc); err != nil {
 			return err
 		}
 
@@ -436,7 +437,7 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 		Identity: ident,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAnonymousConverted,
 		Time:    now,
 		Subject: userID,
@@ -460,7 +461,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 
 	anonUserID := in.AnonymousUserID
 	if in.AnonymousToken != "" {
-		sessRes, err := s.host.Auth().GetSession(ctx, in.AnonymousToken)
+		sessRes, err := s.ctx.Core().GetSession(ctx, in.AnonymousToken)
 		if err != nil {
 			return nil, err
 		}
@@ -481,7 +482,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if ident.Converted() {
 		return nil, ErrAlreadyConverted
 	}
@@ -493,7 +494,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 	var permUser *user.User
 
 	if in.PermanentToken != "" {
-		sessRes, err := s.host.Auth().GetSession(ctx, in.PermanentToken)
+		sessRes, err := s.ctx.Core().GetSession(ctx, in.PermanentToken)
 		if err != nil {
 			return nil, err
 		}
@@ -506,7 +507,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 		if err != nil {
 			return nil, ErrInvalidCredentials
 		}
-		u, err := s.host.Store().Users().GetByEmail(ctx, normEmail)
+		u, err := s.ctx.Store().Users().GetByEmail(ctx, normEmail)
 		if err != nil {
 			if errors.Is(err, corestore.ErrNotFound) {
 				return nil, ErrInvalidCredentials
@@ -514,11 +515,11 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 			return nil, err
 		}
 
-		acc, err := s.host.Store().Accounts().GetByProvider(ctx, account.ProviderPassword, u.ID)
+		acc, err := s.ctx.Store().Accounts().GetByProvider(ctx, account.ProviderPassword, u.ID)
 		if err != nil {
 			return nil, ErrInvalidCredentials
 		}
-		cred, err := s.host.Store().Credentials().GetActiveByAccount(ctx, acc.ID, credential.TypePassword)
+		cred, err := s.ctx.Store().Credentials().GetActiveByAccount(ctx, acc.ID, credential.TypePassword)
 		if err != nil {
 			return nil, ErrInvalidCredentials
 		}
@@ -543,7 +544,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 		return nil, ErrTargetIsAnonymous
 	}
 
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		ident.ConvertedAt = &now
 		ident.LinkedUserID = permUser.ID
 		ident.UpdatedAt = now
@@ -552,7 +553,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 		}
 
 		if in.RevokeAnonymousSessions {
-			_ = s.host.Auth().RevokeUserSessions(txCtx, anonUserID, "")
+			_ = s.ctx.Core().RevokeUserSessions(txCtx, anonUserID, "")
 		}
 		return nil
 	})
@@ -568,7 +569,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 		Identity:        ident,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAnonymousLinked,
 		Time:    now,
 		Subject: anonUserID,
@@ -587,7 +588,7 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 // Cleanup deletes expired and unconverted anonymous identities and their associated core users and sessions.
 func (s *service) Cleanup(ctx context.Context, before time.Time) (CleanupResult, error) {
 	if before.IsZero() {
-		before = s.host.Now()
+		before = s.ctx.Now()
 	}
 
 	hookIn := CleanupInput{BeforeThreshold: before.Format(time.RFC3339)}
@@ -604,20 +605,20 @@ func (s *service) Cleanup(ctx context.Context, before time.Time) (CleanupResult,
 	var result CleanupResult
 
 	for _, ident := range expiredList {
-		err := s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+		err := s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 			// Revoke sessions
-			if err := s.host.Auth().RevokeUserSessions(txCtx, ident.UserID, ""); err == nil {
+			if err := s.ctx.Core().RevokeUserSessions(txCtx, ident.UserID, ""); err == nil {
 				result.SessionsRevoked++
 			}
 
 			// Delete core accounts linked to this anonymous identity
-			accounts, _ := s.host.Store().Accounts().ListByUser(txCtx, ident.UserID)
+			accounts, _ := s.ctx.Store().Accounts().ListByUser(txCtx, ident.UserID)
 			for _, acc := range accounts {
-				_ = s.host.Store().Accounts().Delete(txCtx, acc.ID)
+				_ = s.ctx.Store().Accounts().Delete(txCtx, acc.ID)
 			}
 
 			// Delete core user
-			if err := s.host.Store().Users().Delete(txCtx, ident.UserID); err == nil {
+			if err := s.ctx.Store().Users().Delete(txCtx, ident.UserID); err == nil {
 				result.UsersDeleted++
 			}
 
@@ -629,21 +630,21 @@ func (s *service) Cleanup(ctx context.Context, before time.Time) (CleanupResult,
 			return nil
 		})
 		if err != nil {
-			s.host.Logger().ErrorContext(ctx, "anonymous: cleanup record failed", "identity_id", ident.ID, "error", err)
+			s.ctx.Logger().ErrorContext(ctx, "anonymous: cleanup record failed", "identity_id", ident.ID, "error", err)
 			continue
 		}
 		_ = s.cache.DeleteIdentity(ctx, ident.UserID)
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAnonymousCleanedUp,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: "system",
 		Payload: CleanedUpPayload{
 			IdentitiesDeleted: result.IdentitiesDeleted,
 			UsersDeleted:      result.UsersDeleted,
 			SessionsRevoked:   result.SessionsRevoked,
-			CleanedAt:         s.host.Now(),
+			CleanedAt:         s.ctx.Now(),
 		},
 	})
 

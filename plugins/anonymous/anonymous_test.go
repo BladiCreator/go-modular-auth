@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-anonymous"
 	"github.com/BladiCreator/go-modular-auth-anonymous/plugins"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -43,7 +43,7 @@ func setupHarness(t *testing.T, opts ...anonymous.Option) *testHarness {
 		h.events = append(h.events, e)
 	})
 
-	anonCap, err := engine.Get[plugins.Anonymous]()
+	anonCap, err := auth.Get[plugins.Anonymous](engine)
 	if err != nil {
 		t.Fatalf("failed to retrieve Anonymous capability: %v", err)
 	}
@@ -278,9 +278,9 @@ func TestAnonymous_LinkToPermanent(t *testing.T) {
 
 	// 5. Successful link using password credentials
 	linkRes, err := h.anon.Link(ctx, anonymous.LinkInput{
-		AnonymousUserID:          anonUserID,
-		PermanentEmail:           "permanent@example.com",
-		PermanentPassword:        "PermanentPassword123!",
+		AnonymousUserID:         anonUserID,
+		PermanentEmail:          "permanent@example.com",
+		PermanentPassword:       "PermanentPassword123!",
 		RevokeAnonymousSessions: true,
 	})
 	if err != nil {

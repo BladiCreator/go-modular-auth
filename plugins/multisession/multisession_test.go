@@ -8,13 +8,13 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-multisession"
+	"github.com/BladiCreator/go-modular-auth-multisession/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/session"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
-	"github.com/BladiCreator/go-modular-auth-multisession"
-	"github.com/BladiCreator/go-modular-auth-multisession/plugins"
 )
 
 type testRig struct {
@@ -39,7 +39,7 @@ func setupTestRig(t *testing.T, opts ...multisession.Option) *testRig {
 		t.Fatalf("failed to create auth engine: %v", err)
 	}
 
-	cap, err := app.Get[multisession.MultiSession]()
+	cap, err := auth.Get[multisession.MultiSession](app)
 	if err != nil {
 		t.Fatalf("failed to get MultiSession capability: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestMultiSession_PluginRegistrationAndCapabilityLookup(t *testing.T) {
 	rig := setupTestRig(t)
 
 	// Test lookup via multisession.MultiSession
-	cap1, err := rig.auth.Get[multisession.MultiSession]()
+	cap1, err := auth.Get[multisession.MultiSession](rig.auth)
 	if err != nil {
 		t.Fatalf("Get[multisession.MultiSession] failed: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestMultiSession_PluginRegistrationAndCapabilityLookup(t *testing.T) {
 	}
 
 	// Test lookup via plugins.MultiSession alias
-	cap2, err := rig.auth.Get[plugins.MultiSession]()
+	cap2, err := auth.Get[plugins.MultiSession](rig.auth)
 	if err != nil {
 		t.Fatalf("Get[plugins.MultiSession] failed: %v", err)
 	}
@@ -535,12 +535,12 @@ func TestMultiSession_ConcurrentRevocationSafety(t *testing.T) {
 
 func TestMultiSession_UserAgentParser(t *testing.T) {
 	tests := []struct {
-		name     string
-		ua       string
-		ip       string
-		wantOS   string
-		wantDev  string
-		wantBrw  string
+		name    string
+		ua      string
+		ip      string
+		wantOS  string
+		wantDev string
+		wantBrw string
 	}{
 		{
 			name:    "macOS Chrome",

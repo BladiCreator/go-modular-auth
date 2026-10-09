@@ -7,9 +7,9 @@ import (
 // Bearer is the strongly typed capability provided by the bearer plugin.
 // Applications and transport adapters retrieve this capability via:
 //
-//	bearerAuth, err := auth.Get[plugins.Bearer]()
+//	bearerAuth, err := auth.Get[plugins.Bearer](app)
 //	// or
-//	bearerAuth := auth.MustGet[plugins.Bearer]()
+//	bearerAuth := auth.MustGet[plugins.Bearer](app)
 type Bearer interface {
 	// Authenticate validates bearer credentials against persistence (and optional cache),
 	// checks expiration, revocation, and scope permissions, and resolves the credentials into a Principal.

@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-apikeys/cache"
 	"github.com/BladiCreator/go-modular-auth-apikeys/store"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 type service struct {
-	host    *auth.Host
+	ctx     *sdk.Context
 	store   store.Store
 	limiter *cache.Limiter
 	cfg     Config
@@ -24,16 +25,16 @@ type service struct {
 
 var _ APIKeys = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
+func newService(ctx *sdk.Context, cfg Config) *service {
 	limiter := cache.NewLimiter(
-		h.Cache(),
+		ctx.Cache(),
 		cfg.MaxFailedAttempts,
 		cfg.BruteForceWindow,
 		cfg.CacheTTL,
 	)
 
 	return &service{
-		host:    h,
+		ctx:     ctx,
 		store:   cfg.Store,
 		limiter: limiter,
 		cfg:     cfg,
@@ -65,7 +66,7 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, er
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 
 	var expiresAt *time.Time
 	if in.ExpiresAt != nil {
@@ -101,7 +102,7 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, er
 		return nil, fmt.Errorf("apikeys: failed to persist API key: %w", err)
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAPIKeyCreated,
 		Time:    now,
 		Subject: key.ID,
@@ -164,7 +165,7 @@ func (s *service) Revoke(ctx context.Context, id string) error {
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if !key.IsRevoked() {
 		if err := s.store.Revoke(ctx, id, now); err != nil {
 			return err
@@ -176,7 +177,7 @@ func (s *service) Revoke(ctx context.Context, id string) error {
 	// Immediate cache invalidation
 	_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAPIKeyRevoked,
 		Time:    now,
 		Subject: key.ID,
@@ -212,7 +213,7 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if oldKey.IsRevoked() {
 		return nil, ErrKeyRevoked
 	}
@@ -307,7 +308,7 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		OldKey: oldKey,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAPIKeyRotated,
 		Time:    now,
 		Subject: newKey.ID,
@@ -348,7 +349,7 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 	}
 
 	keyHash := HashKey(rawKey)
-	now := s.host.Now()
+	now := s.ctx.Now()
 
 	// 2. Cache lookup
 	key, err := s.limiter.GetKey(ctx, keyHash)
@@ -425,7 +426,7 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 		Key:       key,
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAPIKeyAuthenticated,
 		Time:    now,
 		Subject: key.ID,
@@ -467,9 +468,9 @@ func (s *service) Delete(ctx context.Context, id string) error {
 
 	_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventAPIKeyDeleted,
-		Time:    s.host.Now(),
+		Time:    s.ctx.Now(),
 		Subject: key.ID,
 		Payload: DeletedPayload{
 			ID:             key.ID,
@@ -484,5 +485,5 @@ func (s *service) Delete(ctx context.Context, id string) error {
 }
 
 func (s *service) PurgeExpired(ctx context.Context) (int, error) {
-	return s.store.DeleteExpired(ctx, s.host.Now())
+	return s.store.DeleteExpired(ctx, s.ctx.Now())
 }

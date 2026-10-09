@@ -2,12 +2,13 @@ package phone
 
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // PluginID is the unique identifier for this plugin module in GoModularAuth.
 const PluginID = "phone"
 
-// Module implements auth.PluginModule for Phone identity and OTP authentication.
+// Module implements auth.PluginModule for Phone identity and OTP authentication using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -34,7 +35,8 @@ func (m *Module) Init(h *auth.Host) error {
 		return ErrProviderRequired
 	}
 
-	svc := newService(h, m.cfg)
+	ctx := sdk.NewContext(h)
+	svc := newService(ctx, m.cfg)
 
-	return auth.Provide[Phone](h, svc)
+	return sdk.Provide[Phone](ctx, svc)
 }

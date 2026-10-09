@@ -40,7 +40,7 @@ Provides enterprise-grade authentication via external identity providers (Google
 
 The plugin integrates strictly with GoModularAuth's capability architecture:
 ```go
-oauthCapability, err := auth.Get[plugins.OAuth]()
+oauthCapability, err := auth.Get[plugins.OAuth](engine)
 ```
 
 ---
@@ -108,7 +108,7 @@ func main() {
 	}
 
 	// 4. Retrieve Strongly-Typed Capability
-	oauthAuth, err := engine.Get[plugins.OAuth]()
+	oauthAuth, err := auth.Get[plugins.OAuth](engine)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
@@ -141,9 +141,9 @@ type CleanupResult struct {
 // Anonymous is the strongly typed capability interface exposed by the anonymous plugin module.
 // Applications retrieve it using:
 //
-//	anon, err := auth.Get[plugins.Anonymous]()
+//	anon, err := auth.Get[plugins.Anonymous](engine)
 //	// or
-//	anon, err := auth.Get[anonymous.Anonymous]()
+//	anon, err := auth.Get[anonymous.Anonymous](engine)
 type Anonymous interface {
 	// Authenticate creates a new Core User, links an anonymous account, persists an anonymous identity,
 	// and issues an authenticated session.

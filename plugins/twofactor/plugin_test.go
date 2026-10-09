@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
 	"github.com/BladiCreator/go-modular-auth-twofactor/plugins"
-	auth "github.com/BladiCreator/go-modular-auth"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
 	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -29,18 +29,18 @@ func TestPlugin_RegistrationAndCapabilityResolution(t *testing.T) {
 	}
 
 	// Resolve via plugins.TwoFactor alias
-	svc, err := engine.Get[plugins.TwoFactor]()
+	svc, err := auth.Get[plugins.TwoFactor](engine)
 	if err != nil {
-		t.Fatalf("engine.Get[plugins.TwoFactor]() failed: %v", err)
+		t.Fatalf("auth.Get[plugins.TwoFactor](engine) failed: %v", err)
 	}
 	if svc == nil {
 		t.Fatal("resolved TwoFactor service is nil")
 	}
 
 	// Also resolve via direct twofactor.TwoFactor
-	svcDirect, err := engine.Get[twofactor.TwoFactor]()
+	svcDirect, err := auth.Get[twofactor.TwoFactor](engine)
 	if err != nil {
-		t.Fatalf("engine.Get[twofactor.TwoFactor]() failed: %v", err)
+		t.Fatalf("auth.Get[twofactor.TwoFactor](engine) failed: %v", err)
 	}
 	if svcDirect == nil {
 		t.Fatal("resolved direct TwoFactor service is nil")
@@ -61,7 +61,7 @@ func TestPlugin_EventsEmission(t *testing.T) {
 		t.Fatalf("auth.New failed: %v", err)
 	}
 
-	svc, _ := engine.Get[plugins.TwoFactor]()
+	svc, _ := auth.Get[plugins.TwoFactor](engine)
 	ctx := context.Background()
 	userID := "usr_events_test"
 
@@ -139,7 +139,7 @@ func TestPlugin_EnforceMFAOnSessionCreateHook(t *testing.T) {
 		t.Fatalf("auth.New failed: %v", err)
 	}
 
-	svc, _ := engine.Get[plugins.TwoFactor]()
+	svc, _ := auth.Get[plugins.TwoFactor](engine)
 	ctx := context.Background()
 
 	// Create user in store

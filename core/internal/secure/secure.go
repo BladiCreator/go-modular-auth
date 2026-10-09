@@ -27,11 +27,13 @@ func NewToken() string {
 	return base64.RawURLEncoding.EncodeToString(randomBytes(TokenBytes))
 }
 
-// randomBytes reads n bytes from crypto/rand. Since Go 1.24 rand.Read never
-// returns an error (it crashes the program on irrecoverable failures).
+// randomBytes reads n bytes from crypto/rand. If reading entropy fails, it panics
+// immediately to prevent generating insecure zero-entropy tokens.
 func randomBytes(n int) []byte {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand: failed to read system entropy: " + err.Error())
+	}
 	return b
 }
 

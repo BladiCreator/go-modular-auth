@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-username"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
-	"github.com/BladiCreator/go-modular-auth-username"
 )
 
 var fastHasher = password.NewArgon2id(password.Argon2idParams{Memory: 64, Iterations: 1})
@@ -29,7 +29,7 @@ func setupTestAuth(t *testing.T, opts ...username.Option) (*auth.Auth, username.
 		t.Fatalf("failed to initialize auth: %v", err)
 	}
 
-	cap, err := a.Get[username.Capability]()
+	cap, err := auth.Get[username.Capability](a)
 	if err != nil {
 		t.Fatalf("failed to retrieve username capability: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestPluginEvents(t *testing.T) {
 		mu.Unlock()
 	})
 
-	cap, err := a.Get[username.Capability]()
+	cap, err := auth.Get[username.Capability](a)
 	if err != nil {
 		t.Fatal(err)
 	}

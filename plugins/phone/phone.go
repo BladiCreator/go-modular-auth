@@ -3,8 +3,8 @@ package phone
 import (
 	"context"
 
-	"github.com/BladiCreator/go-modular-auth-phone/store"
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth-phone/store"
 )
 
 const (
@@ -103,7 +103,7 @@ type RemoveInput struct {
 }
 
 // Phone is the strongly typed public capability exposed by this plugin.
-// Applications consume it via auth.Get[plugins.Phone]() or auth.Get[phone.Phone]().
+// Applications consume it via auth.Get[plugins.Phone](a) or auth.Get[phone.Phone](a).
 type Phone interface {
 	// RequestOTP dispatches an authentication OTP code to the provided phone number.
 	// If AllowSignUp is false and the phone number is unregistered, this method returns nil

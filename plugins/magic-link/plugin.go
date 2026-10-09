@@ -3,9 +3,10 @@ package magiclink
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/email"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
-// Module implements auth.PluginModule for GoModularAuth.
+// Module implements auth.PluginModule for GoModularAuth using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -28,16 +29,18 @@ func (m *Module) ID() string {
 
 // Init initializes the plugin module on the host and registers its capability.
 func (m *Module) Init(h *auth.Host) error {
+	ctx := sdk.NewContext(h)
+
 	var sender email.Sender
 	if m.cfg.EmailSender != nil {
 		sender = m.cfg.EmailSender
-	} else if h.Email() != nil {
-		sender = h.Email()
+	} else if ctx.Email() != nil {
+		sender = ctx.Email()
 	} else {
 		return ErrEmailSenderRequired
 	}
 
-	svc := newService(h, m.cfg, sender)
+	svc := newService(ctx, m.cfg, sender)
 
-	return auth.Provide[MagicLink](h, svc)
+	return sdk.Provide[MagicLink](ctx, svc)
 }

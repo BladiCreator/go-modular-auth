@@ -3,12 +3,13 @@ package emailotp
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/email"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 // PluginID is the unique identifier for this plugin module in GoModularAuth.
 const PluginID = "email_otp"
 
-// Module implements auth.PluginModule for Email OTP authentication.
+// Module implements auth.PluginModule for Email OTP authentication using plugin-sdk.
 type Module struct {
 	cfg Config
 }
@@ -31,16 +32,18 @@ func (m *Module) ID() string {
 
 // Init initializes the plugin module on the host and registers its capability.
 func (m *Module) Init(h *auth.Host) error {
+	ctx := sdk.NewContext(h)
+
 	var sender email.Sender
 	if m.cfg.EmailSender != nil {
 		sender = m.cfg.EmailSender
-	} else if h.Email() != nil {
-		sender = h.Email()
+	} else if ctx.Email() != nil {
+		sender = ctx.Email()
 	} else {
 		return ErrEmailSenderRequired
 	}
 
-	svc := newService(h, m.cfg, sender)
+	svc := newService(ctx, m.cfg, sender)
 
-	return auth.Provide[EmailOTP](h, svc)
+	return sdk.Provide[EmailOTP](ctx, svc)
 }

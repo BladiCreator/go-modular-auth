@@ -116,7 +116,7 @@ func main() {
 	}
 
 	// 2. Retrieve the strongly typed Phone capability
-	phoneAuth, err := engine.Get[plugins.Phone]()
+	phoneAuth, err := auth.Get[plugins.Phone](engine)
 	if err != nil {
 		log.Fatalf("failed to get phone capability: %v", err)
 	}
@@ -204,7 +204,7 @@ fmt.Println(last.Code)
 Applications access the plugin capability through:
 
 ```go
-phoneService, err := auth.Get[plugins.Phone]()
+phoneService, err := auth.Get[plugins.Phone](a)
 ```
 
 ### Phone Capability Interface

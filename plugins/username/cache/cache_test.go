@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth-username/cache"
 	"github.com/BladiCreator/go-modular-auth-username/store"
+	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 func TestSemanticCache(t *testing.T) {

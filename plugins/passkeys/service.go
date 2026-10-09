@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"io"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
 	passkeystore "github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 	"github.com/go-webauthn/webauthn/protocol"
@@ -20,7 +21,7 @@ import (
 )
 
 type service struct {
-	host       *auth.Host
+	ctx        *sdk.Context
 	cfg        Config
 	store      passkeystore.Store
 	challenges challenge.Store
@@ -30,7 +31,7 @@ type service struct {
 
 var _ Passkeys = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) (*service, error) {
+func newService(ctx *sdk.Context, cfg Config) (*service, error) {
 	requireResidentKey := cfg.ResidentKey == protocol.ResidentKeyRequirementRequired
 
 	wcfg := &webauthn.Config{
@@ -62,7 +63,7 @@ func newService(h *auth.Host, cfg Config) (*service, error) {
 	}
 
 	return &service{
-		host:       h,
+		ctx:        ctx,
 		cfg:        cfg,
 		store:      cfg.Store,
 		challenges: cfg.ChallengeStore,
@@ -125,7 +126,7 @@ func (s *service) BeginRegistration(ctx context.Context, in BeginRegistrationInp
 		return nil, err
 	}
 
-	u, err := s.host.Store().Users().GetByID(ctx, in.UserID)
+	u, err := s.ctx.Store().Users().GetByID(ctx, in.UserID)
 	if err != nil {
 		if errors.Is(err, corestore.ErrNotFound) {
 			return nil, ErrUserNotFound
@@ -175,7 +176,7 @@ func (s *service) BeginRegistration(ctx context.Context, in BeginRegistrationInp
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	expiresAt := sessionData.Expires
 	if expiresAt.IsZero() {
 		expiresAt = now.Add(s.cfg.Timeout)
@@ -235,7 +236,7 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 		return nil, err
 	}
 
-	u, err := s.host.Store().Users().GetByID(ctx, sess.UserID)
+	u, err := s.ctx.Store().Users().GetByID(ctx, sess.UserID)
 	if err != nil {
 		if errors.Is(err, corestore.ErrNotFound) {
 			return nil, ErrUserNotFound
@@ -265,7 +266,7 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 		friendlyName = sess.FriendlyName
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	pass := FromWebAuthn(u.ID, friendlyName, cred, now)
 
 	// Persist to passkey store
@@ -286,15 +287,15 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
-	if err := s.host.Store().Accounts().Create(ctx, acc); err != nil && !errors.Is(err, corestore.ErrConflict) {
-		s.host.Logger().ErrorContext(ctx, "passkey: failed to link core account", "user_id", u.ID, "error", err)
+	if err := s.ctx.Store().Accounts().Create(ctx, acc); err != nil && !errors.Is(err, corestore.ErrConflict) {
+		s.ctx.Logger().ErrorContext(ctx, "passkey: failed to link core account", "user_id", u.ID, "error", err)
 	}
 
 	if err := s.hooks.runAfterRegistration(ctx, pass); err != nil {
 		return nil, err
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPasskeyRegistered,
 		Time:    now,
 		Subject: u.ID,
@@ -329,7 +330,7 @@ func (s *service) BeginAuthentication(ctx context.Context, in BeginAuthenticatio
 
 	if in.UserID != "" {
 		// Non-discoverable ceremony targeted at a known user
-		u, errUser := s.host.Store().Users().GetByID(ctx, in.UserID)
+		u, errUser := s.ctx.Store().Users().GetByID(ctx, in.UserID)
 		if errUser != nil {
 			if errors.Is(errUser, corestore.ErrNotFound) {
 				return nil, ErrUserNotFound
@@ -361,7 +362,7 @@ func (s *service) BeginAuthentication(ctx context.Context, in BeginAuthenticatio
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	expiresAt := sessionData.Expires
 	if expiresAt.IsZero() {
 		expiresAt = now.Add(s.cfg.Timeout)
@@ -426,7 +427,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 	)
 
 	if sess.UserID != "" {
-		u, err := s.host.Store().Users().GetByID(ctx, sess.UserID)
+		u, err := s.ctx.Store().Users().GetByID(ctx, sess.UserID)
 		if err != nil {
 			if errors.Is(err, corestore.ErrNotFound) {
 				return nil, ErrUserNotFound
@@ -461,7 +462,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 				targetUserID = credRecord.UserID
 			}
 
-			u, err := s.host.Store().Users().GetByID(ctx, targetUserID)
+			u, err := s.ctx.Store().Users().GetByID(ctx, targetUserID)
 			if err != nil {
 				return nil, err
 			}
@@ -510,7 +511,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 		}
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 
 	// Update stored passkey counters and timestamps
 	storedPasskey.SignCount = validatedCred.Authenticator.SignCount
@@ -520,16 +521,16 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 	storedPasskey.UpdatedAt = now
 
 	if err := s.store.UpdateCredential(ctx, storedPasskey); err != nil {
-		s.host.Logger().ErrorContext(ctx, "passkey: failed to update credential sign counter", "error", err)
+		s.ctx.Logger().ErrorContext(ctx, "passkey: failed to update credential sign counter", "error", err)
 	}
 
 	// Establish authenticated session via Core
-	issued, err := s.host.Auth().CreateSession(ctx, authenticatedUser.ID, in.Session)
+	issued, err := s.ctx.Core().CreateSession(ctx, authenticatedUser.ID, in.Session)
 	if err != nil {
 		return nil, fmt.Errorf("passkey: issue core session: %w", err)
 	}
 
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPasskeyUsed,
 		Time:    now,
 		Subject: authenticatedUser.ID,
@@ -608,7 +609,7 @@ func (s *service) UpdateCredential(ctx context.Context, in UpdateCredentialInput
 	}
 
 	cred.FriendlyName = in.FriendlyName
-	cred.UpdatedAt = s.host.Now()
+	cred.UpdatedAt = s.ctx.Now()
 
 	if err := s.store.UpdateCredential(ctx, cred); err != nil {
 		return nil, err
@@ -643,17 +644,17 @@ func (s *service) DeleteCredential(ctx context.Context, in DeleteCredentialInput
 	}
 
 	// Clean up Core account if present
-	accounts, err := s.host.Store().Accounts().ListByUser(ctx, in.UserID)
+	accounts, err := s.ctx.Store().Accounts().ListByUser(ctx, in.UserID)
 	if err == nil {
 		for _, acc := range accounts {
 			if acc.Provider == ProviderPasskey && acc.ProviderID == cred.ID {
-				_ = s.host.Store().Accounts().Delete(ctx, acc.ID)
+				_ = s.ctx.Store().Accounts().Delete(ctx, acc.ID)
 			}
 		}
 	}
 
-	now := s.host.Now()
-	s.host.Events().Publish(ctx, auth.Event{
+	now := s.ctx.Now()
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPasskeyRevoked,
 		Time:    now,
 		Subject: in.UserID,

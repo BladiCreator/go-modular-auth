@@ -293,15 +293,15 @@ type rowScanner interface {
 
 func scanKey(scanner rowScanner) (*store.APIKey, error) {
 	var (
-		k           store.APIKey
-		userID      sql.NullString
-		orgID       sql.NullString
-		serviceID   sql.NullString
-		scopesRaw   sql.NullString
-		permsRaw    sql.NullString
-		metaRaw     sql.NullString
-		lastUsedIP  sql.NullString
-		lastUsedUA  sql.NullString
+		k          store.APIKey
+		userID     sql.NullString
+		orgID      sql.NullString
+		serviceID  sql.NullString
+		scopesRaw  sql.NullString
+		permsRaw   sql.NullString
+		metaRaw    sql.NullString
+		lastUsedIP sql.NullString
+		lastUsedUA sql.NullString
 	)
 
 	err := scanner.Scan(

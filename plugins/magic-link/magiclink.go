@@ -33,7 +33,7 @@ type AuthenticateInput struct {
 }
 
 // MagicLink is the public capability interface exposed by this plugin.
-// Applications retrieve it using auth.Get[magiclink.MagicLink]() or auth.Get[plugins.MagicLink]().
+// Applications retrieve it using auth.Get[magiclink.MagicLink](a) or auth.Get[plugins.MagicLink](a).
 type MagicLink interface {
 	// Request initiates the passwordless authentication flow for the given email address.
 	// If the user does not exist and AllowSignUp is false, it returns nil to prevent user enumeration.

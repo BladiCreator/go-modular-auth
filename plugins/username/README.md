@@ -45,7 +45,7 @@ Many applications require users to claim unique handles (usernames) for public i
 Application Code
       │
       ▼
-auth.Get[username.Capability]() / auth.Get[username.Username]()
+auth.Get[username.Capability](app) / auth.Get[username.Username](app)
       │
       ▼
 ┌────────────────────────────────────────────────────────┐
@@ -111,7 +111,7 @@ func main() {
 	}
 
 	// 2. Retrieve the typed username capability
-	userPlugin, err := app.Get[username.Capability]()
+	userPlugin, err := auth.Get[username.Capability](app)
 	if err != nil {
 		log.Fatalf("plugin lookup failed: %v", err)
 	}
@@ -162,7 +162,7 @@ uMod := username.New(
 
 ### Capability Interface
 
-Applications access the capability via `auth.Get[username.Capability]()` or `auth.Get[username.Username]()`:
+Applications access the capability via `auth.Get[username.Capability](app)` or `auth.Get[username.Username](app)`:
 
 ```go
 type Capability interface {

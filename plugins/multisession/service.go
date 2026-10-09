@@ -6,27 +6,28 @@ import (
 	"sort"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	corecache "github.com/BladiCreator/go-modular-auth/cache"
-	"github.com/BladiCreator/go-modular-auth/session"
-	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth-multisession/cache"
 	"github.com/BladiCreator/go-modular-auth-multisession/store"
+	corecache "github.com/BladiCreator/go-modular-auth/cache"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/session"
+	corestore "github.com/BladiCreator/go-modular-auth/store"
 )
 
 type service struct {
 	cfg   Config
-	host  *auth.Host
+	ctx   *sdk.Context
 	store store.Store
 	cache *cache.Cache
 }
 
 var _ MultiSession = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
-	cacheAdapter := cache.New(h.Cache(), cfg.MetadataCacheTTL)
+func newService(ctx *sdk.Context, cfg Config) *service {
+	cacheAdapter := cache.New(ctx.Cache(), cfg.MetadataCacheTTL)
 	return &service{
 		cfg:   cfg,
-		host:  h,
+		ctx:   ctx,
 		store: cfg.MetadataStore,
 		cache: cacheAdapter,
 	}
@@ -38,12 +39,12 @@ func (s *service) ListSessions(ctx context.Context, userID string) ([]*session.S
 		return nil, ErrInvalidInput
 	}
 
-	sessions, err := s.host.Store().Sessions().ListByUser(ctx, userID)
+	sessions, err := s.ctx.Store().Sessions().ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	active := make([]*session.Session, 0, len(sessions))
 	for _, sess := range sessions {
 		if sess.Valid(now) {
@@ -93,7 +94,7 @@ func (s *service) GetSession(ctx context.Context, sessionID string) (*session.Se
 		return nil, ErrInvalidInput
 	}
 
-	sess, err := s.host.Store().Sessions().GetByID(ctx, sessionID)
+	sess, err := s.ctx.Store().Sessions().GetByID(ctx, sessionID)
 	if errors.Is(err, corestore.ErrNotFound) {
 		return nil, ErrSessionNotFound
 	}
@@ -101,7 +102,7 @@ func (s *service) GetSession(ctx context.Context, sessionID string) (*session.Se
 		return nil, err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	if !sess.Valid(now) {
 		return nil, ErrSessionNotFound
 	}
@@ -141,7 +142,7 @@ func (s *service) RevokeSession(ctx context.Context, sessionID string) error {
 		return ErrInvalidInput
 	}
 
-	sess, err := s.host.Store().Sessions().GetByID(ctx, sessionID)
+	sess, err := s.ctx.Store().Sessions().GetByID(ctx, sessionID)
 	if errors.Is(err, corestore.ErrNotFound) {
 		return ErrSessionNotFound
 	}
@@ -155,10 +156,10 @@ func (s *service) RevokeSession(ctx context.Context, sessionID string) error {
 		return nil
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 
 	// 1. Update Store first
-	if err := s.host.Store().Sessions().Revoke(ctx, sess.ID, now); err != nil {
+	if err := s.ctx.Store().Sessions().Revoke(ctx, sess.ID, now); err != nil {
 		return err
 	}
 	sess.RevokedAt = &now
@@ -167,7 +168,7 @@ func (s *service) RevokeSession(ctx context.Context, sessionID string) error {
 	s.invalidateSessionCache(ctx, sess)
 
 	// 3. Emit plugin event
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventSessionRevoked,
 		Time:    now,
 		Subject: sess.UserID,
@@ -180,7 +181,7 @@ func (s *service) RevokeSession(ctx context.Context, sessionID string) error {
 	})
 
 	// 4. Emit core session revoked event
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    auth.EventSessionRevoked,
 		Time:    now,
 		Subject: sess.UserID,
@@ -197,7 +198,7 @@ func (s *service) RevokeOtherSessions(ctx context.Context, userID, currentSessio
 	}
 
 	// Verify current session ownership and validity
-	current, err := s.host.Store().Sessions().GetByID(ctx, currentSessionID)
+	current, err := s.ctx.Store().Sessions().GetByID(ctx, currentSessionID)
 	if errors.Is(err, corestore.ErrNotFound) {
 		return ErrSessionNotFound
 	}
@@ -211,12 +212,12 @@ func (s *service) RevokeOtherSessions(ctx context.Context, userID, currentSessio
 		return ErrSessionAlreadyRevoked
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	var revoked []*session.Session
 
 	// Execute revocation atomically inside Store transaction
-	err = s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
-		all, err := s.host.Store().Sessions().ListByUser(txCtx, userID)
+	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
+		all, err := s.ctx.Store().Sessions().ListByUser(txCtx, userID)
 		if err != nil {
 			return err
 		}
@@ -225,7 +226,7 @@ func (s *service) RevokeOtherSessions(ctx context.Context, userID, currentSessio
 			if sess.ID == currentSessionID || sess.Revoked() {
 				continue
 			}
-			if err := s.host.Store().Sessions().Revoke(txCtx, sess.ID, now); err != nil {
+			if err := s.ctx.Store().Sessions().Revoke(txCtx, sess.ID, now); err != nil {
 				return err
 			}
 			sess.RevokedAt = &now
@@ -240,7 +241,7 @@ func (s *service) RevokeOtherSessions(ctx context.Context, userID, currentSessio
 	// Invalidate caches and publish events post-commit
 	for _, r := range revoked {
 		s.invalidateSessionCache(ctx, r)
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    auth.EventSessionRevoked,
 			Time:    now,
 			Subject: userID,
@@ -249,16 +250,16 @@ func (s *service) RevokeOtherSessions(ctx context.Context, userID, currentSessio
 	}
 
 	if len(revoked) > 0 {
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventSessionsRevoked,
 			Time:    now,
 			Subject: userID,
 			Payload: SessionsRevokedPayload{
-				UserID:           userID,
-				RevokedCount:     len(revoked),
+				UserID:          userID,
+				RevokedCount:    len(revoked),
 				ExceptSessionID: currentSessionID,
-				RevokedAt:        now,
-				Reason:           "revoke_others",
+				RevokedAt:       now,
+				Reason:          "revoke_others",
 			},
 		})
 	}
@@ -272,12 +273,12 @@ func (s *service) RevokeAllSessions(ctx context.Context, userID string) error {
 		return ErrInvalidInput
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	var revoked []*session.Session
 
-	err := s.host.Store().Transaction(ctx, func(txCtx context.Context) error {
+	err := s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		var err error
-		revoked, err = s.host.Store().Sessions().RevokeByUser(txCtx, userID, now)
+		revoked, err = s.ctx.Store().Sessions().RevokeByUser(txCtx, userID, now)
 		return err
 	})
 	if err != nil {
@@ -287,7 +288,7 @@ func (s *service) RevokeAllSessions(ctx context.Context, userID string) error {
 	// Invalidate caches and publish events post-commit
 	for _, r := range revoked {
 		s.invalidateSessionCache(ctx, r)
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    auth.EventSessionRevoked,
 			Time:    now,
 			Subject: userID,
@@ -296,7 +297,7 @@ func (s *service) RevokeAllSessions(ctx context.Context, userID string) error {
 	}
 
 	if len(revoked) > 0 {
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventSessionsRevoked,
 			Time:    now,
 			Subject: userID,
@@ -318,7 +319,7 @@ func (s *service) SetMetadata(ctx context.Context, sessionID string, meta Metada
 		return ErrInvalidInput
 	}
 
-	sess, err := s.host.Store().Sessions().GetByID(ctx, sessionID)
+	sess, err := s.ctx.Store().Sessions().GetByID(ctx, sessionID)
 	if errors.Is(err, corestore.ErrNotFound) {
 		return ErrSessionNotFound
 	}
@@ -326,7 +327,7 @@ func (s *service) SetMetadata(ctx context.Context, sessionID string, meta Metada
 		return err
 	}
 
-	now := s.host.Now()
+	now := s.ctx.Now()
 	rec := &store.MetadataRecord{
 		SessionID: sess.ID,
 		UserID:    sess.UserID,
@@ -353,7 +354,7 @@ func (s *service) SetMetadata(ctx context.Context, sessionID string, meta Metada
 	}
 
 	// 3. Emit event
-	s.host.Events().Publish(ctx, auth.Event{
+	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventMetadataUpdated,
 		Time:    now,
 		Subject: sess.UserID,
@@ -403,8 +404,8 @@ func (s *service) onBeforeSessionCreate(ctx context.Context, newSess *session.Se
 		return nil
 	}
 
-	now := s.host.Now()
-	all, err := s.host.Store().Sessions().ListByUser(ctx, newSess.UserID)
+	now := s.ctx.Now()
+	all, err := s.ctx.Store().Sessions().ListByUser(ctx, newSess.UserID)
 	if err != nil {
 		return err
 	}
@@ -434,7 +435,7 @@ func (s *service) onBeforeSessionCreate(ctx context.Context, newSess *session.Se
 		oldest := active[i]
 
 		// Update Store first
-		if err := s.host.Store().Sessions().Revoke(ctx, oldest.ID, now); err != nil {
+		if err := s.ctx.Store().Sessions().Revoke(ctx, oldest.ID, now); err != nil {
 			return err
 		}
 		oldest.RevokedAt = &now
@@ -443,7 +444,7 @@ func (s *service) onBeforeSessionCreate(ctx context.Context, newSess *session.Se
 		s.invalidateSessionCache(ctx, oldest)
 
 		// Emit eviction event
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventSessionEvicted,
 			Time:    now,
 			Subject: newSess.UserID,
@@ -456,7 +457,7 @@ func (s *service) onBeforeSessionCreate(ctx context.Context, newSess *session.Se
 		})
 
 		// Emit core session revoked event
-		s.host.Events().Publish(ctx, auth.Event{
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    auth.EventSessionRevoked,
 			Time:    now,
 			Subject: newSess.UserID,
@@ -472,8 +473,8 @@ func (s *service) invalidateSessionCache(ctx context.Context, sess *session.Sess
 		return
 	}
 	// Invalidate Core session cache entry if cache is configured
-	if s.host.Cache() != nil && sess.TokenHash != "" {
-		sc := corecache.NewSessionCache(s.host.Cache())
+	if s.ctx.Cache() != nil && sess.TokenHash != "" {
+		sc := corecache.NewSessionCache(s.ctx.Cache())
 		_ = sc.Delete(ctx, sess.TokenHash)
 	}
 	// Invalidate metadata cache entry

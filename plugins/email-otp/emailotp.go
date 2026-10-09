@@ -35,7 +35,7 @@ type VerifyInput struct {
 }
 
 // EmailOTP is the strongly typed public capability exposed by this plugin.
-// Applications consume it via auth.Get[plugins.EmailOTP]() or auth.Get[emailotp.EmailOTP]().
+// Applications consume it via auth.Get[plugins.EmailOTP](a) or auth.Get[emailotp.EmailOTP](a).
 type EmailOTP interface {
 	// Request generates and dispatches an OTP code to the requested email.
 	// To prevent user enumeration, if AllowSignUp is false and the email is unknown,

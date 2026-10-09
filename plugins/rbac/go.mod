@@ -1,0 +1,20 @@
+module github.com/BladiCreator/go-modular-auth-rbac
+
+go 1.22.0
+
+replace github.com/BladiCreator/go-modular-auth => ../../core
+
+replace github.com/BladiCreator/go-modular-auth/plugin-sdk => ../../plugin-sdk
+
+replace github.com/BladiCreator/go-modular-auth/adapters/memory => ../../adapters/memory
+
+require (
+	github.com/BladiCreator/go-modular-auth v0.0.0
+	github.com/BladiCreator/go-modular-auth/adapters/memory v0.0.0-00010101000000-000000000000
+	github.com/BladiCreator/go-modular-auth/plugin-sdk v0.0.0-00010101000000-000000000000
+)
+
+require (
+	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+)

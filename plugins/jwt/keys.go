@@ -242,10 +242,10 @@ type KeyManager interface {
 }
 
 type memoryKeyManager struct {
-	mu           sync.RWMutex
-	keys         map[string]Key
-	activeKeyID  string
-	singleKey    *Key
+	mu          sync.RWMutex
+	keys        map[string]Key
+	activeKeyID string
+	singleKey   *Key
 }
 
 // NewKeyManager initializes an empty, thread-safe KeyManager.

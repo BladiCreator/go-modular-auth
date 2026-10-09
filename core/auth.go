@@ -74,20 +74,27 @@ func New(cfg Config) (*Auth, error) {
 
 // Get returns the plugin capability T registered by an installed module:
 //
-//	orgs, err := a.Get[plugins.Organization]()
-func (a *Auth) Get[T any]() (T, error) {
+//	orgs, err := auth.Get[plugins.Organization](a)
+func Get[T any](a *Auth) (T, error) {
+	if a == nil || a.registry == nil {
+		var zero T
+		return zero, plugin.ErrNotFound
+	}
 	return plugin.Lookup[T](a.registry)
 }
 
 // MustGet is like Get but panics when the capability is missing. Use it only
 // during application wiring.
-func (a *Auth) MustGet[T any]() T {
-	v, err := plugin.Lookup[T](a.registry)
+func MustGet[T any](a *Auth) T {
+	v, err := Get[T](a)
 	if err != nil {
 		panic(err)
 	}
 	return v
 }
+
+// Registry returns the capability registry.
+func (a *Auth) Registry() *plugin.Registry { return a.registry }
 
 // Hooks returns the workflow hooks registry.
 func (a *Auth) Hooks() *Hooks { return a.hooks }

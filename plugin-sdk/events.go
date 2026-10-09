@@ -1,17 +1,25 @@
 package sdk
 
-import "context"
+import (
+	auth "github.com/BladiCreator/go-modular-auth"
+)
 
-// Event represents a system event dispatched to subscribers.
-type Event struct {
-	Name    string
-	Payload any
-}
+// Event is the event structure dispatched by the core engine.
+type Event = auth.Event
 
-// EventHandler is a callback invoked when an event is emitted.
-type EventHandler func(ctx context.Context, e Event)
+// EventName represents the typed event identifier.
+type EventName = auth.EventName
 
-// EventSubscriber allows modules to subscribe to events.
-type EventSubscriber interface {
-	Subscribe(eventName string, handler EventHandler)
-}
+// EventHandler is the callback invoked when an event is published.
+type EventHandler = auth.EventHandler
+
+// Common core event names re-exported for plugin convenience.
+const (
+	EventUserCreated     = auth.EventUserCreated
+	EventUserSignedIn    = auth.EventUserSignedIn
+	EventUserSignedOut   = auth.EventUserSignedOut
+	EventSessionCreated  = auth.EventSessionCreated
+	EventSessionRevoked  = auth.EventSessionRevoked
+	EventPasswordChanged = auth.EventPasswordChanged
+	EventEmailVerified   = auth.EventEmailVerified
+)

@@ -1,0 +1,100 @@
+package sso
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/BladiCreator/go-modular-auth-organizations"
+	"github.com/BladiCreator/go-modular-auth-sso/store"
+	"github.com/BladiCreator/go-modular-auth-sso/store/memory"
+)
+
+// Config holds runtime configuration options for the SSO plugin.
+type Config struct {
+	Store         store.Store
+	StateTTL      time.Duration
+	Clock         func() time.Time
+	HTTPClient    *http.Client
+	SPEntityID    string
+	SPACSURL      string
+	Organizations organizations.Organization
+}
+
+// Option modifies Config.
+type Option func(*Config)
+
+func newConfig(opts ...Option) Config {
+	c := Config{
+		Store:      memory.New(),
+		StateTTL:   10 * time.Minute,
+		Clock:      func() time.Time { return time.Now().UTC() },
+		HTTPClient: &http.Client{Timeout: 10 * time.Second},
+		SPEntityID: "urn:gomodularauth:sp",
+		SPACSURL:   "/sso/saml/acs",
+	}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
+}
+
+// WithStore sets the persistence adapter for SSO configurations and state sessions.
+func WithStore(s store.Store) Option {
+	return func(c *Config) {
+		if s != nil {
+			c.Store = s
+		}
+	}
+}
+
+// WithStateTTL configures how long in-flight SSO state sessions remain valid.
+func WithStateTTL(d time.Duration) Option {
+	return func(c *Config) {
+		if d > 0 {
+			c.StateTTL = d
+		}
+	}
+}
+
+// WithClock sets a custom time provider for deterministic testing.
+func WithClock(clock func() time.Time) Option {
+	return func(c *Config) {
+		if clock != nil {
+			c.Clock = clock
+		}
+	}
+}
+
+// WithHTTPClient configures the HTTP client used for OIDC Discovery and token exchange.
+func WithHTTPClient(client *http.Client) Option {
+	return func(c *Config) {
+		if client != nil {
+			c.HTTPClient = client
+		}
+	}
+}
+
+// WithSPEntityID sets the Service Provider Entity ID used for SAML Audience restrictions.
+func WithSPEntityID(entityID string) Option {
+	return func(c *Config) {
+		if entityID != "" {
+			c.SPEntityID = entityID
+		}
+	}
+}
+
+// WithSPACSURL sets the Assertion Consumer Service URL for SAML requests.
+func WithSPACSURL(acsURL string) Option {
+	return func(c *Config) {
+		if acsURL != "" {
+			c.SPACSURL = acsURL
+		}
+	}
+}
+
+// WithOrganizations configures optional integration with the Organizations plugin for JIT membership assignment.
+func WithOrganizations(orgs organizations.Organization) Option {
+	return func(c *Config) {
+		c.Organizations = orgs
+	}
+}

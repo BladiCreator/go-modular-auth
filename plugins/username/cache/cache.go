@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth-username/store"
+	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 
 // KeyNormalized returns the namespaced cache key for a normalized username.

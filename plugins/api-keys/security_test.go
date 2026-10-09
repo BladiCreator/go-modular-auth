@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
 	"github.com/BladiCreator/go-modular-auth-apikeys/plugins"
 	"github.com/BladiCreator/go-modular-auth-apikeys/store/memory"
-	auth "github.com/BladiCreator/go-modular-auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -36,9 +36,9 @@ func TestSecurity_BruteForceProtection(t *testing.T) {
 		t.Fatalf("auth.New failed: %v", err)
 	}
 
-	apiKeys, err := engine.Get[plugins.APIKeys]()
+	apiKeys, err := auth.Get[plugins.APIKeys](engine)
 	if err != nil {
-		t.Fatalf("engine.Get failed: %v", err)
+		t.Fatalf("auth.Get failed: %v", err)
 	}
 
 	ipAttacker := "203.0.113.195"

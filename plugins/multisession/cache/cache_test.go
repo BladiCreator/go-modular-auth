@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth-multisession/cache"
 	"github.com/BladiCreator/go-modular-auth-multisession/store"
+	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 func TestCache_Metadata(t *testing.T) {

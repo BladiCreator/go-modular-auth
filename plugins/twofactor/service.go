@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-twofactor/cache"
 	"github.com/BladiCreator/go-modular-auth-twofactor/store"
-	auth "github.com/BladiCreator/go-modular-auth"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 type service struct {
-	host      *auth.Host
+	ctx       *sdk.Context
 	cfg       Config
 	store     store.Store
 	cache     *cache.Cache
@@ -21,18 +22,18 @@ type service struct {
 
 var _ TwoFactor = (*service)(nil)
 
-func newService(h *auth.Host, cfg Config) *service {
-	if h != nil && h.Cache() != nil {
+func newService(ctx *sdk.Context, cfg Config) *service {
+	if ctx != nil && ctx.Cache() != nil {
 		return &service{
-			host:      h,
+			ctx:       ctx,
 			cfg:       cfg,
 			store:     cfg.Store,
-			cache:     cache.New(h.Cache()),
+			cache:     cache.New(ctx.Cache()),
 			protector: cfg.Protector,
 		}
 	}
 	return &service{
-		host:      h,
+		ctx:       ctx,
 		cfg:       cfg,
 		store:     cfg.Store,
 		cache:     cache.New(nil),
@@ -41,8 +42,8 @@ func newService(h *auth.Host, cfg Config) *service {
 }
 
 func (s *service) now() time.Time {
-	if s.host != nil {
-		return s.host.Now()
+	if s.ctx != nil {
+		return s.ctx.Now()
 	}
 	return time.Now().UTC()
 }
@@ -214,8 +215,8 @@ func (s *service) ConfirmTOTP(ctx context.Context, userID, factorID, code string
 	}
 
 	// Publish TwoFactorEnabled event
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventTwoFactorEnabled,
 			Time:    now,
 			Subject: userID,
@@ -298,8 +299,8 @@ func (s *service) VerifyTOTP(ctx context.Context, userID, code string) (*VerifyR
 			VerifiedAt:     now,
 		}
 
-		if s.host != nil && s.host.Events() != nil {
-			s.host.Events().Publish(ctx, auth.Event{
+		if s.ctx != nil && s.ctx.Events() != nil {
+			s.ctx.Events().Publish(ctx, auth.Event{
 				Name:    EventTwoFactorVerified,
 				Time:    now,
 				Subject: userID,
@@ -364,8 +365,8 @@ func (s *service) VerifyRecoveryCode(ctx context.Context, userID, code string) (
 		VerifiedAt:     now,
 	}
 
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventTwoFactorVerified,
 			Time:    now,
 			Subject: userID,
@@ -555,8 +556,8 @@ func (s *service) Disable(ctx context.Context, userID string) error {
 	}
 
 	now := s.now()
-	if s.host != nil && s.host.Events() != nil {
-		s.host.Events().Publish(ctx, auth.Event{
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
 			Name:    EventTwoFactorDisabled,
 			Time:    now,
 			Subject: userID,
@@ -596,8 +597,8 @@ func (s *service) DisableFactor(ctx context.Context, userID, factorID string) er
 	status, err := s.GetStatus(ctx, userID)
 	if err == nil && !status.Enabled {
 		now := s.now()
-		if s.host != nil && s.host.Events() != nil {
-			s.host.Events().Publish(ctx, auth.Event{
+		if s.ctx != nil && s.ctx.Events() != nil {
+			s.ctx.Events().Publish(ctx, auth.Event{
 				Name:    EventTwoFactorDisabled,
 				Time:    now,
 				Subject: userID,

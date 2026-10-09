@@ -24,11 +24,11 @@ type SessionRevokedPayload struct {
 
 // SessionsRevokedPayload represents observational data when bulk sessions are revoked.
 type SessionsRevokedPayload struct {
-	UserID           string    `json:"user_id"`
-	RevokedCount     int       `json:"revoked_count"`
+	UserID          string    `json:"user_id"`
+	RevokedCount    int       `json:"revoked_count"`
 	ExceptSessionID string    `json:"except_session_id,omitempty"`
-	RevokedAt        time.Time `json:"revoked_at"`
-	Reason           string    `json:"reason,omitempty"`
+	RevokedAt       time.Time `json:"revoked_at"`
+	Reason          string    `json:"reason,omitempty"`
 }
 
 // SessionEvictedPayload represents observational data when a session is evicted due to concurrency limits.
