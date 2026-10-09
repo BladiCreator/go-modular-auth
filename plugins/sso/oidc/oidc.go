@@ -63,8 +63,13 @@ type JWK struct {
 	Y   string `json:"y"`
 }
 
+// HTTPClient abstracts outbound HTTP request execution.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Client struct {
-	httpClient *http.Client
+	httpClient HTTPClient
 	mu         sync.RWMutex
 	jwksCache  map[string]cachedJWKS
 }
@@ -74,7 +79,7 @@ type cachedJWKS struct {
 	expiresAt time.Time
 }
 
-func NewClient(httpClient *http.Client) *Client {
+func NewClient(httpClient HTTPClient) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Second}
 	}

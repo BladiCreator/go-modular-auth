@@ -9,12 +9,17 @@ import (
 	"github.com/BladiCreator/go-modular-auth-sso/store/memory"
 )
 
+// HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Config holds runtime configuration options for the SSO plugin.
 type Config struct {
 	Store         store.Store
 	StateTTL      time.Duration
 	Clock         func() time.Time
-	HTTPClient    *http.Client
+	HTTPClient    HTTPClient
 	SPEntityID    string
 	SPACSURL      string
 	Organizations organizations.Organization
@@ -66,7 +71,7 @@ func WithClock(clock func() time.Time) Option {
 }
 
 // WithHTTPClient configures the HTTP client used for OIDC Discovery and token exchange.
-func WithHTTPClient(client *http.Client) Option {
+func WithHTTPClient(client HTTPClient) Option {
 	return func(c *Config) {
 		if client != nil {
 			c.HTTPClient = client

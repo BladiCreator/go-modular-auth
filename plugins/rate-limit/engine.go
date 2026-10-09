@@ -219,6 +219,10 @@ func (e *limiterEngine) evaluateTokenBucket(ctx context.Context, key string, p P
 		refillRate = 1.0 // 1 token per second
 	}
 
+	// Synchronize access to prevent concurrent read-modify-write data races
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	// 1. If Cache is available, load and store state in cache
 	if e.cache != nil {
 		decision, err := e.distributedTokenBucket(ctx, key, p, capacity, refillRate, consume, now)
@@ -239,8 +243,6 @@ func (e *limiterEngine) evaluateTokenBucket(ctx context.Context, key string, p P
 	}
 
 	// 2. In-memory token bucket implementation
-	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	state, ok := e.memBuckets[key]
 	if !ok {

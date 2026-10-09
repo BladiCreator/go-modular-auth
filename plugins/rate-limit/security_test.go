@@ -134,3 +134,53 @@ func TestSecurity_FailModes(t *testing.T) {
 		t.Fatalf("expected FailOpen")
 	}
 }
+
+func TestDistributedTokenBucket_ConcurrentExecution(t *testing.T) {
+	ctx := context.Background()
+	_, limiter := setupTestAuth(t,
+		ratelimit.WithPolicy(ratelimit.Policy{
+			Action:     "concurrent_token_bucket",
+			Algorithm:  ratelimit.AlgorithmTokenBucket,
+			Capacity:   20,
+			RefillRate: 0.1, // Very slow refill so burst limit is strictly tested
+			KeyType:    ratelimit.KeyTypeIdentity,
+		}),
+	)
+
+	req := ratelimit.Request{
+		Action:   "concurrent_token_bucket",
+		Identity: "concurrent_bucket_user",
+	}
+
+	var wg sync.WaitGroup
+	workers := 40
+	var allowedCount int64
+	var deniedCount int64
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			dec, err := limiter.Allow(ctx, req)
+			if err != nil {
+				t.Errorf("Allow returned error: %v", err)
+				return
+			}
+			if dec.Allowed {
+				atomic.AddInt64(&allowedCount, 1)
+			} else {
+				atomic.AddInt64(&deniedCount, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if allowedCount != 20 {
+		t.Fatalf("expected exactly 20 allowed requests under concurrent token bucket, got %d (denied: %d)", allowedCount, deniedCount)
+	}
+	if deniedCount != 20 {
+		t.Fatalf("expected exactly 20 denied requests under concurrent token bucket, got %d", deniedCount)
+	}
+}
+

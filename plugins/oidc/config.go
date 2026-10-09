@@ -8,13 +8,18 @@ import (
 	"github.com/BladiCreator/go-modular-auth-oidc/store/memory"
 )
 
+// HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Config holds the configuration settings for the OIDC plugin.
 type Config struct {
 	Providers     map[string]ProviderConfig
 	Store         store.Store
 	StateTTL      time.Duration
 	LinkingPolicy LinkingPolicy
-	HTTPClient    *http.Client
+	HTTPClient    HTTPClient
 	Clock         func() time.Time
 }
 
@@ -73,7 +78,7 @@ func WithLinkingPolicy(policy LinkingPolicy) Option {
 }
 
 // WithHTTPClient overrides the default HTTP client used for discovery, token exchange, and JWKS fetching.
-func WithHTTPClient(client *http.Client) Option {
+func WithHTTPClient(client HTTPClient) Option {
 	return func(c *Config) {
 		if client != nil {
 			c.HTTPClient = client

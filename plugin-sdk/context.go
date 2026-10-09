@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
@@ -16,6 +17,7 @@ import (
 // infrastructure contracts and never private core internals.
 type Context struct {
 	host   *auth.Host
+	mu     sync.RWMutex
 	values map[string]any
 }
 
@@ -106,7 +108,10 @@ func (c *Context) Now() time.Time {
 }
 
 // Set stores a key-value pair in the contextual execution bag.
+// It is safe for concurrent use.
 func (c *Context) Set(key string, val any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.values == nil {
 		c.values = make(map[string]any)
 	}
@@ -114,10 +119,10 @@ func (c *Context) Set(key string, val any) {
 }
 
 // Get retrieves a value by key from the contextual execution bag.
+// It is safe for concurrent use.
 func (c *Context) Get(key string) (any, bool) {
-	if c.values == nil {
-		return nil, false
-	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	v, ok := c.values[key]
 	return v, ok
 }

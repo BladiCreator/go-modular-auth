@@ -14,7 +14,7 @@ type ProviderCommonConfig struct {
 	ClientID            string
 	ClientSecret        string
 	AllowedRedirectURIs []string
-	HTTPClient          *http.Client
+	HTTPClient          HTTPClient
 }
 
 // NewGoogleProvider builds a Google OAuth 2.0 / OpenID Connect provider.

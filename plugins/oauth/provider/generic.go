@@ -15,6 +15,11 @@ import (
 // ProfileExtractorFunc is a function that parses raw JSON profile bytes into a ProviderProfile.
 type ProfileExtractorFunc func(ctx context.Context, rawBody []byte, token *TokenResponse) (*ProviderProfile, error)
 
+// HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // GenericConfig configures a GenericProvider instance.
 type GenericConfig struct {
 	// Name uniquely identifies the provider (e.g. "google", "github").
@@ -43,8 +48,8 @@ type GenericConfig struct {
 	AllowedRedirectURIs []string
 
 	// HTTPClient is the HTTP client used to perform outbound requests to the provider.
-	// Defaults to http.DefaultClient with a 15-second timeout if nil.
-	HTTPClient *http.Client
+	// Defaults to &http.Client{Timeout: 15 * time.Second} if nil.
+	HTTPClient HTTPClient
 
 	// ProfileExtractor customizes the parsing of user profile responses.
 	// If nil, StandardProfileExtractor is used.
