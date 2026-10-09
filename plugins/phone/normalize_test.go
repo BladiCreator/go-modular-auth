@@ -107,3 +107,38 @@ func TestDefaultValidator(t *testing.T) {
 		t.Fatal("expected error for too short")
 	}
 }
+
+func FuzzNormalizeE164(f *testing.F) {
+	seeds := []string{
+		"+12025550123",
+		"+1 (202) 555-0123",
+		"0044 20 7183 8750",
+		"+34.612.345.678",
+		"12025550123",
+		"",
+		"   ",
+		"+0123456789",
+		"+12345678901234567890",
+		"+1202555012A",
+		"📞+1-800-GO-FED",
+		"\x00\xff\xfe",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	norm := DefaultNormalizer()
+	val := DefaultValidator()
+
+	f.Fuzz(func(t *testing.T, input string) {
+		res, err := norm(input)
+		if err != nil {
+			return
+		}
+		// If normalization succeeds, it must pass E.164 validation without error!
+		if err := val(res); err != nil {
+			t.Fatalf("normalized output %q failed validation: %v", res, err)
+		}
+	})
+}
+

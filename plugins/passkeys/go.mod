@@ -1,11 +1,14 @@
 module github.com/BladiCreator/go-modular-auth-passkeys
 
-go 1.27.1
+go 1.26.0
 
 replace github.com/BladiCreator/go-modular-auth => ../../core
 
+replace github.com/BladiCreator/go-modular-auth/plugin-sdk => ../../plugin-sdk
+
 require (
 	github.com/BladiCreator/go-modular-auth v0.0.0
+	github.com/BladiCreator/go-modular-auth/plugin-sdk v0.0.0
 	github.com/go-webauthn/webauthn v0.11.2
 )
 

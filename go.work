@@ -1,8 +1,15 @@
-go 1.22.0
+go 1.26.0
 
 use (
+	./adapters/grpc
+	./adapters/http
 	./adapters/memory
+	./adapters/mysql
 	./adapters/postgres
+	./adapters/redis
+	./adapters/smtp
+	./adapters/sqlite
+	./adapters/valkey
 	./core
 	./plugin-sdk
 	./plugins/account-linking
@@ -25,7 +32,7 @@ use (
 	./plugins/one-time-token
 	./plugins/openapi
 	./plugins/organizations
-//	./plugins/passkeys
+	./plugins/passkeys
 	./plugins/password-policy
 	./plugins/phone
 	./plugins/policy

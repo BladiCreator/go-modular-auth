@@ -1,6 +1,6 @@
 module github.com/BladiCreator/go-modular-auth-anonymous
 
-go 1.22.0
+go 1.26.0
 
 replace github.com/BladiCreator/go-modular-auth => ../../core
 
@@ -12,6 +12,6 @@ require (
 )
 
 require (
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
