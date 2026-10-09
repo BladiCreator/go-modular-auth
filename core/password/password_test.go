@@ -37,3 +37,25 @@ func TestArgon2idRoundTrip(t *testing.T) {
 		t.Fatalf("want ErrInvalidHash, got %v", err)
 	}
 }
+
+type errReader struct{}
+
+func (errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("entropy source depleted")
+}
+
+func TestArgon2id_EntropyFailure(t *testing.T) {
+	restore := password.SetRandReaderForTesting(errReader{})
+	defer restore()
+
+	ctx := context.Background()
+	h := password.NewArgon2id(password.Argon2idParams{Memory: 64, Iterations: 1})
+	_, err := h.Hash(ctx, "s3cret")
+	if err == nil {
+		t.Fatal("expected error on depleted entropy, got nil")
+	}
+	if !strings.Contains(err.Error(), "entropy") {
+		t.Fatalf("expected entropy error message, got: %v", err)
+	}
+}
+

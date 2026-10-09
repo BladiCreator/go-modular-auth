@@ -2,6 +2,7 @@ package organizations_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -151,3 +152,108 @@ func TestSecurityConstantTimeComparison(t *testing.T) {
 		t.Error("Expected different hashes to compare false")
 	}
 }
+
+func TestOrganizationService_UnauthorizedMutationRejection(t *testing.T) {
+	ctx := context.Background()
+	orgModule := organizations.New(organizations.WithStore(memory.New()))
+	a, _ := auth.New(auth.Config{
+		Store:   coremem.New(),
+		Plugins: []auth.PluginModule{orgModule},
+	})
+	orgs, _ := auth.Get[organizations.Organization](a)
+
+	// 1. Create Organization with owner_user
+	org, err := orgs.CreateOrganization(ctx, organizations.CreateOrganizationInput{
+		Name:    "Secure Corp",
+		Slug:    "secure-corp",
+		OwnerID: "owner_user",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganization failed: %v", err)
+	}
+
+	// 2. Add an admin and a regular member
+	_, err = orgs.AddMember(ctx, organizations.AddMemberInput{
+		OrganizationID: org.ID,
+		UserID:         "admin_user",
+		Role:           organizations.RoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("AddMember admin failed: %v", err)
+	}
+
+	_, err = orgs.AddMember(ctx, organizations.AddMemberInput{
+		OrganizationID: org.ID,
+		UserID:         "regular_member",
+		Role:           organizations.RoleMember,
+	})
+	if err != nil {
+		t.Fatalf("AddMember regular failed: %v", err)
+	}
+
+	memberCtx := auth.WithPrincipal(ctx, auth.Principal{Subject: "regular_member", Type: auth.PrincipalUser})
+	adminCtx := auth.WithPrincipal(ctx, auth.Principal{Subject: "admin_user", Type: auth.PrincipalUser})
+	outsiderCtx := auth.WithPrincipal(ctx, auth.Principal{Subject: "outsider_user", Type: auth.PrincipalUser})
+	ownerCtx := auth.WithPrincipal(ctx, auth.Principal{Subject: "owner_user", Type: auth.PrincipalUser})
+
+	// Test A: Outsider cannot mutate anything
+	_, err = orgs.UpdateOrganization(outsiderCtx, org.ID, organizations.UpdateOrganizationInput{})
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for outsider UpdateOrganization, got %v", err)
+	}
+
+	// Test B: Regular member cannot perform admin mutations
+	_, err = orgs.AddMember(memberCtx, organizations.AddMemberInput{
+		OrganizationID: org.ID,
+		UserID:         "intruder",
+	})
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for regular member AddMember, got %v", err)
+	}
+
+	_, err = orgs.UpdateMemberRole(memberCtx, org.ID, "regular_member", organizations.RoleOwner)
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for member escalating own role, got %v", err)
+	}
+
+	err = orgs.DeleteOrganization(memberCtx, org.ID)
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for member deleting organization, got %v", err)
+	}
+
+	// Test C: Admin cannot delete organization or transfer ownership (owner only)
+	err = orgs.DeleteOrganization(adminCtx, org.ID)
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for admin deleting organization, got %v", err)
+	}
+
+	err = orgs.TransferOwnership(adminCtx, org.ID, "admin_user")
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for admin transferring ownership, got %v", err)
+	}
+
+	// Test D: Admin cannot change Owner's role
+	_, err = orgs.UpdateMemberRole(adminCtx, org.ID, "owner_user", organizations.RoleMember)
+	if !errors.Is(err, organizations.ErrUnauthorized) {
+		t.Fatalf("Expected ErrUnauthorized for admin demoting owner, got %v", err)
+	}
+
+	// Test E: Authorized operations succeed
+	newName := "Secure Corp Renamed"
+	updated, err := orgs.UpdateOrganization(adminCtx, org.ID, organizations.UpdateOrganizationInput{
+		Name: &newName,
+	})
+	if err != nil {
+		t.Fatalf("Admin UpdateOrganization failed: %v", err)
+	}
+	if updated.Name != newName {
+		t.Errorf("Expected updated name %s, got %s", newName, updated.Name)
+	}
+
+	// Test F: Owner can transfer ownership
+	err = orgs.TransferOwnership(ownerCtx, org.ID, "admin_user")
+	if err != nil {
+		t.Fatalf("Owner TransferOwnership failed: %v", err)
+	}
+}
+

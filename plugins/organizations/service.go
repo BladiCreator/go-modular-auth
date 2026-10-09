@@ -60,6 +60,15 @@ func validateSlug(slug string) error {
 	return nil
 }
 
+func (s *service) checkPrincipalAuth(ctx context.Context, orgID string, minRole Role) error {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok || principal.Subject == "" {
+		return nil
+	}
+	_, err := s.Authorize(ctx, orgID, minRole)
+	return err
+}
+
 // CreateOrganization creates a new organization and assigns the owner as its initial member.
 func (s *service) CreateOrganization(ctx context.Context, in CreateOrganizationInput) (*OrganizationRecord, error) {
 	in.Name = strings.TrimSpace(in.Name)
@@ -185,6 +194,10 @@ func (s *service) GetOrganizationBySlug(ctx context.Context, slug string) (*Orga
 
 // UpdateOrganization updates organization name or metadata.
 func (s *service) UpdateOrganization(ctx context.Context, orgID string, in UpdateOrganizationInput) (*OrganizationRecord, error) {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return nil, err
+	}
+
 	org, err := s.GetOrganization(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -219,6 +232,10 @@ func (s *service) UpdateOrganization(ctx context.Context, orgID string, in Updat
 
 // DeleteOrganization removes an organization and cascades to related elements.
 func (s *service) DeleteOrganization(ctx context.Context, orgID string) error {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleOwner); err != nil {
+		return err
+	}
+
 	org, err := s.GetOrganization(ctx, orgID)
 	if err != nil {
 		return err
@@ -249,6 +266,10 @@ func (s *service) ListUserOrganizations(ctx context.Context, userID string) ([]*
 
 // TransferOwnership transfers ownership to an existing active member.
 func (s *service) TransferOwnership(ctx context.Context, orgID, newOwnerUserID string) error {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleOwner); err != nil {
+		return err
+	}
+
 	org, err := s.GetOrganization(ctx, orgID)
 	if err != nil {
 		return err
@@ -318,6 +339,10 @@ func (s *service) AddMember(ctx context.Context, in AddMemberInput) (*Membership
 		in.Role = RoleMember
 	}
 
+	if err := s.checkPrincipalAuth(ctx, in.OrganizationID, RoleAdmin); err != nil {
+		return nil, err
+	}
+
 	if err := s.hooks.runBeforeMemberAdd(ctx, &in); err != nil {
 		return nil, err
 	}
@@ -379,6 +404,21 @@ func (s *service) GetMember(ctx context.Context, orgID, userID string) (*Members
 
 // UpdateMemberRole updates the role assigned to a member.
 func (s *service) UpdateMemberRole(ctx context.Context, orgID, userID string, role Role) (*Membership, error) {
+	if principal, ok := auth.PrincipalFrom(ctx); ok && principal.Subject != "" {
+		minRole := RoleAdmin
+		if role == RoleOwner {
+			minRole = RoleOwner
+		}
+		callerMem, err := s.Authorize(ctx, orgID, minRole)
+		if err != nil {
+			return nil, err
+		}
+		targetMem, err := s.GetMember(ctx, orgID, userID)
+		if err == nil && targetMem.Role == RoleOwner && callerMem.Role != RoleOwner {
+			return nil, ErrUnauthorized
+		}
+	}
+
 	m, err := s.GetMember(ctx, orgID, userID)
 	if err != nil {
 		return nil, err
@@ -410,6 +450,10 @@ func (s *service) UpdateMemberRole(ctx context.Context, orgID, userID string, ro
 
 // UpdateMemberStatus updates the membership status (active/suspended).
 func (s *service) UpdateMemberStatus(ctx context.Context, orgID, userID string, status MembershipStatus) (*Membership, error) {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return nil, err
+	}
+
 	m, err := s.GetMember(ctx, orgID, userID)
 	if err != nil {
 		return nil, err
@@ -441,6 +485,24 @@ func (s *service) UpdateMemberStatus(ctx context.Context, orgID, userID string, 
 
 // RemoveMember removes a user from an organization.
 func (s *service) RemoveMember(ctx context.Context, orgID, userID string) error {
+	orgID = strings.TrimSpace(orgID)
+	userID = strings.TrimSpace(userID)
+	if orgID == "" || userID == "" {
+		return fmt.Errorf("%w: organization_id and user_id are required", ErrInvalidInput)
+	}
+
+	if principal, ok := auth.PrincipalFrom(ctx); ok && principal.Subject != "" {
+		if principal.Subject != userID {
+			if _, err := s.Authorize(ctx, orgID, RoleAdmin); err != nil {
+				return err
+			}
+		} else {
+			if _, err := s.Authorize(ctx, orgID, RoleMember); err != nil {
+				return err
+			}
+		}
+	}
+
 	m, err := s.GetMember(ctx, orgID, userID)
 	if err != nil {
 		return err
@@ -485,6 +547,9 @@ func (s *service) CreateTeam(ctx context.Context, in CreateTeamInput) (*Team, er
 	if err := validateSlug(in.Slug); err != nil {
 		return nil, err
 	}
+	if err := s.checkPrincipalAuth(ctx, in.OrganizationID, RoleAdmin); err != nil {
+		return nil, err
+	}
 
 	now := s.now()
 	t := &Team{
@@ -527,6 +592,10 @@ func (s *service) GetTeam(ctx context.Context, orgID, teamID string) (*Team, err
 
 // UpdateTeam updates team details.
 func (s *service) UpdateTeam(ctx context.Context, orgID, teamID string, in UpdateTeamInput) (*Team, error) {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return nil, err
+	}
+
 	t, err := s.GetTeam(ctx, orgID, teamID)
 	if err != nil {
 		return nil, err
@@ -558,6 +627,10 @@ func (s *service) UpdateTeam(ctx context.Context, orgID, teamID string, in Updat
 
 // DeleteTeam deletes a team.
 func (s *service) DeleteTeam(ctx context.Context, orgID, teamID string) error {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return err
+	}
+
 	if _, err := s.GetTeam(ctx, orgID, teamID); err != nil {
 		return err
 	}
@@ -581,6 +654,10 @@ func (s *service) ListTeams(ctx context.Context, orgID string) ([]*Team, error) 
 
 // AddTeamMember enrolls a member into a team, ensuring they belong to the organization.
 func (s *service) AddTeamMember(ctx context.Context, orgID, teamID, userID string) error {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return err
+	}
+
 	if _, err := s.GetTeam(ctx, orgID, teamID); err != nil {
 		return err
 	}
@@ -618,6 +695,18 @@ func (s *service) AddTeamMember(ctx context.Context, orgID, teamID, userID strin
 
 // RemoveTeamMember removes a user from a team.
 func (s *service) RemoveTeamMember(ctx context.Context, orgID, teamID, userID string) error {
+	if principal, ok := auth.PrincipalFrom(ctx); ok && principal.Subject != "" {
+		if principal.Subject != userID {
+			if _, err := s.Authorize(ctx, orgID, RoleAdmin); err != nil {
+				return err
+			}
+		} else {
+			if _, err := s.Authorize(ctx, orgID, RoleMember); err != nil {
+				return err
+			}
+		}
+	}
+
 	if _, err := s.GetTeam(ctx, orgID, teamID); err != nil {
 		return err
 	}
@@ -654,6 +743,9 @@ func (s *service) CreateInvitation(ctx context.Context, in CreateInvitationInput
 
 	if in.OrganizationID == "" || in.Email == "" || in.InviterUserID == "" {
 		return nil, "", fmt.Errorf("%w: organization_id, email, and inviter_user_id are required", ErrInvalidInput)
+	}
+	if err := s.checkPrincipalAuth(ctx, in.OrganizationID, RoleAdmin); err != nil {
+		return nil, "", err
 	}
 	if in.Role == "" {
 		in.Role = RoleMember
@@ -793,6 +885,10 @@ func (s *service) AcceptInvitation(ctx context.Context, rawToken, userID string)
 
 // RevokeInvitation cancels an active invitation.
 func (s *service) RevokeInvitation(ctx context.Context, orgID, invitationID string) error {
+	if err := s.checkPrincipalAuth(ctx, orgID, RoleAdmin); err != nil {
+		return err
+	}
+
 	if _, err := s.GetInvitation(ctx, orgID, invitationID); err != nil {
 		return err
 	}

@@ -9,10 +9,22 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
 )
+
+var randReader io.Reader = rand.Reader
+
+// SetRandReaderForTesting overrides the entropy source during unit tests and returns a restore func.
+func SetRandReaderForTesting(r io.Reader) func() {
+	prev := randReader
+	randReader = r
+	return func() {
+		randReader = prev
+	}
+}
 
 var (
 	// ErrMismatch is returned by Hasher.Verify when the password does not match the hash.
@@ -87,7 +99,9 @@ func (h *Argon2id) Hash(ctx context.Context, password string) (string, error) {
 	}
 	p := h.params
 	salt := make([]byte, p.SaltLength)
-	_, _ = rand.Read(salt)
+	if _, err := io.ReadFull(randReader, salt); err != nil {
+		return "", fmt.Errorf("password: failed to read salt entropy: %w", err)
+	}
 	key := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
 	b64 := base64.RawStdEncoding
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
