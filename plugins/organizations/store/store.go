@@ -185,26 +185,8 @@ func (inv *Invitation) Active(now time.Time) bool {
 //		s.redis.Set(ctx, cacheKey, bytes, s.ttl)
 //		return mem, nil
 //	}
-type Store interface {
-	// Transaction runs fn atomically within a storage transaction.
-	//
-	// Function:
-	//   Executes multi-entity operations (such as creating an organization and owner membership) atomically.
-	//
-	// Storage:
-	//   Database (GORM / SQL).
-	//
-	// Arguments:
-	//   - ctx: Request cancellation context.
-	//   - fn: Transaction body function.
-	//
-	// Returns:
-	//   - error: Nil on successful commit, or error causing rollback.
-	//
-	// Example SQL:
-	//   BEGIN; ... COMMIT;
-	Transaction(ctx context.Context, fn func(ctx context.Context) error) error
-
+// OrganizationStore defines the storage contract specifically for organizations.
+type OrganizationStore interface {
 	// CreateOrganization persists a new organization record.
 	//
 	// Function:
@@ -327,7 +309,10 @@ type Store interface {
 	// Example SQL:
 	//   SELECT o.id, o.name, o.slug, o.owner_id, o.metadata, o.created_at, o.updated_at FROM auth_organizations o INNER JOIN auth_organization_memberships m ON o.id = m.organization_id WHERE m.user_id = $1 AND m.status = 'active';
 	ListOrganizationsByUser(ctx context.Context, userID string) ([]*Organization, error)
+}
 
+// MembershipStore defines the storage contract specifically for memberships.
+type MembershipStore interface {
 	// CreateMembership persists a new membership record.
 	//
 	// Function:
@@ -429,7 +414,10 @@ type Store interface {
 	// Example SQL:
 	//   SELECT id, organization_id, user_id, role, status, created_at, updated_at FROM auth_organization_memberships WHERE organization_id = $1 ORDER BY created_at ASC;
 	ListMembershipsByOrg(ctx context.Context, orgID string) ([]*Membership, error)
+}
 
+// TeamStore defines the storage contract specifically for teams and team enrollments.
+type TeamStore interface {
 	// CreateTeam persists a new team record.
 	//
 	// Function:
@@ -608,7 +596,10 @@ type Store interface {
 	// Example SQL:
 	//   SELECT user_id FROM auth_organization_team_members WHERE team_id = $1;
 	ListTeamMembers(ctx context.Context, teamID string) ([]string, error)
+}
 
+// InvitationStore defines the storage contract specifically for invitations.
+type InvitationStore interface {
 	// CreateInvitation persists a new invitation record.
 	//
 	// Function:
@@ -728,3 +719,16 @@ type Store interface {
 	//   SELECT id, organization_id, email, role, inviter_user_id, token_hash, expires_at, accepted_at, created_at FROM auth_organization_invitations WHERE organization_id = $1 ORDER BY created_at DESC;
 	ListInvitationsByOrg(ctx context.Context, orgID string) ([]*Invitation, error)
 }
+
+// Store defines the aggregated persistent storage contract required by the organizations plugin.
+// It composes cohesive sub-interfaces: OrganizationStore, MembershipStore, TeamStore, and InvitationStore.
+type Store interface {
+	// Transaction runs fn atomically within a storage transaction.
+	Transaction(ctx context.Context, fn func(ctx context.Context) error) error
+
+	OrganizationStore
+	MembershipStore
+	TeamStore
+	InvitationStore
+}
+

@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-admin/store"
+	"github.com/BladiCreator/go-modular-auth/store/sqltx"
 )
-
-type txKey struct{}
 
 // Store implements store.Store using standard database/sql.
 type Store struct {
@@ -27,36 +26,15 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-type queryable interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
+type queryable = sqltx.DBTX
 
 func (s *Store) executor(ctx context.Context) queryable {
-	if tx, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return tx
-	}
-	return s.db
+	return sqltx.Executor(ctx, s.db)
 }
 
-// Transaction executes fn inside a database transaction.
+// Transaction executes fn inside a database transaction using the shared sqltx context.
 func (s *Store) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	if _, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return fn(ctx)
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	txCtx := context.WithValue(ctx, txKey{}, tx)
-	if err := fn(txCtx); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	return tx.Commit()
+	return sqltx.Run(ctx, s.db, nil, fn)
 }
 
 // UpsertUser persists or updates a user record.

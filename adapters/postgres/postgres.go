@@ -17,6 +17,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/credential"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/store"
+	"github.com/BladiCreator/go-modular-auth/store/sqltx"
 	"github.com/BladiCreator/go-modular-auth/user"
 	"github.com/BladiCreator/go-modular-auth/verification"
 )
@@ -80,14 +81,8 @@ CREATE TABLE IF NOT EXISTS auth_verification_tokens (
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup ON auth_verification_tokens(purpose, subject);
 `
 
-type txKey struct{}
-
 // DBTX abstracts *sql.DB and *sql.Tx.
-type DBTX interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
+type DBTX = sqltx.DBTX
 
 // Store is a PostgreSQL-backed implementation of store.Store.
 type Store struct {
@@ -113,32 +108,14 @@ func (s *Store) Migrate(ctx context.Context) error {
 }
 
 func (s *Store) dbtx(ctx context.Context) DBTX {
-	if tx, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return tx
-	}
-	return s.db
+	return sqltx.Executor(ctx, s.db)
 }
 
-// Transaction runs fn inside an atomic database transaction.
+// Transaction runs fn inside an atomic database transaction. The transaction
+// is published through package sqltx, so plugin SQL stores sharing the same
+// database join it automatically.
 func (s *Store) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	if _, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return fn(ctx)
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	txCtx := context.WithValue(ctx, txKey{}, tx)
-	if err := fn(txCtx); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return sqltx.Run(ctx, s.db, nil, fn)
 }
 
 func (s *Store) Users() store.UserStore             { return &userStore{s} }

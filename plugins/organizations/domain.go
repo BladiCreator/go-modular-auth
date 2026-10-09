@@ -46,15 +46,13 @@ type ScopedPrincipal struct {
 	Membership     *Membership
 }
 
-type orgContextKey struct{}
-
 // WithOrganizationContext returns a new context containing the target organization ID.
 func WithOrganizationContext(ctx context.Context, orgID string) context.Context {
-	return context.WithValue(ctx, orgContextKey{}, orgID)
+	return auth.WithOrganization(ctx, orgID)
 }
 
 // OrganizationFromContext retrieves the organization ID bound to ctx, if present.
 func OrganizationFromContext(ctx context.Context) (string, bool) {
-	orgID, ok := ctx.Value(orgContextKey{}).(string)
-	return orgID, ok && orgID != ""
+	return auth.OrganizationFrom(ctx)
 }
+

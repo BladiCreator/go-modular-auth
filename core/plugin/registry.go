@@ -61,6 +61,17 @@ func (r *Registry) HasModule(id string) bool {
 	return ok
 }
 
+// Modules returns a list of all registered module IDs.
+func (r *Registry) Modules() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	list := make([]string, 0, len(r.modules))
+	for id := range r.modules {
+		list = append(list, id)
+	}
+	return list
+}
+
 // Provide registers value as the implementation of capability T on behalf of
 // module. T is usually an interface type exported by the plugin.
 func Provide[T any](r *Registry, module string, value T) error {

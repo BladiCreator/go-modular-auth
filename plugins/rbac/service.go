@@ -63,6 +63,13 @@ func (s *service) Evaluate(ctx context.Context, principal auth.Principal, permis
 		return nil, ErrPermissionRequired
 	}
 
+	// Resolve contextual multi-tenant organization boundary if not explicitly set
+	if resource.OrganizationID == "" {
+		if orgID, ok := auth.OrganizationFrom(ctx); ok {
+			resource.OrganizationID = orgID
+		}
+	}
+
 	cacheKey := cache.BuildKey(principal, permission, resource.Type, resource.ID, resource.OrganizationID, resource.ServiceID)
 
 	if s.cache != nil {

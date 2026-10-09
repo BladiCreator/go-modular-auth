@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/BladiCreator/go-modular-auth-audit/store"
+	"github.com/BladiCreator/go-modular-auth/store/sqltx"
 )
 
 // Store implements store.Store on PostgreSQL.
@@ -24,19 +25,10 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-type txKey struct{}
+type executor = sqltx.DBTX
 
 func (s *Store) getExecutor(ctx context.Context) executor {
-	if tx, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return tx
-	}
-	return s.db
-}
-
-type executor interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	return sqltx.Executor(ctx, s.db)
 }
 
 // Record persists a single immutable audit log record.
@@ -77,49 +69,41 @@ func (s *Store) RecordBatch(ctx context.Context, records []*store.AuditRecord) e
 		return nil
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
+	return sqltx.Run(ctx, s.db, nil, func(txCtx context.Context) error {
+		query := `
+			INSERT INTO auth_audit_records (
+				id, timestamp, event, action, actor_subject, actor_type,
+				target_type, target_id, outcome, organization_id,
+				ip_address, user_agent, metadata, error_message
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+		`
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO auth_audit_records (
-			id, timestamp, event, action, actor_subject, actor_type,
-			target_type, target_id, outcome, organization_id,
-			ip_address, user_agent, metadata, error_message
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
+		exec := s.getExecutor(txCtx)
+		for _, record := range records {
+			if record == nil {
+				return store.ErrNilRecord
+			}
+			if err := record.Validate(); err != nil {
+				return err
+			}
 
-	for _, record := range records {
-		if record == nil {
-			return store.ErrNilRecord
+			metaJSON, err := json.Marshal(record.Metadata)
+			if err != nil {
+				metaJSON = []byte("{}")
+			}
+
+			_, err = exec.ExecContext(txCtx, query,
+				record.ID, record.Timestamp, record.Event, record.Action,
+				record.ActorSubject, record.ActorType, record.TargetType, record.TargetID,
+				string(record.Outcome), record.OrganizationID, record.IPAddress, record.UserAgent,
+				string(metaJSON), record.ErrorMessage,
+			)
+			if err != nil {
+				return err
+			}
 		}
-		if err := record.Validate(); err != nil {
-			return err
-		}
-
-		metaJSON, err := json.Marshal(record.Metadata)
-		if err != nil {
-			metaJSON = []byte("{}")
-		}
-
-		_, err = stmt.ExecContext(ctx,
-			record.ID, record.Timestamp, record.Event, record.Action,
-			record.ActorSubject, record.ActorType, record.TargetType, record.TargetID,
-			string(record.Outcome), record.OrganizationID, record.IPAddress, record.UserAgent,
-			string(metaJSON), record.ErrorMessage,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 // GetByID retrieves a single audit record by primary ID.

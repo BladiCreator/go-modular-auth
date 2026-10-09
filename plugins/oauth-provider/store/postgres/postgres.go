@@ -6,11 +6,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-oauth-provider/store"
+	"github.com/BladiCreator/go-modular-auth/store/sqltx"
 )
 
 // Store implements store.Store backed by PostgreSQL.
@@ -30,21 +30,16 @@ func (s *Store) Codes() store.CodeStore     { return &codeStore{db: s.db} }
 func (s *Store) Tokens() store.TokenStore   { return &tokenStore{db: s.db} }
 
 func (s *Store) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("oauth_provider postgres: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := fn(ctx); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return sqltx.Run(ctx, s.db, nil, fn)
 }
 
 // --- ClientStore ---
 
 type clientStore struct{ db *sql.DB }
+
+func (cs *clientStore) dbtx(ctx context.Context) sqltx.DBTX {
+	return sqltx.Executor(ctx, cs.db)
+}
 
 func (cs *clientStore) Create(ctx context.Context, c *store.Client) error {
 	urisJSON, err := json.Marshal(c.RedirectURIs)
@@ -64,7 +59,7 @@ func (cs *clientStore) Create(ctx context.Context, c *store.Client) error {
 		INSERT INTO oauth_clients (id, secret_hash, name, client_type, redirect_uris, allowed_grant_types, allowed_scopes, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
-	_, err = cs.db.ExecContext(ctx, query,
+	_, err = cs.dbtx(ctx).ExecContext(ctx, query,
 		c.ID,
 		c.SecretHash,
 		c.Name,
@@ -90,7 +85,7 @@ func (cs *clientStore) GetByID(ctx context.Context, id string) (*store.Client, e
 		SELECT id, secret_hash, name, client_type, redirect_uris, allowed_grant_types, allowed_scopes, status, created_at, updated_at
 		FROM oauth_clients WHERE id = $1
 	`
-	row := cs.db.QueryRowContext(ctx, query, id)
+	row := cs.dbtx(ctx).QueryRowContext(ctx, query, id)
 
 	var c store.Client
 	var secretHash sql.NullString
@@ -144,7 +139,7 @@ func (cs *clientStore) Update(ctx context.Context, c *store.Client) error {
 		SET secret_hash = $2, name = $3, client_type = $4, redirect_uris = $5, allowed_grant_types = $6, allowed_scopes = $7, status = $8, updated_at = $9
 		WHERE id = $1
 	`
-	res, err := cs.db.ExecContext(ctx, query,
+	res, err := cs.dbtx(ctx).ExecContext(ctx, query,
 		c.ID,
 		c.SecretHash,
 		c.Name,
@@ -167,7 +162,7 @@ func (cs *clientStore) Update(ctx context.Context, c *store.Client) error {
 
 func (cs *clientStore) Revoke(ctx context.Context, id string, now time.Time) error {
 	query := `UPDATE oauth_clients SET status = $2, updated_at = $3 WHERE id = $1`
-	res, err := cs.db.ExecContext(ctx, query, id, string(store.ClientStatusRevoked), now)
+	res, err := cs.dbtx(ctx).ExecContext(ctx, query, id, string(store.ClientStatusRevoked), now)
 	if err != nil {
 		return err
 	}
@@ -180,7 +175,7 @@ func (cs *clientStore) Revoke(ctx context.Context, id string, now time.Time) err
 
 func (cs *clientStore) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM oauth_clients WHERE id = $1`
-	res, err := cs.db.ExecContext(ctx, query, id)
+	res, err := cs.dbtx(ctx).ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -195,6 +190,10 @@ func (cs *clientStore) Delete(ctx context.Context, id string) error {
 
 type codeStore struct{ db *sql.DB }
 
+func (cos *codeStore) dbtx(ctx context.Context) sqltx.DBTX {
+	return sqltx.Executor(ctx, cos.db)
+}
+
 func (cos *codeStore) Create(ctx context.Context, c *store.AuthorizationCode) error {
 	scopesJSON, err := json.Marshal(c.Scopes)
 	if err != nil {
@@ -204,7 +203,7 @@ func (cos *codeStore) Create(ctx context.Context, c *store.AuthorizationCode) er
 		INSERT INTO oauth_authorization_codes (id, code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
-	_, err = cos.db.ExecContext(ctx, query,
+	_, err = cos.dbtx(ctx).ExecContext(ctx, query,
 		c.ID,
 		c.CodeHash,
 		c.ClientID,
@@ -230,7 +229,7 @@ func (cos *codeStore) GetByHash(ctx context.Context, codeHash string) (*store.Au
 		SELECT id, code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at, consumed_at, created_at
 		FROM oauth_authorization_codes WHERE code_hash = $1
 	`
-	row := cos.db.QueryRowContext(ctx, query, codeHash)
+	row := cos.dbtx(ctx).QueryRowContext(ctx, query, codeHash)
 
 	var c store.AuthorizationCode
 	var scopesStr string
@@ -270,7 +269,7 @@ func (cos *codeStore) Consume(ctx context.Context, codeHash string, now time.Tim
 		WHERE code_hash = $1 AND consumed_at IS NULL
 		RETURNING id, code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at, consumed_at, created_at
 	`
-	row := cos.db.QueryRowContext(ctx, query, codeHash, now)
+	row := cos.dbtx(ctx).QueryRowContext(ctx, query, codeHash, now)
 
 	var c store.AuthorizationCode
 	var scopesStr string
@@ -305,7 +304,7 @@ func (cos *codeStore) Consume(ctx context.Context, codeHash string, now time.Tim
 
 func (cos *codeStore) DeleteExpired(ctx context.Context, now time.Time) (int, error) {
 	query := `DELETE FROM oauth_authorization_codes WHERE expires_at <= $1`
-	res, err := cos.db.ExecContext(ctx, query, now)
+	res, err := cos.dbtx(ctx).ExecContext(ctx, query, now)
 	if err != nil {
 		return 0, err
 	}
@@ -317,6 +316,10 @@ func (cos *codeStore) DeleteExpired(ctx context.Context, now time.Time) (int, er
 
 type tokenStore struct{ db *sql.DB }
 
+func (ts *tokenStore) dbtx(ctx context.Context) sqltx.DBTX {
+	return sqltx.Executor(ctx, ts.db)
+}
+
 func (ts *tokenStore) CreateAccessToken(ctx context.Context, t *store.AccessToken) error {
 	scopesJSON, err := json.Marshal(t.Scopes)
 	if err != nil {
@@ -326,7 +329,7 @@ func (ts *tokenStore) CreateAccessToken(ctx context.Context, t *store.AccessToke
 		INSERT INTO oauth_access_tokens (id, token_hash, client_id, user_id, scopes, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err = ts.db.ExecContext(ctx, query,
+	_, err = ts.dbtx(ctx).ExecContext(ctx, query,
 		t.ID,
 		t.TokenHash,
 		t.ClientID,
@@ -349,7 +352,7 @@ func (ts *tokenStore) GetAccessTokenByHash(ctx context.Context, tokenHash string
 		SELECT id, token_hash, client_id, user_id, scopes, expires_at, revoked_at, created_at
 		FROM oauth_access_tokens WHERE token_hash = $1
 	`
-	row := ts.db.QueryRowContext(ctx, query, tokenHash)
+	row := ts.dbtx(ctx).QueryRowContext(ctx, query, tokenHash)
 
 	var t store.AccessToken
 	var scopesStr string
@@ -380,7 +383,7 @@ func (ts *tokenStore) GetAccessTokenByHash(ctx context.Context, tokenHash string
 
 func (ts *tokenStore) RevokeAccessToken(ctx context.Context, tokenHash string, now time.Time) error {
 	query := `UPDATE oauth_access_tokens SET revoked_at = $2 WHERE token_hash = $1`
-	_, err := ts.db.ExecContext(ctx, query, tokenHash, now)
+	_, err := ts.dbtx(ctx).ExecContext(ctx, query, tokenHash, now)
 	return err
 }
 
@@ -393,7 +396,7 @@ func (ts *tokenStore) CreateRefreshToken(ctx context.Context, t *store.RefreshTo
 		INSERT INTO oauth_refresh_tokens (id, token_hash, access_token_id, client_id, user_id, scopes, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
-	_, err = ts.db.ExecContext(ctx, query,
+	_, err = ts.dbtx(ctx).ExecContext(ctx, query,
 		t.ID,
 		t.TokenHash,
 		t.AccessTokenID,
@@ -417,7 +420,7 @@ func (ts *tokenStore) GetRefreshTokenByHash(ctx context.Context, tokenHash strin
 		SELECT id, token_hash, access_token_id, client_id, user_id, scopes, expires_at, revoked_at, created_at
 		FROM oauth_refresh_tokens WHERE token_hash = $1
 	`
-	row := ts.db.QueryRowContext(ctx, query, tokenHash)
+	row := ts.dbtx(ctx).QueryRowContext(ctx, query, tokenHash)
 
 	var t store.RefreshToken
 	var scopesStr string
@@ -449,35 +452,35 @@ func (ts *tokenStore) GetRefreshTokenByHash(ctx context.Context, tokenHash strin
 
 func (ts *tokenStore) RevokeRefreshToken(ctx context.Context, tokenHash string, now time.Time) error {
 	query := `UPDATE oauth_refresh_tokens SET revoked_at = $2 WHERE token_hash = $1`
-	_, err := ts.db.ExecContext(ctx, query, tokenHash, now)
+	_, err := ts.dbtx(ctx).ExecContext(ctx, query, tokenHash, now)
 	return err
 }
 
 func (ts *tokenStore) RevokeTokensByClient(ctx context.Context, clientID string, now time.Time) error {
 	q1 := `UPDATE oauth_access_tokens SET revoked_at = $2 WHERE client_id = $1 AND revoked_at IS NULL`
 	q2 := `UPDATE oauth_refresh_tokens SET revoked_at = $2 WHERE client_id = $1 AND revoked_at IS NULL`
-	if _, err := ts.db.ExecContext(ctx, q1, clientID, now); err != nil {
+	if _, err := ts.dbtx(ctx).ExecContext(ctx, q1, clientID, now); err != nil {
 		return err
 	}
-	_, err := ts.db.ExecContext(ctx, q2, clientID, now)
+	_, err := ts.dbtx(ctx).ExecContext(ctx, q2, clientID, now)
 	return err
 }
 
 func (ts *tokenStore) RevokeTokensByUser(ctx context.Context, userID string, now time.Time) error {
 	q1 := `UPDATE oauth_access_tokens SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL`
 	q2 := `UPDATE oauth_refresh_tokens SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL`
-	if _, err := ts.db.ExecContext(ctx, q1, userID, now); err != nil {
+	if _, err := ts.dbtx(ctx).ExecContext(ctx, q1, userID, now); err != nil {
 		return err
 	}
-	_, err := ts.db.ExecContext(ctx, q2, userID, now)
+	_, err := ts.dbtx(ctx).ExecContext(ctx, q2, userID, now)
 	return err
 }
 
 func (ts *tokenStore) DeleteExpired(ctx context.Context, now time.Time) (int, error) {
 	q1 := `DELETE FROM oauth_access_tokens WHERE expires_at <= $1`
 	q2 := `DELETE FROM oauth_refresh_tokens WHERE expires_at <= $1`
-	res1, _ := ts.db.ExecContext(ctx, q1, now)
-	res2, _ := ts.db.ExecContext(ctx, q2, now)
+	res1, _ := ts.dbtx(ctx).ExecContext(ctx, q1, now)
+	res2, _ := ts.dbtx(ctx).ExecContext(ctx, q2, now)
 
 	var n1, n2 int64
 	if res1 != nil {

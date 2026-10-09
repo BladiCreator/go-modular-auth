@@ -296,3 +296,67 @@ func TestRBAC_CacheInvalidationOnMutation(t *testing.T) {
 		t.Fatalf("expected ErrForbidden after role revocation, got: %v", err)
 	}
 }
+
+func TestRBAC_ContextualOrganizationEvaluation(t *testing.T) {
+	ctx := context.Background()
+	coreStore := adaptermem.NewStore()
+	rbacStore := memory.NewStore()
+	plugin := rbac.New(rbac.WithStore(rbacStore))
+
+	a, err := auth.New(auth.Config{
+		Store:   coreStore,
+		Plugins: []auth.PluginModule{plugin},
+	})
+	if err != nil {
+		t.Fatalf("auth.New failed: %v", err)
+	}
+
+	rbacSvc, err := auth.Get[rbac.RBAC](a)
+	if err != nil {
+		t.Fatalf("auth.Get failed: %v", err)
+	}
+
+	// 1. Create organization-scoped role
+	role := &rbac.Role{
+		ID:          "role-org-admin",
+		Name:        "billing_admin",
+		Scope:       rbac.ScopeOrganization,
+		Permissions: []string{"billing:view", "billing:update"},
+	}
+	if err := rbacSvc.CreateRole(ctx, role); err != nil {
+		t.Fatalf("CreateRole failed: %v", err)
+	}
+
+	principal := auth.Principal{Subject: "finance-carol", Type: auth.PrincipalUser}
+
+	// 2. Assign role to principal specifically in "org-acme"
+	err = rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
+		RoleID:           role.ID,
+		PrincipalSubject: principal.Subject,
+		PrincipalType:    principal.Type,
+		Scope:            rbac.ScopeOrganization,
+		ScopeID:          "org-acme",
+	})
+	if err != nil {
+		t.Fatalf("AssignRole failed: %v", err)
+	}
+
+	// 3. Evaluation without organization context fails
+	emptyRes := rbac.NewResource("invoice", "inv-1")
+	if err := rbacSvc.Authorize(ctx, principal, "billing:view", emptyRes); !errors.Is(err, rbac.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden without org context, got %v", err)
+	}
+
+	// 4. Evaluation with context-bound organization succeeds automatically
+	acmeCtx := auth.WithOrganization(ctx, "org-acme")
+	if err := rbacSvc.Authorize(acmeCtx, principal, "billing:view", emptyRes); err != nil {
+		t.Fatalf("expected success with contextual org-acme, got: %v", err)
+	}
+
+	// 5. Evaluation with a different organization in context fails
+	otherCtx := auth.WithOrganization(ctx, "org-other")
+	if err := rbacSvc.Authorize(otherCtx, principal, "billing:view", emptyRes); !errors.Is(err, rbac.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden with wrong org context, got %v", err)
+	}
+}
+
