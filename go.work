@@ -9,6 +9,7 @@ use (
 	./adapters/redis
 	./adapters/smtp
 	./adapters/sqlite
+	./adapters/surrealdb
 	./adapters/valkey
 	./core
 	./plugin-sdk
