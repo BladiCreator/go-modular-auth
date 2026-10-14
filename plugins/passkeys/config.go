@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
-	"github.com/BladiCreator/go-modular-auth-passkeys/store"
-	"github.com/BladiCreator/go-modular-auth-passkeys/store/memory"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 
@@ -40,10 +38,6 @@ type Config struct {
 	// EnforceSignCounter ensures that authenticator sign counter regressions trigger clone detection errors.
 	// Default: true.
 	EnforceSignCounter bool
-
-	// Store is the authoritative storage adapter for passkeys.
-	// Defaults to in-memory store if nil.
-	Store store.Store
 
 	// ChallengeStore is the storage adapter for transient ceremony challenges.
 	// Defaults to in-memory challenge store if nil.
@@ -90,10 +84,6 @@ func (c Config) withDefaults() (Config, error) {
 
 	if c.ResidentKey == "" {
 		c.ResidentKey = protocol.ResidentKeyRequirementPreferred
-	}
-
-	if c.Store == nil {
-		c.Store = memory.New()
 	}
 
 	if c.ChallengeStore == nil {
@@ -144,13 +134,6 @@ func WithTimeout(d time.Duration) Option {
 func WithEnforceSignCounter(enforce bool) Option {
 	return func(c *Config) {
 		c.EnforceSignCounter = enforce
-	}
-}
-
-// WithStore sets the authoritative passkey store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
 	}
 }
 

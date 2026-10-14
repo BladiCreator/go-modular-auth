@@ -31,7 +31,7 @@ type Account struct {
     UpdatedAt  time.Time
 }
 ```
-For local password authentication, `Provider` is `"password"` and `ProviderID` is the `UserID`. External plugins (OAuth, Passkeys) map their provider identifiers through `Account`.
+For local password authentication, `Provider` is `account.ProviderPassword` (`"password"`) and `ProviderID` is the `UserID`. External plugins (OAuth, Passkeys, SAML) map their provider identifiers through `Account`.
 
 ### 1.3 `Credential` (`credential.Credential`)
 Holds authentication material decoupled from the account:
@@ -41,14 +41,14 @@ type Credential struct {
     ID        string
     UserID    string
     AccountID string
-    Type      Type
+    Type      Type // TypePassword, etc.
     Secret    string
     CreatedAt time.Time
     UpdatedAt time.Time
     RevokedAt *time.Time
 }
 ```
-`Secret` never holds plaintext data. For passwords, it stores an encoded Argon2id hash. Plugins attach credentials (e.g. public keys, recovery codes) by specifying their own `credential.Type`.
+`Secret` never holds plaintext data. For passwords, it stores an encoded Argon2id hash. Plugins attach credentials (e.g. WebAuthn public keys, recovery codes) by specifying their own `credential.Type`.
 
 ### 1.4 `Session` (`session.Session`)
 Represents an opaque server-side session:
@@ -65,158 +65,174 @@ type Session struct {
     CreatedAt time.Time
 }
 ```
-GoModularAuth does not use stateless JWTs for sessions by default. Sessions are opaque tokens with 256-bit entropy generated via `crypto/rand`. Only `TokenHash` (SHA-256) is persisted.
+GoModularAuth does not use stateless JWTs for sessions by default. Sessions are opaque tokens with 256-bit entropy generated via `crypto/rand`. Only `TokenHash` (SHA-256) is persisted in the database.
 
 ### 1.5 `VerificationToken` (`verification.Token`)
-Generic primitive for single-use, expiring actions:
+A single-use verification primitive with atomic consumption:
 
 ```go
 type Token struct {
     ID        string
-    Purpose   Purpose
-    Subject   string
-    TokenHash string
+    Purpose   Purpose // e.g. "email_verification", "password_reset"
+    Subject   string  // User ID, email, or client ID
+    TokenHash string  // SHA-256 hash of plaintext token
     ExpiresAt time.Time
     UsedAt    *time.Time
     CreatedAt time.Time
 }
 ```
-Used for email verification (`email_verification`), password resets (`password_reset`), and plugins (magic links, one-time tokens, device authorization).
 
-### 1.6 `Principal` (`auth.Principal`)
-The identity passed across the boundary from authentication to authorization:
+### 1.6 `Principal` (`auth.Principal`) & Context Helpers
+The boundary between authentication and authorization:
 
 ```go
 type Principal struct {
     Subject string
-    Type    PrincipalType // "user", "service_account", "api_key"
+    Type    PrincipalType // PrincipalUser, PrincipalServiceAccount, PrincipalAPIKey
 }
+
+// Bind to context
+ctx = auth.WithPrincipal(ctx, principal)
+
+// Retrieve from context
+principal, ok := auth.PrincipalFrom(ctx)
+
+// Multi-tenant binding
+ctx = auth.WithOrganization(ctx, orgID)
+orgID, ok := auth.OrganizationFrom(ctx)
 ```
 
 ---
 
-## 2. Password Hashing (`password.Hasher`)
+## 2. Core Engine Operations
 
-Password hashing is abstracted behind the `Hasher` interface:
-
+### 2.1 Initialization (`auth.New`)
 ```go
-type Hasher interface {
-    Hash(ctx context.Context, password string) (string, error)
-    Verify(ctx context.Context, hash, password string) error
-}
+import (
+    auth "github.com/BladiCreator/go-modular-auth"
+    "github.com/BladiCreator/go-modular-auth/adapters/postgres"
+)
+
+engine, err := auth.New(auth.Config{
+    Store: postgres.New(db),
+})
 ```
+- Validates configuration and applies secure defaults.
+- Compiles dummy timing hashes to prevent user enumeration attacks.
+- Resolves plugin dependency graphs and initializes plugins topologically.
 
-### Argon2id Implementation
-GoModularAuth ships with an Argon2id implementation as default, adhering to OWASP recommendations:
-
-- **Memory**: 19 MiB (19,456 KiB)
-- **Iterations**: 2
-- **Parallelism**: 1
-- **Salt length**: 16 bytes
-- **Key length**: 32 bytes
-
-Hashes follow the standard PHC string format:
-```text
-$argon2id$v=19$m=19456,t=2,p=1$<base64-salt>$<base64-key>
-```
-Parameters are encoded into the hash, allowing algorithm cost increases over time without invalidating existing passwords.
-
----
-
-## 3. Core Engine Operations
-
-### 3.1 Sign Up (`auth.SignUp`)
-Creates `User + Account + Credential + Session` in a single atomic database transaction:
-
+### 2.2 User Registration (`SignUp`)
 ```go
-res, err := app.SignUp(ctx, auth.SignUpInput{
+res, err := engine.SignUp(ctx, auth.SignUpInput{
     Email:    "user@example.com",
     Password: "SecurePassword123!",
     Session: auth.SessionOptions{
-        IPAddress: "192.168.1.10",
+        IPAddress: "192.168.1.1",
         UserAgent: "Mozilla/5.0 ...",
     },
 })
 ```
-- If `EmailVerification.Required` is set to `true`, no session is issued until the email address is verified.
-- Emits `auth.EventUserCreated` upon successful commit.
+1. Executes `BeforeSignUp` hooks.
+2. Normalizes email and validates password against `PasswordPolicy`.
+3. Hashes password using Argon2id outside the database transaction (prevents holding database locks during CPU-heavy hashing).
+4. Begins an atomic `Store.Transaction`:
+   - Checks email uniqueness (`store.ErrConflict`).
+   - Persists `User`, `Account`, and `Credential`.
+   - Creates `Session` (unless email verification is required).
+5. Post-commit:
+   - Populates semantic caches (`sessionCache`, `userCache`).
+   - Dispatches `EventUserCreated` and `EventSessionCreated`.
+   - Sends verification email if configured.
+   - Runs `AfterSignUp` hooks.
 
-### 3.2 Sign In (`auth.SignIn`)
-Authenticates email and password:
-
+### 2.3 User Authentication (`SignIn`)
 ```go
-res, err := app.SignIn(ctx, auth.SignInInput{
+res, err := engine.SignIn(ctx, auth.SignInInput{
     Email:    "user@example.com",
     Password: "SecurePassword123!",
 })
 ```
-- **Timing Equalization**: If the user email does not exist, Argon2id verification is still run against a dummy hash to prevent user enumeration via timing analysis.
-- Emits `auth.EventUserSignedIn`.
+- **Anti-Enumeration Timing Mitigation**: If the user does not exist, the engine runs password verification against a precomputed dummy hash, ensuring response times are indistinguishable between non-existent users and incorrect passwords.
+- Validates credentials and checks email verification status.
+- Issues a new session atomically and caches it.
 
-### 3.3 Sign Out (`auth.SignOut`)
-Idempotently revokes the session matching the given plaintext token:
-
+### 2.4 Session Revocation (`SignOut`)
 ```go
-err := app.SignOut(ctx, auth.SignOutInput{
-    Token: token,
+err := engine.SignOut(ctx, auth.SignOutInput{
+    Token: tokenString,
 })
 ```
-- Revokes in Store, deletes from Cache, and emits `auth.EventUserSignedOut` and `auth.EventSessionRevoked`.
+- Idempotent: revoking an unknown or already-revoked session returns `nil`.
+- Marks `RevokedAt` in the Store, evicts the session from cache, and publishes `EventSessionRevoked` and `EventUserSignedOut`.
 
-### 3.4 Session Validation (`GetSession` & `RequireSession`)
-Resolves an opaque bearer/cookie token:
-
+### 2.5 Session Verification (`GetSession` & `RequireSession`)
 ```go
-// Returns (nil, nil) if token is invalid or expired
-res, err := app.GetSession(ctx, token)
+// Lenient lookup: returns (nil, nil) if token is invalid or expired
+res, err := engine.GetSession(ctx, tokenString)
 
-// Returns auth.ErrUnauthenticated if token is invalid or expired
-res, err := app.RequireSession(ctx, token)
+// Strict lookup: returns ErrUnauthorized if invalid or expired
+res, err := engine.RequireSession(ctx, tokenString)
 ```
-Utilizes **Cache-Aside**: checks cache first, queries the Store on miss, populates cache with remaining TTL, and validates user existence.
+- Hashes token using SHA-256.
+- Queries `cache.SessionCache` (Cache-Aside pattern). On cache miss, queries `Store.Sessions().GetByTokenHash()` and populates cache.
+- Validates expiration and revocation status. Loads user details and returns `*SessionResult`.
 
-### 3.5 Password Management
-- **`ChangePassword`**: Verifies old password, creates a new credential, revokes older credentials, and revokes all other active sessions (unless `KeepOtherSessions: true`).
-- **`RequestPasswordReset`**: Issues a single-use verification token and delivers it via `email.Sender`. Always returns `nil` for unknown emails to eliminate enumeration.
-- **`ResetPassword`**: Atomically consumes the verification token, rotates the password credential, and revokes all active sessions for the user.
-- **`VerifyEmail`**: Atomically consumes the verification token and marks `EmailVerified = true`.
+### 2.6 Plugin Session Issuance (`CreateSession`)
+```go
+issued, err := engine.CreateSession(ctx, userID, auth.SessionOptions{
+    IPAddress: "10.0.0.1",
+    UserAgent: "iOS App",
+})
+// issued.Token is the plaintext token returned to the client
+// issued.Session is the persisted domain session
+```
+Enables external plugins (OAuth, Passkeys, Magic Links, 2FA) to issue valid sessions for existing users.
+
+### 2.7 Password Management & Account Recovery
+- **`ChangePassword`**: Verifies existing password, hashes new password, updates credential, and revokes other active sessions unless `KeepOtherSessions: true`.
+- **`RequestPasswordReset`**: Issues single-use token and sends reset instructions via configured `email.Sender`.
+- **`ResetPassword`**: Atomically consumes the verification token and updates password credential.
+- **`VerifyEmail`**: Atomically consumes verification token and sets `EmailVerified = true`.
+
+### 2.8 Single-Use Token Engine (`IssueToken` & `ConsumeToken`)
+```go
+// Issue single-use token
+token, err := engine.IssueToken(ctx, "magic_link", userID, 15*time.Minute)
+
+// Atomically consume token
+tok, err := engine.ConsumeToken(ctx, "magic_link", token)
+```
+- Plaintext token is returned once; only SHA-256 hash is persisted.
+- `ConsumeToken` uses atomic compare-and-swap update (`used_at IS NULL`), preventing race conditions and replay attacks.
+
+### 2.9 Background Maintenance (`PurgeExpired`)
+```go
+sessionsDeleted, tokensDeleted, err := engine.PurgeExpired(ctx)
+```
+Invoked periodically by background schedulers to clean up expired sessions and consumed verification tokens.
 
 ---
 
-## 4. Configuration & Secure Zero-Value Defaults
+## 3. Password Hashing Specification
 
-GoModularAuth is configured via `auth.Config`. Only `Store` is mandatory; all other fields fall back to secure, hardened defaults:
+The core uses **Argon2id** conforming to OWASP recommendations:
 
-```go
-type Config struct {
-    Store             store.Store             // Required
-    Cache             cache.Cache             // Optional: nil operates directly against Store
-    Email             email.Sender            // Optional: required only for email verification / reset
-    Hasher            password.Hasher         // Defaults to Argon2id (OWASP params)
-    Plugins           []PluginModule          // Installed plugins
-    Logger            *slog.Logger            // Defaults to slog.DiscardHandler
-    Now               func() time.Time        // Clock, defaults to time.Now
-    Session           SessionConfig
-    User              UserConfig
-    Password          PasswordPolicy
-    EmailVerification EmailVerificationConfig
-    PasswordReset     PasswordResetConfig
-    Messages          Messages
-}
-```
+- **Time (Iterations)**: 1
+- **Memory**: 64 MB (65536 KiB)
+- **Threads / Parallelism**: 4
+- **Key Length**: 32 bytes
+- **Salt Length**: 16 cryptographically random bytes
 
-### 4.1 Default Values & Policy Matrix
+Hash format: `$argon2id$v=19$m=65536,t=1,p=4$<salt>$<digest>`
 
-| Setting | Field | Default Value | Description |
-| :--- | :--- | :--- | :--- |
-| **Hasher** | `Config.Hasher` | Argon2id (`m=19MiB, t=2, p=1`) | OWASP compliant memory-hard password hasher. |
-| **Session Lifetime** | `Session.TTL` | `7 * 24 * time.Hour` (7 days) | Total validity period of an issued session. |
-| **Session Cache TTL** | `Session.CacheTTL` | `5 * time.Minute` | Upper bound for cached sessions, mitigating stale read windows. |
-| **User Cache TTL** | `User.CacheTTL` | `5 * time.Minute` | Cache duration for user entities. |
-| **Min Password Length** | `Password.MinLength` | `8` bytes | Minimum password length requirement. |
-| **Max Password Length** | `Password.MaxLength` | `128` bytes | Protects Argon2id from Denial of Service (DoS) attacks. |
-| **Email Verification TTL** | `EmailVerification.TokenTTL` | `24 * time.Hour` | Validity duration of email confirmation tokens. |
-| **Password Reset TTL** | `PasswordReset.TokenTTL` | `1 * time.Hour` | Validity duration of password reset tokens. |
-| **Require Verified Email** | `EmailVerification.Required` | `false` | If `true`, blocks session issuance on SignUp and rejects SignIn. |
-| **Send Verification Email** | `EmailVerification.SendOnSignUp` | `false` | If `true`, dispatches verification email right after SignUp. |
+---
 
+## 4. Hooks vs Events
+
+| Feature | Hooks (`auth.Hooks`) | Events (`auth.Events`) |
+| :--- | :--- | :--- |
+| **Execution** | Synchronous during the workflow | Observational, post-commit |
+| **Transaction** | Before hooks run **inside** the DB transaction | Runs **after** commit |
+| **Veto Power** | Can abort the operation by returning an error | Cannot abort or modify the workflow |
+| **Panic Safety** | Propagates errors | Automatically recovers and logs panics |
+| **Use Cases** | Input mutation, validation, tenant checks | Audit logging, notifications, telemetry |

@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth-multisession/cache"
-	"github.com/BladiCreator/go-modular-auth-multisession/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/session"
@@ -15,10 +15,10 @@ import (
 )
 
 type service struct {
-	cfg   Config
-	ctx   *sdk.Context
-	store store.Store
-	cache *cache.Cache
+	cfg     Config
+	ctx     *sdk.Context
+	records *sdk.Repository[MetadataRecord]
+	cache   *cache.Cache
 }
 
 var _ MultiSession = (*service)(nil)
@@ -26,10 +26,50 @@ var _ MultiSession = (*service)(nil)
 func newService(ctx *sdk.Context, cfg Config) *service {
 	cacheAdapter := cache.New(ctx.Cache(), cfg.MetadataCacheTTL)
 	return &service{
-		cfg:   cfg,
-		ctx:   ctx,
-		store: cfg.MetadataStore,
-		cache: cacheAdapter,
+		cfg:     cfg,
+		ctx:     ctx,
+		records: sdk.Model[MetadataRecord](ctx, ModelSessionMetadata),
+		cache:   cacheAdapter,
+	}
+}
+
+func metadataRecordToCached(r *MetadataRecord) *cache.CachedMetadataRecord {
+	if r == nil {
+		return nil
+	}
+	return &cache.CachedMetadataRecord{
+		SessionID: r.SessionID,
+		UserID:    r.UserID,
+		Device: cache.CachedDeviceRecord{
+			Name:      r.Device.Name,
+			Type:      r.Device.Type,
+			OS:        r.Device.OS,
+			Browser:   r.Device.Browser,
+			IPAddress: r.Device.IPAddress,
+		},
+		Custom:    r.Custom,
+		CreatedAt: r.CreatedAt,
+		UpdatedAt: r.UpdatedAt,
+	}
+}
+
+func cachedToMetadataRecord(c *cache.CachedMetadataRecord) *MetadataRecord {
+	if c == nil {
+		return nil
+	}
+	return &MetadataRecord{
+		SessionID: c.SessionID,
+		UserID:    c.UserID,
+		Device: DeviceRecord{
+			Name:      c.Device.Name,
+			Type:      c.Device.Type,
+			OS:        c.Device.OS,
+			Browser:   c.Device.Browser,
+			IPAddress: c.Device.IPAddress,
+		},
+		Custom:    c.Custom,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
 	}
 }
 
@@ -328,10 +368,10 @@ func (s *service) SetMetadata(ctx context.Context, sessionID string, meta Metada
 	}
 
 	now := s.ctx.Now()
-	rec := &store.MetadataRecord{
+	rec := &MetadataRecord{
 		SessionID: sess.ID,
 		UserID:    sess.UserID,
-		Device: store.DeviceRecord{
+		Device: DeviceRecord{
 			Name:      meta.Device.Name,
 			Type:      meta.Device.Type,
 			OS:        meta.Device.OS,
@@ -343,14 +383,26 @@ func (s *service) SetMetadata(ctx context.Context, sessionID string, meta Metada
 		UpdatedAt: now,
 	}
 
-	// 1. Store first
-	if err := s.store.Save(ctx, rec); err != nil {
-		return err
+	// 1. Persistence first (upsert)
+	existing, err := s.records.FindOne(ctx, adapter.Eq("session_id", sess.ID))
+	if err == nil && existing != nil {
+		_, err = s.records.Update(ctx, []adapter.Condition{adapter.Eq("session_id", sess.ID)}, map[string]any{
+			"device":     rec.Device,
+			"custom":     rec.Custom,
+			"updated_at": now,
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := s.records.Create(ctx, rec); err != nil {
+			return err
+		}
 	}
 
 	// 2. Cache update
 	if s.cache != nil {
-		s.cache.SetMetadata(ctx, rec)
+		s.cache.SetMetadata(ctx, metadataRecordToCached(rec))
 	}
 
 	// 3. Emit event
@@ -377,13 +429,13 @@ func (s *service) GetMetadata(ctx context.Context, sessionID string) (*Metadata,
 	// Check cache first (cache-aside)
 	if s.cache != nil {
 		if rec, ok := s.cache.GetMetadata(ctx, sessionID); ok {
-			return mapRecordToMetadata(rec), nil
+			return mapRecordToMetadata(cachedToMetadataRecord(rec)), nil
 		}
 	}
 
-	// Fallback to Store
-	rec, err := s.store.Get(ctx, sessionID)
-	if errors.Is(err, store.ErrNotFound) {
+	// Fallback to Persistence
+	rec, err := s.records.FindOne(ctx, adapter.Eq("session_id", sessionID))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrMetadataNotFound
 	}
 	if err != nil {
@@ -391,7 +443,7 @@ func (s *service) GetMetadata(ctx context.Context, sessionID string) (*Metadata,
 	}
 
 	if s.cache != nil {
-		s.cache.SetMetadata(ctx, rec)
+		s.cache.SetMetadata(ctx, metadataRecordToCached(rec))
 	}
 
 	return mapRecordToMetadata(rec), nil
@@ -483,7 +535,7 @@ func (s *service) invalidateSessionCache(ctx context.Context, sess *session.Sess
 	}
 }
 
-func mapRecordToMetadata(rec *store.MetadataRecord) *Metadata {
+func mapRecordToMetadata(rec *MetadataRecord) *Metadata {
 	if rec == nil {
 		return nil
 	}

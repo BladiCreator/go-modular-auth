@@ -4,9 +4,27 @@ import (
 	"context"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-multisession/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
+
+// CachedDeviceRecord contains persistent device identification details for caching.
+type CachedDeviceRecord struct {
+	Name      string `json:"name,omitempty"`
+	Type      string `json:"type,omitempty"`
+	OS        string `json:"os,omitempty"`
+	Browser   string `json:"browser,omitempty"`
+	IPAddress string `json:"ip_address,omitempty"`
+}
+
+// CachedMetadataRecord is the cached representation of session metadata.
+type CachedMetadataRecord struct {
+	SessionID string            `json:"session_id"`
+	UserID    string            `json:"user_id"`
+	Device    CachedDeviceRecord `json:"device"`
+	Custom    map[string]string `json:"custom,omitempty"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+}
 
 // KeyMetadata returns the namespaced cache key for session metadata.
 // Format: gomodularauth:multisession:meta:<sessionID>
@@ -33,11 +51,11 @@ func New(c corecache.Cache, ttl time.Duration) *Cache {
 }
 
 // GetMetadata returns cached session metadata, if present.
-func (c *Cache) GetMetadata(ctx context.Context, sessionID string) (*store.MetadataRecord, bool) {
+func (c *Cache) GetMetadata(ctx context.Context, sessionID string) (*CachedMetadataRecord, bool) {
 	if c == nil || c.c == nil || sessionID == "" {
 		return nil, false
 	}
-	var rec store.MetadataRecord
+	var rec CachedMetadataRecord
 	if err := c.c.Get(ctx, KeyMetadata(sessionID), &rec); err != nil {
 		return nil, false
 	}
@@ -45,7 +63,7 @@ func (c *Cache) GetMetadata(ctx context.Context, sessionID string) (*store.Metad
 }
 
 // SetMetadata stores the session metadata in cache.
-func (c *Cache) SetMetadata(ctx context.Context, rec *store.MetadataRecord) {
+func (c *Cache) SetMetadata(ctx context.Context, rec *CachedMetadataRecord) {
 	if c == nil || c.c == nil || rec == nil || rec.SessionID == "" {
 		return
 	}

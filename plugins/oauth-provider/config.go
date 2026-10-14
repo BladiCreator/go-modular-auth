@@ -2,16 +2,10 @@ package oauthprovider
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-oauth-provider/store"
-	"github.com/BladiCreator/go-modular-auth-oauth-provider/store/memory"
 )
 
 // Config holds configuration parameters for the OAuth 2.1 Provider plugin.
 type Config struct {
-	// Store is the persistence store adapter. If nil, memory.New() is used.
-	Store store.Store
-
 	// Issuer is the canonical authorization server identifier URL (e.g. "https://auth.example.com").
 	Issuer string
 
@@ -36,13 +30,6 @@ type Config struct {
 
 // Option configures the OAuth 2.1 Provider plugin.
 type Option func(*Config)
-
-// WithStore sets the persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithIssuer sets the authorization server issuer URL.
 func WithIssuer(issuer string) Option {
@@ -87,9 +74,6 @@ func WithRotateRefreshTokens(rotate bool) Option {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.AuthorizationCodeTTL <= 0 {
 		c.AuthorizationCodeTTL = 5 * time.Minute
 	}

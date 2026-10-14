@@ -3,12 +3,14 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
@@ -16,6 +18,7 @@ type service struct {
 	ctx      *sdk.Context
 	cfg      Config
 	logger   *slog.Logger
+	model    *sdk.Repository[AuditRecord]
 	asyncCh  chan *AuditRecord
 	wg       sync.WaitGroup
 	stopOnce sync.Once
@@ -26,8 +29,10 @@ var _ Audit = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	var logger *slog.Logger
+	var model *sdk.Repository[AuditRecord]
 	if ctx != nil {
 		logger = ctx.Logger()
+		model = sdk.Model[AuditRecord](ctx, ModelAuditRecords)
 	} else {
 		logger = slog.Default()
 	}
@@ -36,6 +41,7 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 		ctx:    ctx,
 		cfg:    cfg,
 		logger: logger,
+		model:  model,
 		stopCh: make(chan struct{}),
 	}
 
@@ -74,24 +80,103 @@ func (s *service) Record(ctx context.Context, record *AuditRecord) error {
 		default:
 			// Buffer full fallback: record synchronously to guarantee zero lost audit logs
 			s.logger.WarnContext(ctx, "audit: async buffer full, falling back to sync store")
-			return s.cfg.Store.Record(ctx, record)
+			if s.model != nil {
+				return s.model.Create(ctx, record)
+			}
+			return nil
 		}
 	}
 
-	return s.cfg.Store.Record(ctx, record)
+	if s.model != nil {
+		return s.model.Create(ctx, record)
+	}
+	return nil
+}
+
+func (s *service) recordBatch(ctx context.Context, records []*AuditRecord) error {
+	if len(records) == 0 || s.model == nil {
+		return nil
+	}
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		return s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+			txModel := sdk.FromAdapter[AuditRecord](tx, ModelAuditRecords)
+			for _, r := range records {
+				if err := txModel.Create(txCtx, r); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	for _, r := range records {
+		if err := s.model.Create(ctx, r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Query searches the audit log with customizable filtering and pagination criteria.
 func (s *service) Query(ctx context.Context, filter ListFilter) (*ListResult, error) {
+	if s.model == nil {
+		return &ListResult{Records: []*AuditRecord{}}, nil
+	}
 	filter.Normalize()
-	records, total, err := s.cfg.Store.Query(ctx, filter)
+
+	var where []adapter.Condition
+	if filter.ActorSubject != "" {
+		where = append(where, adapter.Eq("actor_subject", filter.ActorSubject))
+	}
+	if filter.ActorType != "" {
+		where = append(where, adapter.Eq("actor_type", filter.ActorType))
+	}
+	if filter.TargetType != "" {
+		where = append(where, adapter.Eq("target_type", filter.TargetType))
+	}
+	if filter.TargetID != "" {
+		where = append(where, adapter.Eq("target_id", filter.TargetID))
+	}
+	if filter.Event != "" {
+		where = append(where, adapter.Eq("event", filter.Event))
+	}
+	if filter.Outcome != "" {
+		where = append(where, adapter.Eq("outcome", string(filter.Outcome)))
+	}
+	if filter.OrganizationID != "" {
+		where = append(where, adapter.Eq("organization_id", filter.OrganizationID))
+	}
+	if !filter.Since.IsZero() {
+		where = append(where, adapter.Gte("timestamp", filter.Since))
+	}
+	if !filter.Until.IsZero() {
+		where = append(where, adapter.Lte("timestamp", filter.Until))
+	}
+
+	total, err := s.model.Count(ctx, where...)
 	if err != nil {
 		return nil, err
 	}
 
+	rows, err := s.model.FindMany(ctx, adapter.Query{
+		Model:  ModelAuditRecords,
+		Where:  where,
+		Limit:  filter.Limit,
+		Offset: filter.Offset,
+		SortBy: "timestamp",
+		Desc:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]*AuditRecord, len(rows))
+	for i := range rows {
+		records[i] = &rows[i]
+	}
+
 	return &ListResult{
 		Records: records,
-		Total:   total,
+		Total:   int(total),
 		Limit:   filter.Limit,
 		Offset:  filter.Offset,
 	}, nil
@@ -102,7 +187,18 @@ func (s *service) GetByID(ctx context.Context, id string) (*AuditRecord, error) 
 	if strings.TrimSpace(id) == "" {
 		return nil, ErrRecordNotFound
 	}
-	return s.cfg.Store.GetByID(ctx, id)
+	if s.model == nil {
+		return nil, ErrRecordNotFound
+	}
+
+	rec, err := s.model.FindOne(ctx, adapter.Eq("id", id))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return rec, nil
 }
 
 // QueryByActor returns audit entries performed by or associated with a specific actor subject.
@@ -193,7 +289,7 @@ func deriveOutcome(ev auth.Event) Outcome {
 	if strings.Contains(name, "denied") ||
 		strings.Contains(name, "rejected") ||
 		strings.Contains(name, "failed") ||
-		strings.Contains(name, "revoked") && strings.Contains(name, "token.rejected") {
+		(strings.Contains(name, "revoked") && strings.Contains(name, "token.rejected")) {
 		return OutcomeFailure
 	}
 	return OutcomeSuccess
@@ -295,7 +391,7 @@ func (s *service) workerLoop() {
 		batch = batch[:0]
 
 		bgCtx := context.Background()
-		if err := s.cfg.Store.RecordBatch(bgCtx, toPersist); err != nil {
+		if err := s.recordBatch(bgCtx, toPersist); err != nil {
 			s.logger.Error("audit: async batch persist failed", "error", err, "count", len(toPersist))
 		}
 	}

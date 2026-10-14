@@ -4,12 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/BladiCreator/go-modular-auth-username/store"
 )
-
-// Record is an alias to store.Record, exposing the persistent identity mapping in the public API.
-type Record = store.Record
 
 // Validator is a function that checks if a raw username satisfies syntactic and business rules.
 type Validator func(username string) error

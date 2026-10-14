@@ -10,7 +10,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth-oauth"
 	"github.com/BladiCreator/go-modular-auth-oauth/plugins"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 // mockProvider implements provider.Provider for testing without live HTTP network.
@@ -86,7 +86,7 @@ func setupTestAuth(t *testing.T, opts ...oauth.Option) (*auth.Auth, plugins.OAut
 	module := oauth.New(defaultOpts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{module},
 	})
 	if err != nil {

@@ -6,17 +6,17 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	ott "github.com/BladiCreator/go-modular-auth-one-time-token"
 )
 
 func setupTest(t *testing.T, opts ...ott.Option) (*auth.Auth, ott.OneTimeToken) {
 	t.Helper()
-	s := storememory.New()
+	ad := adaptermem.New()
 	mod := ott.New(append([]ott.Option{ott.WithTTL(5 * time.Minute)}, opts...)...)
 
 	a, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

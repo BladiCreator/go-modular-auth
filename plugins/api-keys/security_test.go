@@ -12,22 +12,20 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
 	"github.com/BladiCreator/go-modular-auth-apikeys/plugins"
-	"github.com/BladiCreator/go-modular-auth-apikeys/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func TestSecurity_BruteForceProtection(t *testing.T) {
 	ctx := context.Background()
-	memStore := memory.New()
+	ad := adaptermem.New()
 	memCache := corecache.New()
 
 	engine, err := auth.New(auth.Config{
-		Store: corestore.New(),
-		Cache: memCache,
+		Adapter: ad,
+		Cache:   memCache,
 		Plugins: []auth.PluginModule{
 			apikeys.New(
-				apikeys.WithStore(memStore),
 				apikeys.WithBruteForceProtection(3, 1*time.Minute),
 			),
 		},

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	ssooidc "github.com/BladiCreator/go-modular-auth-sso/oidc"
-	"github.com/BladiCreator/go-modular-auth-sso/store"
 )
 
 func TestOIDCClient_DiscoveryAndBuildURL(t *testing.T) {
@@ -45,7 +44,7 @@ func TestOIDCClient_DiscoveryAndBuildURL(t *testing.T) {
 		t.Errorf("unexpected auth endpoint: %s", doc.AuthorizationEndpoint)
 	}
 
-	cfg := &store.OIDCConfig{
+	cfg := &ssooidc.OIDCConfig{
 		ClientID:    "client_123",
 		RedirectURI: "https://app.com/cb",
 		Scopes:      []string{"openid", "email"},
@@ -118,7 +117,7 @@ func TestOIDCClient_VerifyIDToken(t *testing.T) {
 	}
 	rawToken := signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
 
-	cfg := &store.OIDCConfig{
+	cfg := &ssooidc.OIDCConfig{
 		Issuer:   issuer,
 		ClientID: clientID,
 	}

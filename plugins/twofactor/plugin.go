@@ -3,17 +3,21 @@ package twofactor
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
 const PluginID = "twofactor"
 
-// Module implements auth.PluginModule for two-factor authentication using plugin-sdk.
+// Module implements auth.PluginModule and auth.SchemaProvider for two-factor authentication.
 type Module struct {
 	cfg Config
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
 
 // New creates an installable twofactor PluginModule with optional configurations.
 func New(opts ...Option) *Module {
@@ -27,6 +31,11 @@ func New(opts ...Option) *Module {
 // ID returns the module's unique identifier.
 func (m *Module) ID() string {
 	return PluginID
+}
+
+// RegisterSchema contributes twofactor tables and user field extensions to the compiled schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
 }
 
 // Init configures infrastructure, registers hooks, and provides the typed Capability into GoModularAuth via plugin-sdk.

@@ -1,7 +1,7 @@
 -- Migration: 001_create_rbac_tables
 -- Description: Schema for RBAC roles, permissions, and principal assignments
 
-CREATE TABLE IF NOT EXISTS auth_rbac_roles (
+CREATE TABLE IF NOT EXISTS rbac_roles (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(128) UNIQUE NOT NULL,
     description TEXT,
@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS auth_rbac_roles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rbac_roles_scope 
-    ON auth_rbac_roles(scope);
+    ON rbac_roles(scope);
 
-CREATE TABLE IF NOT EXISTS auth_rbac_assignments (
+CREATE TABLE IF NOT EXISTS rbac_assignments (
     id VARCHAR(64) PRIMARY KEY,
-    role_id VARCHAR(64) NOT NULL REFERENCES auth_rbac_roles(id) ON DELETE RESTRICT,
+    role_id VARCHAR(64) NOT NULL REFERENCES rbac_roles(id) ON DELETE RESTRICT,
     principal_subject VARCHAR(128) NOT NULL,
     principal_type VARCHAR(64) NOT NULL,
     scope VARCHAR(32) NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS auth_rbac_assignments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rbac_assignments_principal 
-    ON auth_rbac_assignments(principal_subject, principal_type);
+    ON rbac_assignments(principal_subject, principal_type);
 
 CREATE INDEX IF NOT EXISTS idx_rbac_assignments_scope 
-    ON auth_rbac_assignments(scope, scope_id);
+    ON rbac_assignments(scope, scope_id);

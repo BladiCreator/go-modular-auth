@@ -7,7 +7,7 @@ import "errors"
 // Credential and token errors are deliberately coarse (ErrInvalidCredentials,
 // ErrInvalidToken) so callers cannot be used as user/token existence oracles.
 var (
-	ErrStoreRequired      = errors.New("auth: store is required")
+	ErrAdapterRequired    = errors.New("auth: adapter is required")
 	ErrInvalidEmail       = errors.New("auth: invalid email")
 	ErrInvalidPassword    = errors.New("auth: password does not satisfy the policy")
 	ErrEmailAlreadyExists = errors.New("auth: email already registered")

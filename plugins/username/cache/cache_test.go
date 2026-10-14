@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-username/cache"
-	"github.com/BladiCreator/go-modular-auth-username/store"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
@@ -15,7 +14,7 @@ func TestSemanticCache(t *testing.T) {
 	underlying := memcache.New()
 	c := cache.New(underlying, time.Minute)
 
-	rec := &store.Record{
+	rec := &cache.CachedRecord{
 		UserID:     "user-100",
 		Username:   "BobBuilder",
 		Normalized: "bobbuilder",

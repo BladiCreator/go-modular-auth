@@ -3,18 +3,22 @@ package oidc
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
 const PluginID = "oidc"
 
-// Module implements auth.PluginModule for OpenID Connect relying party authentication.
+// Module implements auth.PluginModule and auth.SchemaProvider for OpenID Connect relying party authentication.
 type Module struct {
 	cfg Config
 	svc *service
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
 
 // New creates an installable OIDC PluginModule with options.
 func New(opts ...Option) *Module {
@@ -28,6 +32,11 @@ func New(opts ...Option) *Module {
 // ID returns the module's unique identifier.
 func (m *Module) ID() string {
 	return PluginID
+}
+
+// RegisterSchema contributes schema models for OIDC state sessions.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
 }
 
 // Init configures infrastructure and registers the typed Capability in GoModularAuth.

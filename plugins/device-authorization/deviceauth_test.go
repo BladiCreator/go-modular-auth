@@ -9,26 +9,23 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	deviceauth "github.com/BladiCreator/go-modular-auth-device-authorization"
 	"github.com/BladiCreator/go-modular-auth-device-authorization/plugins"
-	devicememory "github.com/BladiCreator/go-modular-auth-device-authorization/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-func setupTestAuth(t *testing.T) (*auth.Auth, plugins.DeviceAuthorization, *devicememory.Store) {
+func setupTestAuth(t *testing.T) (*auth.Auth, plugins.DeviceAuthorization, *adaptermem.Adapter) {
 	t.Helper()
-	cStore := corememory.New()
+	cAdapter := adaptermem.New()
 	cCache := corecache.New()
-	devStore := devicememory.New()
 
 	devModule := deviceauth.New(
-		deviceauth.WithStore(devStore),
 		deviceauth.WithVerificationURI("https://auth.example.com/device"),
 		deviceauth.WithExpiresIn(10*time.Minute),
 		deviceauth.WithPollingInterval(1*time.Second),
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cAdapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{devModule},
 	})
@@ -41,7 +38,7 @@ func setupTestAuth(t *testing.T) (*auth.Auth, plugins.DeviceAuthorization, *devi
 		t.Fatalf("auth.Get[plugins.DeviceAuthorization] failed: %v", err)
 	}
 
-	return a, devCap, devStore
+	return a, devCap, cAdapter
 }
 
 func TestDeviceAuthorization_EndToEnd_Approval(t *testing.T) {

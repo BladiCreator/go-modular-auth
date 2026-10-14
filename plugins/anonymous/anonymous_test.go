@@ -9,8 +9,8 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-anonymous"
 	"github.com/BladiCreator/go-modular-auth-anonymous/plugins"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 type testHarness struct {
@@ -21,7 +21,7 @@ type testHarness struct {
 
 func setupHarness(t *testing.T, opts ...anonymous.Option) *testHarness {
 	t.Helper()
-	storeAdapter := corestore.New()
+	ad := adaptermem.New()
 	cacheAdapter := corecache.New()
 
 	h := &testHarness{}
@@ -29,8 +29,8 @@ func setupHarness(t *testing.T, opts ...anonymous.Option) *testHarness {
 	anonPlugin := anonymous.New(opts...)
 
 	engine, err := auth.New(auth.Config{
-		Store: storeAdapter,
-		Cache: cacheAdapter,
+		Adapter: ad,
+		Cache:   cacheAdapter,
 		Plugins: []auth.PluginModule{
 			anonPlugin,
 		},

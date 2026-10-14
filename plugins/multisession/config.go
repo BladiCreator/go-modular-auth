@@ -2,9 +2,6 @@ package multisession
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-multisession/store"
-	"github.com/BladiCreator/go-modular-auth-multisession/store/memory"
 )
 
 // OverflowPolicy defines the action taken when a user exceeds MaxConcurrentSessions.
@@ -28,10 +25,6 @@ type Config struct {
 
 	// OverflowPolicy controls what happens when the session concurrency limit is exceeded.
 	OverflowPolicy OverflowPolicy
-
-	// MetadataStore is the persistence adapter for optional session and device metadata.
-	// If nil, defaults to an in-memory store.
-	MetadataStore store.Store
 
 	// MetadataCacheTTL controls how long session metadata is cached.
 	MetadataCacheTTL time.Duration
@@ -59,15 +52,6 @@ func WithOverflowPolicy(policy OverflowPolicy) Option {
 	}
 }
 
-// WithMetadataStore sets the persistence adapter for session metadata.
-func WithMetadataStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.MetadataStore = s
-		}
-	}
-}
-
 // WithMetadataCacheTTL sets the cache duration for session metadata.
 func WithMetadataCacheTTL(ttl time.Duration) Option {
 	return func(c *Config) {
@@ -81,7 +65,6 @@ func defaultConfig() Config {
 	return Config{
 		MaxConcurrentSessions: 0, // Concurrency limit disabled by default
 		OverflowPolicy:        OverflowRevokeOldest,
-		MetadataStore:         memory.New(),
 		MetadataCacheTTL:      10 * time.Minute,
 	}
 }

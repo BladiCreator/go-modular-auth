@@ -1,6 +1,6 @@
 module github.com/BladiCreator/go-modular-auth-rbac
 
-go 1.26.0
+go 1.27.1
 
 replace github.com/BladiCreator/go-modular-auth => ../../core
 
@@ -10,7 +10,6 @@ replace github.com/BladiCreator/go-modular-auth/adapters/memory => ../../adapter
 
 require (
 	github.com/BladiCreator/go-modular-auth v0.0.0
-	github.com/BladiCreator/go-modular-auth/adapters/memory v0.0.0-00010101000000-000000000000
 	github.com/BladiCreator/go-modular-auth/plugin-sdk v0.0.0-00010101000000-000000000000
 )
 

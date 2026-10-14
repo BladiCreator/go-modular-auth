@@ -10,8 +10,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	oauthprovider "github.com/BladiCreator/go-modular-auth-oauth-provider"
 	"github.com/BladiCreator/go-modular-auth-oauth-provider/plugins"
-	"github.com/BladiCreator/go-modular-auth-oauth-provider/store/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func generatePKCEPair() (verifier, challenge string) {
@@ -24,7 +23,6 @@ func generatePKCEPair() (verifier, challenge string) {
 func setupProvider(t *testing.T) (oauthprovider.OAuthProvider, *auth.Auth) {
 	t.Helper()
 	mod := oauthprovider.New(
-		oauthprovider.WithStore(memory.New()),
 		oauthprovider.WithAccessTokenTTL(10*time.Minute),
 		oauthprovider.WithAuthorizationCodeTTL(2*time.Minute),
 		oauthprovider.WithRefreshTokenTTL(24*time.Hour),
@@ -32,7 +30,7 @@ func setupProvider(t *testing.T) (oauthprovider.OAuthProvider, *auth.Auth) {
 	)
 
 	engine, err := auth.New(auth.Config{
-		Store:   corestore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

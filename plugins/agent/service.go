@@ -8,8 +8,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-agent/store"
 )
 
 type AgentManager interface {
@@ -25,16 +25,18 @@ type AgentManager interface {
 }
 
 type service struct {
-	ctx   *sdk.Context
-	store store.Store
+	ctx    *sdk.Context
+	agents *sdk.Repository[Agent]
+	creds  *sdk.Repository[Credential]
 }
 
 var _ AgentManager = (*service)(nil)
 
-func newService(ctx *sdk.Context, st store.Store) *service {
+func newService(ctx *sdk.Context) *service {
 	return &service{
-		ctx:   ctx,
-		store: st,
+		ctx:    ctx,
+		agents: sdk.Model[Agent](ctx, ModelAgents),
+		creds:  sdk.Model[Credential](ctx, ModelAgentCredentials),
 	}
 }
 
@@ -49,6 +51,13 @@ func hashToken(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
+func (s *service) now() time.Time {
+	if s.ctx != nil {
+		return s.ctx.Now()
+	}
+	return time.Now()
+}
+
 func (s *service) CreateAgent(ctx context.Context, ownerID, name, description string, scopes []string, metadata map[string]string) (*Agent, error) {
 	if ownerID == "" {
 		return nil, ErrInvalidOwnerID
@@ -57,10 +66,10 @@ func (s *service) CreateAgent(ctx context.Context, ownerID, name, description st
 		return nil, ErrInvalidName
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 	id := generateID("agt")
 
-	rec := &store.AgentRecord{
+	ag := &Agent{
 		ID:          id,
 		Name:        name,
 		Description: description,
@@ -72,70 +81,42 @@ func (s *service) CreateAgent(ctx context.Context, ownerID, name, description st
 		UpdatedAt:   now,
 	}
 
-	if err := s.store.CreateAgent(ctx, rec); err != nil {
+	if err := s.agents.Create(ctx, ag); err != nil {
 		return nil, err
 	}
 
-	return &Agent{
-		ID:          rec.ID,
-		Name:        rec.Name,
-		Description: rec.Description,
-		OwnerID:     rec.OwnerID,
-		Scopes:      rec.Scopes,
-		Metadata:    rec.Metadata,
-		Active:      rec.Active,
-		CreatedAt:   rec.CreatedAt,
-		UpdatedAt:   rec.UpdatedAt,
-	}, nil
+	return ag, nil
 }
 
 func (s *service) GetAgent(ctx context.Context, id string) (*Agent, error) {
 	if id == "" {
 		return nil, ErrNotFound
 	}
-	rec, err := s.store.GetAgent(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	ag, err := s.agents.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-
-	return &Agent{
-		ID:          rec.ID,
-		Name:        rec.Name,
-		Description: rec.Description,
-		OwnerID:     rec.OwnerID,
-		Scopes:      rec.Scopes,
-		Metadata:    rec.Metadata,
-		Active:      rec.Active,
-		CreatedAt:   rec.CreatedAt,
-		UpdatedAt:   rec.UpdatedAt,
-	}, nil
+	return ag, nil
 }
 
 func (s *service) ListAgents(ctx context.Context, ownerID string) ([]*Agent, error) {
 	if ownerID == "" {
 		return nil, ErrInvalidOwnerID
 	}
-	records, err := s.store.ListAgentsByOwner(ctx, ownerID)
+	records, err := s.agents.FindMany(ctx, adapter.Query{
+		Model: ModelAgents,
+		Where: []adapter.Condition{adapter.Eq("owner_id", ownerID)},
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	res := make([]*Agent, len(records))
-	for i, r := range records {
-		res[i] = &Agent{
-			ID:          r.ID,
-			Name:        r.Name,
-			Description: r.Description,
-			OwnerID:     r.OwnerID,
-			Scopes:      r.Scopes,
-			Metadata:    r.Metadata,
-			Active:      r.Active,
-			CreatedAt:   r.CreatedAt,
-			UpdatedAt:   r.UpdatedAt,
-		}
+	for i := range records {
+		res[i] = &records[i]
 	}
 	return res, nil
 }
@@ -144,26 +125,37 @@ func (s *service) UpdateAgent(ctx context.Context, a *Agent) error {
 	if a == nil || a.ID == "" {
 		return ErrNotFound
 	}
-	a.UpdatedAt = s.ctx.Now()
-	rec := &store.AgentRecord{
-		ID:          a.ID,
-		Name:        a.Name,
-		Description: a.Description,
-		OwnerID:     a.OwnerID,
-		Scopes:      a.Scopes,
-		Metadata:    a.Metadata,
-		Active:      a.Active,
-		CreatedAt:   a.CreatedAt,
-		UpdatedAt:   a.UpdatedAt,
+	a.UpdatedAt = s.now()
+	affected, err := s.agents.Update(ctx, []adapter.Condition{adapter.Eq("id", a.ID)}, map[string]any{
+		"name":        a.Name,
+		"description": a.Description,
+		"owner_id":    a.OwnerID,
+		"scopes":      a.Scopes,
+		"metadata":    a.Metadata,
+		"active":      a.Active,
+		"updated_at":  a.UpdatedAt,
+	})
+	if err != nil {
+		return err
 	}
-	return s.store.UpdateAgent(ctx, rec)
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *service) DeleteAgent(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrNotFound
 	}
-	return s.store.DeleteAgent(ctx, id)
+	affected, err := s.agents.Delete(ctx, adapter.Eq("id", id))
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *service) IssueCredential(ctx context.Context, agentID string, ttl time.Duration) (string, *Credential, error) {
@@ -189,11 +181,11 @@ func (s *service) IssueCredential(ctx context.Context, agentID string, ttl time.
 	plainToken := "mcp_" + hex.EncodeToString(tokenBytes)
 	hashed := hashToken(plainToken)
 
-	now := s.ctx.Now()
+	now := s.now()
 	credID := generateID("cred")
 	expiresAt := now.Add(ttl)
 
-	cRec := &store.CredentialRecord{
+	cred := &Credential{
 		ID:        credID,
 		AgentID:   agentID,
 		TokenHash: hashed,
@@ -201,16 +193,8 @@ func (s *service) IssueCredential(ctx context.Context, agentID string, ttl time.
 		CreatedAt: now,
 	}
 
-	if err := s.store.SaveCredential(ctx, cRec); err != nil {
+	if err := s.creds.Create(ctx, cred); err != nil {
 		return "", nil, err
-	}
-
-	cred := &Credential{
-		ID:        cRec.ID,
-		AgentID:   cRec.AgentID,
-		TokenHash: cRec.TokenHash,
-		ExpiresAt: cRec.ExpiresAt,
-		CreatedAt: cRec.CreatedAt,
 	}
 
 	return plainToken, cred, nil
@@ -222,34 +206,26 @@ func (s *service) ValidateCredential(ctx context.Context, token string) (*Agent,
 	}
 
 	hashed := hashToken(token)
-	cRec, err := s.store.GetCredentialByHash(ctx, hashed)
-	if errors.Is(err, store.ErrNotFound) {
+	cred, err := s.creds.FindOne(ctx, adapter.Eq("token_hash", hashed))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, nil, ErrInvalidToken
 	}
 	if err != nil {
 		return nil, nil, err
 	}
 
-	now := s.ctx.Now()
-	if now.After(cRec.ExpiresAt) {
-		_ = s.store.RevokeCredential(ctx, cRec.ID)
+	now := s.now()
+	if now.After(cred.ExpiresAt) {
+		_, _ = s.creds.Delete(ctx, adapter.Eq("id", cred.ID))
 		return nil, nil, ErrInvalidToken
 	}
 
-	ag, err := s.GetAgent(ctx, cRec.AgentID)
+	ag, err := s.GetAgent(ctx, cred.AgentID)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !ag.Active {
 		return nil, nil, ErrAgentInactive
-	}
-
-	cred := &Credential{
-		ID:        cRec.ID,
-		AgentID:   cRec.AgentID,
-		TokenHash: cRec.TokenHash,
-		ExpiresAt: cRec.ExpiresAt,
-		CreatedAt: cRec.CreatedAt,
 	}
 
 	return ag, cred, nil
@@ -259,5 +235,12 @@ func (s *service) RevokeCredential(ctx context.Context, credentialID string) err
 	if credentialID == "" {
 		return ErrNotFound
 	}
-	return s.store.RevokeCredential(ctx, credentialID)
+	affected, err := s.creds.Delete(ctx, adapter.Eq("id", credentialID))
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

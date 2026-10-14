@@ -1,7 +1,7 @@
 -- Migration: 001_create_sso_tables.sql
 -- Description: Creates persistent storage tables for enterprise SSO configurations, domains, and in-flight state sessions.
 
-CREATE TABLE IF NOT EXISTS auth_sso_configs (
+CREATE TABLE IF NOT EXISTS sso_configs (
     id VARCHAR(64) PRIMARY KEY,
     organization_id VARCHAR(64) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -18,21 +18,21 @@ CREATE TABLE IF NOT EXISTS auth_sso_configs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_sso_configs_org ON auth_sso_configs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_sso_configs_org ON sso_configs(organization_id);
 
-CREATE TABLE IF NOT EXISTS auth_sso_domains (
+CREATE TABLE IF NOT EXISTS sso_domains (
     domain VARCHAR(255) PRIMARY KEY,
     organization_id VARCHAR(64) NOT NULL,
-    config_id VARCHAR(64) NOT NULL REFERENCES auth_sso_configs(id) ON DELETE CASCADE,
+    config_id VARCHAR(64) NOT NULL REFERENCES sso_configs(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_sso_domains_org ON auth_sso_domains(organization_id);
+CREATE INDEX IF NOT EXISTS idx_sso_domains_org ON sso_domains(organization_id);
 
-CREATE TABLE IF NOT EXISTS auth_sso_states (
+CREATE TABLE IF NOT EXISTS sso_states (
     state VARCHAR(255) PRIMARY KEY,
     organization_id VARCHAR(64) NOT NULL,
-    config_id VARCHAR(64) NOT NULL REFERENCES auth_sso_configs(id) ON DELETE CASCADE,
+    config_id VARCHAR(64) NOT NULL REFERENCES sso_configs(id) ON DELETE CASCADE,
     protocol VARCHAR(32) NOT NULL,
     redirect_uri TEXT NOT NULL,
     relay_state TEXT NULL,
@@ -44,5 +44,5 @@ CREATE TABLE IF NOT EXISTS auth_sso_states (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_sso_states_expires ON auth_sso_states(expires_at);
-CREATE INDEX IF NOT EXISTS idx_auth_sso_states_consumed ON auth_sso_states(consumed_at);
+CREATE INDEX IF NOT EXISTS idx_sso_states_expires ON sso_states(expires_at);
+CREATE INDEX IF NOT EXISTS idx_sso_states_consumed ON sso_states(consumed_at);

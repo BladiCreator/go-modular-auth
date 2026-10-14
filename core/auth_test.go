@@ -9,13 +9,14 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/session"
-	"github.com/BladiCreator/go-modular-auth/store"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
@@ -31,23 +32,23 @@ func (c *clock) Now() time.Time          { c.mu.Lock(); defer c.mu.Unlock(); ret
 func (c *clock) Advance(d time.Duration) { c.mu.Lock(); c.t = c.t.Add(d); c.mu.Unlock() }
 
 type fixture struct {
-	auth  *auth.Auth
-	store *memstore.Store
-	cache *memcache.Cache
-	email *mememail.Sender
-	clock *clock
+	auth    *auth.Auth
+	adapter *adaptermem.Adapter
+	cache   *memcache.Cache
+	email   *mememail.Sender
+	clock   *clock
 }
 
 func newFixture(t *testing.T, mutate func(*auth.Config)) *fixture {
 	t.Helper()
 	clk := &clock{t: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
 	f := &fixture{
-		store: memstore.New(),
-		cache: memcache.New(memcache.WithClock(clk.Now)),
-		email: mememail.New(),
-		clock: clk,
+		adapter: adaptermem.New(),
+		cache:   memcache.New(memcache.WithClock(clk.Now)),
+		email:   mememail.New(),
+		clock:   clk,
 	}
-	cfg := auth.Config{Store: f.store, Cache: f.cache, Email: f.email, Hasher: fastHasher, Now: clk.Now}
+	cfg := auth.Config{Adapter: f.adapter, Cache: f.cache, Email: f.email, Hasher: fastHasher, Now: clk.Now}
 	if mutate != nil {
 		mutate(&cfg)
 	}
@@ -84,15 +85,15 @@ func lastToken(t *testing.T, s *mememail.Sender) string {
 	return ""
 }
 
-func TestNewRequiresStore(t *testing.T) {
-	if _, err := auth.New(auth.Config{}); !errors.Is(err, auth.ErrStoreRequired) {
-		t.Fatalf("want ErrStoreRequired, got %v", err)
+func TestNewRequiresAdapter(t *testing.T) {
+	if _, err := auth.New(auth.Config{}); !errors.Is(err, auth.ErrAdapterRequired) {
+		t.Fatalf("want ErrAdapterRequired, got %v", err)
 	}
 }
 
 func TestMinimalConfigWorksWithoutCache(t *testing.T) {
 	ctx := context.Background()
-	a, err := auth.New(auth.Config{Store: memstore.New(), Hasher: fastHasher})
+	a, err := auth.New(auth.Config{Adapter: adaptermem.New(), Hasher: fastHasher})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,8 +118,12 @@ func TestSignUpSignInSignOut(t *testing.T) {
 	if up.Token == "" || up.Session == nil {
 		t.Fatal("sign up should issue a session")
 	}
-	stored, _ := f.store.Sessions().GetByID(ctx, up.Session.ID)
-	if stored.TokenHash == up.Token || strings.Contains(stored.TokenHash, up.Token) {
+	stored, err := f.adapter.FindOne(ctx, schema.ModelSessions, []adapter.Condition{adapter.Eq("id", up.Session.ID)})
+	if err != nil {
+		t.Fatalf("session not found in adapter: %v", err)
+	}
+	tokenHash, _ := stored["token_hash"].(string)
+	if tokenHash == up.Token || strings.Contains(tokenHash, up.Token) {
 		t.Fatal("plaintext token must never be stored")
 	}
 
@@ -197,9 +202,9 @@ func TestSessionCacheAsideAndInvalidation(t *testing.T) {
 		t.Fatalf("session should be cached after creation: %v", err)
 	}
 
-	// Store is the source of truth: revoke directly in the store, the cache
+	// Adapter is the source of truth: revoke directly in the adapter, the cache
 	// still serves the stale entry (bounded by CacheTTL) ...
-	if err := f.store.Sessions().Revoke(ctx, up.Session.ID, f.clock.Now()); err != nil {
+	if _, err := f.adapter.Update(ctx, schema.ModelSessions, []adapter.Condition{adapter.Eq("id", up.Session.ID)}, map[string]any{"revoked_at": f.clock.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	if res, _ := f.auth.GetSession(ctx, up.Token); res == nil {
@@ -262,7 +267,7 @@ func TestTransactionRollbackOnHookVeto(t *testing.T) {
 	if _, err := f.auth.SignUp(ctx, auth.SignUpInput{Email: "tx@x.co", Password: "password1"}); !errors.Is(err, veto) {
 		t.Fatalf("want veto, got %v", err)
 	}
-	if _, err := f.store.Users().GetByEmail(ctx, "tx@x.co"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := f.adapter.FindOne(ctx, schema.ModelUsers, []adapter.Condition{adapter.Eq("email", "tx@x.co")}); !errors.Is(err, adapter.ErrNotFound) {
 		t.Fatalf("user must be rolled back, got %v", err)
 	}
 }
@@ -423,3 +428,98 @@ func TestPurgeExpired(t *testing.T) {
 		t.Fatalf("PurgeExpired = %d, %v", n, err)
 	}
 }
+
+type schemaTestPlugin struct {
+	registered bool
+}
+
+func (p *schemaTestPlugin) ID() string { return "schema_test_plugin" }
+
+func (p *schemaTestPlugin) RegisterSchema(s *schema.Schema) error {
+	p.registered = true
+	// Extend users
+	if err := s.ExtendModel(schema.ModelUsers, schema.Field{
+		Name:    "two_factor_enabled",
+		Type:    schema.TypeBool,
+		Default: false,
+	}); err != nil {
+		return err
+	}
+	// Add new model
+	m := schema.NewModel("two_factors", "two_factors", "id")
+	_ = m.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{
+		Name:     "user_id",
+		Type:     schema.TypeString,
+		Required: true,
+		References: &schema.Reference{
+			Model:    schema.ModelUsers,
+			Field:    "id",
+			OnDelete: "CASCADE",
+		},
+	})
+	return s.AddModel(m)
+}
+
+func (p *schemaTestPlugin) Init(h *auth.Host) error {
+	if h.Adapter() == nil {
+		return errors.New("expected adapter on host")
+	}
+	if h.Schema() == nil {
+		return errors.New("expected schema on host")
+	}
+	return nil
+}
+
+func TestAdapterDrivenAuthAndSchemaProvider(t *testing.T) {
+	ctx := context.Background()
+	memAdapter := adaptermem.New()
+	plugin := &schemaTestPlugin{}
+
+	engine, err := auth.New(auth.Config{
+		Adapter: memAdapter,
+		Hasher:  fastHasher,
+		Plugins: []auth.PluginModule{plugin},
+	})
+	if err != nil {
+		t.Fatalf("auth.New with Adapter failed: %v", err)
+	}
+
+	if !plugin.registered {
+		t.Fatal("expected plugin.RegisterSchema to be called")
+	}
+
+	// Verify authentication workflow works transparently over generic adapter
+	res, err := engine.SignUp(ctx, auth.SignUpInput{
+		Email:    "adapter_user@example.com",
+		Password: "SecurePassword123!",
+	})
+	if err != nil {
+		t.Fatalf("SignUp on adapter failed: %v", err)
+	}
+	if res.User.Email != "adapter_user@example.com" {
+		t.Errorf("expected adapter_user@example.com, got %v", res.User.Email)
+	}
+
+	// Sign In
+	signInRes, err := engine.SignIn(ctx, auth.SignInInput{
+		Email:    "adapter_user@example.com",
+		Password: "SecurePassword123!",
+	})
+	if err != nil {
+		t.Fatalf("SignIn on adapter failed: %v", err)
+	}
+	if signInRes.Session == nil {
+		t.Fatal("expected session from SignIn")
+	}
+
+	// Require Session
+	sessionRes, err := engine.RequireSession(ctx, signInRes.Token)
+	if err != nil {
+		t.Fatalf("RequireSession failed: %v", err)
+	}
+	if sessionRes.User.ID != res.User.ID {
+		t.Errorf("user ID mismatch: %v vs %v", sessionRes.User.ID, res.User.ID)
+	}
+}
+

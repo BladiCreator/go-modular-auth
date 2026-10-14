@@ -4,27 +4,25 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	admin "github.com/BladiCreator/go-modular-auth-admin"
 	"github.com/BladiCreator/go-modular-auth-admin/plugins"
-	"github.com/BladiCreator/go-modular-auth-admin/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-func setupTestAuth(t *testing.T) (*auth.Auth, plugins.Admin, *memory.Store) {
+func setupTestAuth(t *testing.T) (*auth.Auth, plugins.Admin, adapter.Adapter) {
 	t.Helper()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	aStore := memory.New()
 
-	adminModule := admin.New(
-		admin.WithStore(aStore),
-	)
+	adminModule := admin.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{adminModule},
 	})
@@ -37,12 +35,36 @@ func setupTestAuth(t *testing.T) (*auth.Auth, plugins.Admin, *memory.Store) {
 		t.Fatalf("auth.Get[plugins.Admin] failed: %v", err)
 	}
 
-	return a, adm, aStore
+	return a, adm, ad
+}
+
+func bootstrapAdmin(ctx context.Context, ad adapter.Adapter, userID, email string) error {
+	affected, err := ad.Update(ctx, admin.ModelAdminUsers, []adapter.Condition{adapter.Eq("user_id", userID)}, map[string]any{
+		"is_admin":   true,
+		"role":       "superadmin",
+		"updated_at": time.Now(),
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		_, err = ad.Create(ctx, admin.ModelAdminUsers, map[string]any{
+			"user_id":    userID,
+			"email":      email,
+			"disabled":   false,
+			"is_admin":   true,
+			"role":       "superadmin",
+			"created_at": time.Now(),
+			"updated_at": time.Now(),
+		})
+		return err
+	}
+	return nil
 }
 
 func TestAdmin_EndToEnd(t *testing.T) {
 	ctx := context.Background()
-	a, adm, aStore := setupTestAuth(t)
+	a, adm, ad := setupTestAuth(t)
 
 	// 1. Create Administrator User and Regular User
 	adminRes, err := a.SignUp(ctx, auth.SignUpInput{
@@ -54,9 +76,9 @@ func TestAdmin_EndToEnd(t *testing.T) {
 	}
 	adminPrincipal := adminRes.Principal()
 
-	// Bootstrap admin role in store
-	if err := aStore.SetAdminRole(ctx, adminPrincipal.Subject, true, "superadmin"); err != nil {
-		t.Fatalf("SetAdminRole failed: %v", err)
+	// Bootstrap admin role in adapter
+	if err := bootstrapAdmin(ctx, ad, adminPrincipal.Subject, "superadmin@example.com"); err != nil {
+		t.Fatalf("bootstrapAdmin failed: %v", err)
 	}
 
 	userRes, err := a.SignUp(ctx, auth.SignUpInput{

@@ -3,6 +3,7 @@ package multisession
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -14,6 +15,12 @@ type Module struct {
 }
 
 var _ auth.PluginModule = (*Module)(nil)
+var _ auth.SchemaProvider = (*Module)(nil)
+
+// RegisterSchema registers the plugin's models into the schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
 
 // New creates an installable multisession PluginModule with optional configurations.
 func New(opts ...Option) *Module {

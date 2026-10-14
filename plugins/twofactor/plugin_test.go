@@ -9,18 +9,17 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
 	"github.com/BladiCreator/go-modular-auth-twofactor/plugins"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
-	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 func TestPlugin_RegistrationAndCapabilityResolution(t *testing.T) {
-	s := storememory.New()
+	ad := adaptermem.New()
 	c := cachememory.New()
 	mod := twofactor.New()
 
 	engine, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Cache:   c,
 		Plugins: []auth.PluginModule{mod},
 	})
@@ -48,12 +47,12 @@ func TestPlugin_RegistrationAndCapabilityResolution(t *testing.T) {
 }
 
 func TestPlugin_EventsEmission(t *testing.T) {
-	s := storememory.New()
+	ad := adaptermem.New()
 	c := cachememory.New()
 	mod := twofactor.New()
 
 	engine, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Cache:   c,
 		Plugins: []auth.PluginModule{mod},
 	})
@@ -124,14 +123,14 @@ func TestPlugin_EventsEmission(t *testing.T) {
 }
 
 func TestPlugin_EnforceMFAOnSessionCreateHook(t *testing.T) {
-	s := storememory.New()
+	ad := adaptermem.New()
 	c := cachememory.New()
 
 	// Plugin with MFA enforcement turned on
 	mod := twofactor.New(twofactor.WithEnforceMFAOnSignIn(true))
 
 	engine, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Cache:   c,
 		Plugins: []auth.PluginModule{mod},
 	})
@@ -142,12 +141,20 @@ func TestPlugin_EnforceMFAOnSessionCreateHook(t *testing.T) {
 	svc, _ := auth.Get[plugins.TwoFactor](engine)
 	ctx := context.Background()
 
-	// Create user in store
-	u := &user.User{ID: "usr_mfa_hook", Email: "mfa@example.com"}
-	_ = s.Users().Create(ctx, u)
+	// Create user in adapter
+	now := time.Now().UTC()
+	_, err = ad.Create(ctx, "users", map[string]any{
+		"id":         "usr_mfa_hook",
+		"email":      "mfa@example.com",
+		"created_at": now,
+		"updated_at": now,
+	})
+	if err != nil {
+		t.Fatalf("failed to create user in adapter: %v", err)
+	}
 
 	// User without MFA can create session without restrictions
-	sess1, err := engine.CreateSession(ctx, u.ID, auth.SessionOptions{})
+	sess1, err := engine.CreateSession(ctx, "usr_mfa_hook", auth.SessionOptions{})
 	if err != nil {
 		t.Fatalf("CreateSession failed for user without MFA: %v", err)
 	}
@@ -156,20 +163,19 @@ func TestPlugin_EnforceMFAOnSessionCreateHook(t *testing.T) {
 	}
 
 	// Now enable 2FA for this user
-	enrollment, _ := svc.EnrollTOTP(ctx, u.ID)
-	now := time.Now().UTC()
+	enrollment, _ := svc.EnrollTOTP(ctx, "usr_mfa_hook")
 	code, _ := twofactor.CalculateTOTP(enrollment.Secret, now.Unix()/30)
-	_ = svc.ConfirmTOTP(ctx, u.ID, enrollment.FactorID, code)
+	_ = svc.ConfirmTOTP(ctx, "usr_mfa_hook", enrollment.FactorID, code)
 
 	// Now attempt to create session with default AAL1 context -> should be blocked by hook!
-	_, err = engine.CreateSession(ctx, u.ID, auth.SessionOptions{})
+	_, err = engine.CreateSession(ctx, "usr_mfa_hook", auth.SessionOptions{})
 	if err == nil || err != twofactor.ErrAssuranceLevelInsufficient {
 		t.Fatalf("expected ErrAssuranceLevelInsufficient when creating session without AAL2, got %v", err)
 	}
 
 	// Attempt with AAL2 in context -> succeeds!
 	ctxAAL2 := twofactor.WithAssuranceLevel(ctx, twofactor.AAL2)
-	sess2, err := engine.CreateSession(ctxAAL2, u.ID, auth.SessionOptions{})
+	sess2, err := engine.CreateSession(ctxAAL2, "usr_mfa_hook", auth.SessionOptions{})
 	if err != nil {
 		t.Fatalf("CreateSession with AAL2 context failed: %v", err)
 	}

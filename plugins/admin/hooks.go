@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-admin/store"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
@@ -53,11 +52,11 @@ func (s *service) registerHooks() {
 
 	// AfterUserCreate: Ensure every newly registered user is indexed in the administrative store.
 	hooks.AfterUserCreate(func(ctx context.Context, u *user.User) {
-		if u == nil || s.store == nil {
+		if u == nil || s.usersRepo == nil {
 			return
 		}
 
-		_ = s.store.UpsertUser(ctx, &store.UserRecord{
+		_ = s.upsertUser(ctx, &UserRecord{
 			UserID:    u.ID,
 			Email:     u.Email,
 			Disabled:  false,

@@ -6,19 +6,20 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
 	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
 	"github.com/BladiCreator/go-modular-auth-passkeys/plugins"
-	passkeystore "github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/BladiCreator/go-modular-auth/account"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/user"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 
-func setupTestAuth(t *testing.T, opts ...passkey.Option) (*auth.Auth, passkey.Passkeys) {
+func setupTestAuth(t *testing.T, opts ...passkey.Option) (*auth.Auth, passkey.Passkeys, adapter.Adapter) {
 	t.Helper()
-	storeAdapter := corestore.New()
+	ad := adaptermem.New()
 
 	defaultOpts := []passkey.Option{
 		passkey.WithRP("localhost", "Test App", []string{"http://localhost:3000"}),
@@ -29,7 +30,7 @@ func setupTestAuth(t *testing.T, opts ...passkey.Option) (*auth.Auth, passkey.Pa
 	mod := passkey.New(allOpts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   storeAdapter,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {
@@ -41,7 +42,7 @@ func setupTestAuth(t *testing.T, opts ...passkey.Option) (*auth.Auth, passkey.Pa
 		t.Fatalf("failed to lookup plugins.Passkeys capability: %v", err)
 	}
 
-	return a, pk
+	return a, pk, ad
 }
 
 func createTestUser(t *testing.T, a *auth.Auth, email string) *user.User {
@@ -61,7 +62,7 @@ func createTestUser(t *testing.T, a *auth.Auth, email string) *user.User {
 }
 
 func TestCapabilityLookup(t *testing.T) {
-	a, pk1 := setupTestAuth(t)
+	a, pk1, _ := setupTestAuth(t)
 
 	pk2, err := auth.Get[passkey.Passkeys](a)
 	if err != nil {
@@ -75,7 +76,7 @@ func TestCapabilityLookup(t *testing.T) {
 
 func TestBeginRegistration(t *testing.T) {
 	ctx := context.Background()
-	a, pk := setupTestAuth(t)
+	a, pk, _ := setupTestAuth(t)
 	u := createTestUser(t, a, "alice@example.com")
 
 	// 1. Missing user ID
@@ -120,7 +121,7 @@ func TestBeginRegistration(t *testing.T) {
 
 func TestFinishRegistrationValidation(t *testing.T) {
 	ctx := context.Background()
-	_, pk := setupTestAuth(t)
+	_, pk, _ := setupTestAuth(t)
 
 	// 1. Missing session ID
 	_, err := pk.FinishRegistration(ctx, passkey.FinishRegistrationInput{})
@@ -139,7 +140,7 @@ func TestFinishRegistrationValidation(t *testing.T) {
 
 	// 3. Invalid / missing client response data
 	cStore := challenge.NewMemoryStore()
-	_, pkWithCStore := setupTestAuth(t, passkey.WithChallengeStore(cStore))
+	_, pkWithCStore, _ := setupTestAuth(t, passkey.WithChallengeStore(cStore))
 	_ = cStore.Save(ctx, &challenge.Session{
 		ID:        "valid_session",
 		Type:      challenge.CeremonyRegistration,
@@ -166,7 +167,7 @@ func TestFinishRegistrationValidation(t *testing.T) {
 
 func TestBeginAuthentication(t *testing.T) {
 	ctx := context.Background()
-	a, pk := setupTestAuth(t)
+	a, pk, _ := setupTestAuth(t)
 	u := createTestUser(t, a, "bob@example.com")
 
 	// 1. Discoverable login (empty UserID)
@@ -190,9 +191,7 @@ func TestBeginAuthentication(t *testing.T) {
 
 func TestCredentialManagementAndOwnership(t *testing.T) {
 	ctx := context.Background()
-	pStore := passkeystore.Store(nil)
-	memStore := passkey.WithStore(nil) // default in-memory store
-	a, pk := setupTestAuth(t, memStore)
+	a, pkCustom, ad := setupTestAuth(t)
 
 	u1 := createTestUser(t, a, "user1@example.com")
 	u2 := createTestUser(t, a, "user2@example.com")
@@ -209,15 +208,10 @@ func TestCredentialManagementAndOwnership(t *testing.T) {
 		UpdatedAt:    time.Now(),
 	}
 
-	// Save to plugin store
-	cfgField, ok := pk.(interface {
-		ListCredentials(ctx context.Context, userID string) ([]*passkey.Passkey, error)
-	})
-	if !ok {
-		t.Fatal("pk does not implement ListCredentials")
+	repo := sdk.FromAdapter[passkey.Passkey](ad, passkey.ModelPasskeys)
+	if err := repo.Create(ctx, cred1); err != nil {
+		t.Fatalf("failed to create test passkey: %v", err)
 	}
-	_ = cfgField
-	_ = pStore
 
 	// We can link account to core store
 	_ = a.Store().Accounts().Create(ctx, &account.Account{
@@ -228,12 +222,6 @@ func TestCredentialManagementAndOwnership(t *testing.T) {
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	})
-
-	// Inject credential through BeginRegistration + test store
-	customStore := &testCustomStore{credentials: make(map[string]*passkey.Passkey)}
-	customStore.credentials[string(cred1.CredentialID)] = cred1
-
-	_, pkCustom := setupTestAuth(t, passkey.WithStore(customStore))
 
 	// 1. List credentials
 	list, err := pkCustom.ListCredentials(ctx, u1.ID)
@@ -298,8 +286,7 @@ func TestCredentialManagementAndOwnership(t *testing.T) {
 
 func TestEventEmissions(t *testing.T) {
 	ctx := context.Background()
-	customStore := &testCustomStore{credentials: make(map[string]*passkey.Passkey)}
-	a, pk := setupTestAuth(t, passkey.WithStore(customStore))
+	a, pk, ad := setupTestAuth(t)
 
 	u := createTestUser(t, a, "events@example.com")
 
@@ -312,7 +299,10 @@ func TestEventEmissions(t *testing.T) {
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
-	customStore.credentials[string(cred.CredentialID)] = cred
+	repo := sdk.FromAdapter[passkey.Passkey](ad, passkey.ModelPasskeys)
+	if err := repo.Create(ctx, cred); err != nil {
+		t.Fatalf("failed to create test passkey: %v", err)
+	}
 
 	revokedReceived := false
 	a.Events().Subscribe(passkey.EventPasskeyRevoked, func(ctx context.Context, e auth.Event) {
@@ -351,7 +341,7 @@ func TestHooksIntervention(t *testing.T) {
 		return nil
 	}
 
-	a, pk := setupTestAuth(t, passkey.WithHooks(hooks))
+	a, pk, _ := setupTestAuth(t, passkey.WithHooks(hooks))
 	u := createTestUser(t, a, "hooks@example.com")
 
 	_, err := pk.BeginRegistration(ctx, passkey.BeginRegistrationInput{UserID: u.ID})
@@ -362,58 +352,4 @@ func TestHooksIntervention(t *testing.T) {
 	if !hookCalled {
 		t.Fatal("expected BeforeBeginRegistration hook to execute")
 	}
-}
-
-// testCustomStore satisfies passkeystore.Store for isolated mock testing.
-type testCustomStore struct {
-	credentials map[string]*passkey.Passkey
-}
-
-func (s *testCustomStore) SaveCredential(ctx context.Context, c *passkeystore.Credential) error {
-	if _, ok := s.credentials[string(c.CredentialID)]; ok {
-		return passkeystore.ErrConflict
-	}
-	cp := *c
-	s.credentials[string(c.CredentialID)] = &cp
-	return nil
-}
-
-func (s *testCustomStore) GetCredentialByID(ctx context.Context, id []byte) (*passkeystore.Credential, error) {
-	c, ok := s.credentials[string(id)]
-	if !ok || !c.Active() {
-		return nil, passkeystore.ErrNotFound
-	}
-	cp := *c
-	return &cp, nil
-}
-
-func (s *testCustomStore) ListCredentialsByUser(ctx context.Context, userID string) ([]*passkeystore.Credential, error) {
-	var res []*passkeystore.Credential
-	for _, c := range s.credentials {
-		if c.UserID == userID && c.Active() {
-			cp := *c
-			res = append(res, &cp)
-		}
-	}
-	return res, nil
-}
-
-func (s *testCustomStore) UpdateCredential(ctx context.Context, c *passkeystore.Credential) error {
-	if _, ok := s.credentials[string(c.CredentialID)]; !ok {
-		return passkeystore.ErrNotFound
-	}
-	cp := *c
-	s.credentials[string(c.CredentialID)] = &cp
-	return nil
-}
-
-func (s *testCustomStore) DeleteCredential(ctx context.Context, id []byte) error {
-	c, ok := s.credentials[string(id)]
-	if !ok {
-		return passkeystore.ErrNotFound
-	}
-	now := time.Now()
-	c.RevokedAt = &now
-	delete(s.credentials, string(id))
-	return nil
 }

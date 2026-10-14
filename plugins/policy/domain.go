@@ -4,6 +4,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
@@ -174,4 +175,28 @@ func Challenge(policyID string, ch ChallengeInfo) Decision {
 		PolicyID:    policyID,
 		EvaluatedAt: time.Now(),
 	}
+}
+
+// PolicyRecord represents a persisted policy metadata entry.
+type PolicyRecord struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description,omitempty"`
+	Combinator  string    `json:"combinator,omitempty"` // e.g. "deny_overrides", "all_of", "any_of"
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+const (
+	ModelPolicies = "policies"
+)
+
+// RegisterSchema registers the policy models in the compiled schema.
+func RegisterSchema(s *schema.Schema) error {
+	m := schema.NewModel(ModelPolicies, ModelPolicies, "id")
+	_ = m.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "description", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "combinator", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	_ = m.AddField(schema.Field{Name: "updated_at", Type: schema.TypeTime, Required: true})
+	return s.AddModel(m)
 }

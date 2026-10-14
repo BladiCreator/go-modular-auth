@@ -1,7 +1,7 @@
 -- Migration: 001_create_oidc_tables.sql
--- Description: Creates auth_oidc_states table for OpenID Connect state sessions and single-use redemption.
+-- Description: Creates oidc_states table for OpenID Connect state sessions and single-use redemption.
 
-CREATE TABLE IF NOT EXISTS auth_oidc_states (
+CREATE TABLE IF NOT EXISTS oidc_states (
     state VARCHAR(128) PRIMARY KEY,
     provider VARCHAR(64) NOT NULL,
     redirect_uri TEXT NOT NULL,
@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS auth_oidc_states (
     created_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_oidc_states_expires_at
-    ON auth_oidc_states (expires_at);
+CREATE INDEX IF NOT EXISTS idx_oidc_states_expires_at
+    ON oidc_states (expires_at);
 
-CREATE INDEX IF NOT EXISTS idx_auth_oidc_states_user_id
-    ON auth_oidc_states (user_id);
+CREATE INDEX IF NOT EXISTS idx_oidc_states_user_id
+    ON oidc_states (user_id);

@@ -4,22 +4,68 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-oidc/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
-// StateSession represents an ephemeral, single-use state binding.
-type StateSession = store.StateSession
-
 // Action denotes the purpose of the OIDC authorization flow.
-type Action = store.Action
+type Action string
 
 const (
-	ActionSignIn = store.ActionSignIn
-	ActionLink   = store.ActionLink
+	ActionSignIn Action = "sign_in"
+	ActionLink   Action = "link"
 )
+
+// ModelOIDCStates is the schema model identifier for OIDC transient state sessions.
+const ModelOIDCStates = "oidc_states"
+
+// StateSession represents an ephemeral, single-use state binding for an in-flight OIDC authentication flow.
+type StateSession struct {
+	State        string            `json:"state"`
+	Provider     string            `json:"provider"`
+	RedirectURI  string            `json:"redirect_uri"`
+	CodeVerifier string            `json:"code_verifier,omitempty"`
+	Nonce        string            `json:"nonce,omitempty"`
+	Action       Action            `json:"action"`
+	UserID       string            `json:"user_id,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	ConsumedAt   *time.Time        `json:"consumed_at,omitempty"`
+	ExpiresAt    time.Time         `json:"expires_at"`
+	CreatedAt    time.Time         `json:"created_at"`
+}
+
+// Expired reports whether the state session has expired relative to the given time.
+func (s *StateSession) Expired(now time.Time) bool {
+	return s != nil && !s.ExpiresAt.IsZero() && !now.Before(s.ExpiresAt)
+}
+
+// IsConsumed reports whether the state session has already been redeemed.
+func (s *StateSession) IsConsumed() bool {
+	return s != nil && s.ConsumedAt != nil
+}
+
+// RegisterSchema registers the OIDC transient state session model.
+func RegisterSchema(s *schema.Schema) error {
+	m := schema.NewModel(ModelOIDCStates, ModelOIDCStates, "state")
+	_ = m.AddField(schema.Field{Name: "state", Type: schema.TypeString, Required: true, Unique: true})
+	_ = m.AddField(schema.Field{Name: "provider", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "redirect_uri", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "code_verifier", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "nonce", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "action", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "user_id", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "metadata", Type: schema.TypeJSON})
+	_ = m.AddField(schema.Field{Name: "consumed_at", Type: schema.TypeTime})
+	_ = m.AddField(schema.Field{Name: "expires_at", Type: schema.TypeTime, Required: true})
+	_ = m.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	m.Indexes = []schema.Index{
+		{Name: "idx_oidc_states_state", Fields: []string{"state"}, Unique: true},
+		{Name: "idx_oidc_states_expires", Fields: []string{"expires_at"}},
+	}
+	return s.AddModel(m)
+}
 
 // LinkingPolicy defines rules for associating external OIDC identities with Core Users.
 type LinkingPolicy string

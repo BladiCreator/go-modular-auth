@@ -2,14 +2,10 @@ package saml
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-saml/store"
-	"github.com/BladiCreator/go-modular-auth-saml/store/memory"
 )
 
 // Config holds runtime configuration settings for the SAML plugin.
 type Config struct {
-	Store            store.Store
 	SPEntityID       string
 	SPACSURL         string
 	SPSLOURL         string
@@ -25,7 +21,6 @@ type Option func(*Config)
 
 func newConfig(opts ...Option) Config {
 	c := Config{
-		Store:         memory.New(),
 		SPEntityID:    "urn:gomodularauth:saml:sp",
 		SPACSURL:      "/saml/acs",
 		RequestTTL:    5 * time.Minute,
@@ -36,15 +31,6 @@ func newConfig(opts ...Option) Config {
 		opt(&c)
 	}
 	return c
-}
-
-// WithStore sets the persistence adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
 }
 
 // WithSPEntityID sets the canonical Entity ID of this Service Provider.

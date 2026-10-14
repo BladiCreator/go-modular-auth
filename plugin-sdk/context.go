@@ -7,8 +7,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/store"
 )
 
@@ -16,9 +18,12 @@ import (
 // It acts as the isolation boundary so plugins only interact with public
 // infrastructure contracts and never private core internals.
 type Context struct {
-	host   *auth.Host
-	mu     sync.RWMutex
-	values map[string]any
+	host    *auth.Host
+	adapter adapter.Adapter
+	cache   cache.Cache
+	email   email.Sender
+	mu      sync.RWMutex
+	values  map[string]any
 }
 
 // NewContext creates a new plugin context wrapping the host runtime.
@@ -26,6 +31,16 @@ func NewContext(host *auth.Host) *Context {
 	return &Context{
 		host:   host,
 		values: make(map[string]any),
+	}
+}
+
+// NewTestContext creates a standalone test Context with injected adapters.
+func NewTestContext(ad adapter.Adapter, c cache.Cache, em email.Sender) *Context {
+	return &Context{
+		adapter: ad,
+		cache:   c,
+		email:   em,
+		values:  make(map[string]any),
 	}
 }
 
@@ -50,17 +65,44 @@ func (c *Context) Core() *auth.Auth {
 	return c.host.Auth()
 }
 
-// Store returns the core store adapter (authoritative source of truth).
+// Store returns the core store (bridged from adapter when necessary).
 func (c *Context) Store() store.Store {
+	if c.host == nil || c.host.Auth() == nil {
+		return nil
+	}
+	return c.host.Auth().Store()
+}
+
+// Adapter returns the generic schema-driven storage adapter, or nil if none is configured.
+func (c *Context) Adapter() adapter.Adapter {
+	if c.adapter != nil {
+		return c.adapter
+	}
 	if c.host == nil {
 		return nil
 	}
-	return c.host.Store()
+	return c.host.Adapter()
+}
+
+// Schema returns the compiled database schema, or nil if none is active.
+func (c *Context) Schema() *schema.Schema {
+	if c.host == nil {
+		return nil
+	}
+	return c.host.Schema()
+}
+
+// DB returns the typed database access facade.
+func (c *Context) DB() *DB {
+	return &DB{adapter: c.Adapter()}
 }
 
 // Cache returns the shared cache adapter, or nil when none is configured.
 // Plugins must namespace their cache keys.
 func (c *Context) Cache() cache.Cache {
+	if c.cache != nil {
+		return c.cache
+	}
 	if c.host == nil {
 		return nil
 	}
@@ -69,6 +111,9 @@ func (c *Context) Cache() cache.Cache {
 
 // Email returns the transactional email sender, or nil when none is configured.
 func (c *Context) Email() email.Sender {
+	if c.email != nil {
+		return c.email
+	}
 	if c.host == nil {
 		return nil
 	}

@@ -2,14 +2,10 @@ package username
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-username/store"
-	"github.com/BladiCreator/go-modular-auth-username/store/memory"
 )
 
 // Config holds configuration parameters for the username plugin.
 type Config struct {
-	Store         store.Store
 	MinLength     int
 	MaxLength     int
 	CaseSensitive bool
@@ -21,15 +17,6 @@ type Config struct {
 
 // Option modifies plugin configuration.
 type Option func(*Config)
-
-// WithStore sets the persistence Store adapter. If not provided, an in-memory store is used by default.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithMinLength sets the minimum allowed username length.
 func WithMinLength(min int) Option {
@@ -110,6 +97,5 @@ func defaultConfig() Config {
 	}
 	cfg.Normalizer = DefaultNormalizer(cfg.CaseSensitive)
 	cfg.Validator = DefaultValidator(cfg.MinLength, cfg.MaxLength, cfg.Reserved)
-	cfg.Store = memory.New()
 	return cfg
 }

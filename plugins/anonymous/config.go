@@ -3,8 +3,6 @@ package anonymous
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-anonymous/store"
-	"github.com/BladiCreator/go-modular-auth-anonymous/store/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
 )
 
@@ -20,10 +18,6 @@ const (
 
 // Config configures the anonymous authentication plugin.
 type Config struct {
-	// Store is the persistence store for anonymous identities.
-	// If nil, defaults to an in-memory store (convenient for testing and development).
-	Store store.Store
-
 	// IdentityTTL is the duration after which an unconverted anonymous identity expires.
 	IdentityTTL time.Duration
 
@@ -52,13 +46,6 @@ type Config struct {
 
 // Option configures an anonymous plugin module.
 type Option func(*Config)
-
-// WithStore sets the store implementation.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithIdentityTTL sets the expiration duration for anonymous identities.
 func WithIdentityTTL(ttl time.Duration) Option {
@@ -111,9 +98,6 @@ func WithHooks(h *Hooks) Option {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.IdentityTTL <= 0 {
 		c.IdentityTTL = DefaultIdentityTTL
 	}

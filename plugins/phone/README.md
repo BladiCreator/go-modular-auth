@@ -258,7 +258,7 @@ type Store interface {
 A production adapter is provided in `store/postgres`, with migration schema in `migrations/001_create_phone_tables.sql`:
 
 ```sql
-CREATE TABLE IF NOT EXISTS auth_phones (
+CREATE TABLE IF NOT EXISTS phones (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,
     phone_number VARCHAR(32) NOT NULL,
@@ -266,11 +266,11 @@ CREATE TABLE IF NOT EXISTS auth_phones (
     verified_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_auth_phones_user_id UNIQUE (user_id),
-    CONSTRAINT uq_auth_phones_phone_number UNIQUE (phone_number)
+    CONSTRAINT uq_phones_user_id UNIQUE (user_id),
+    CONSTRAINT uq_phones_phone_number UNIQUE (phone_number)
 );
 
-CREATE TABLE IF NOT EXISTS auth_phone_otps (
+CREATE TABLE IF NOT EXISTS phone_otps (
     id VARCHAR(64) PRIMARY KEY,
     phone_number VARCHAR(32) NOT NULL,
     subject VARCHAR(64) NOT NULL,

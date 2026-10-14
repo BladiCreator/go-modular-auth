@@ -17,9 +17,8 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	oidc "github.com/BladiCreator/go-modular-auth-oidc"
 	"github.com/BladiCreator/go-modular-auth-oidc/plugins"
-	oidcmemory "github.com/BladiCreator/go-modular-auth-oidc/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func setupSecurityHarness(t *testing.T, customPolicy oidc.LinkingPolicy, tokenOverride func(mock *mockOIDCServer, code string) string) (*auth.Auth, plugins.OIDC, *mockOIDCServer) {
@@ -94,9 +93,8 @@ func setupSecurityHarness(t *testing.T, customPolicy oidc.LinkingPolicy, tokenOv
 	mock.server = httptest.NewServer(mux)
 	mock.issuer = mock.server.URL
 
-	cStore := corememory.New()
+	adapter := adaptermem.New()
 	cCache := corecache.New()
-	oidcStore := oidcmemory.New()
 
 	providerCfg := oidc.ProviderConfig{
 		ID:           "test-idp",
@@ -109,7 +107,6 @@ func setupSecurityHarness(t *testing.T, customPolicy oidc.LinkingPolicy, tokenOv
 
 	opts := []oidc.Option{
 		oidc.WithProvider(providerCfg),
-		oidc.WithStore(oidcStore),
 		oidc.WithHTTPClient(mock.server.Client()),
 	}
 	if customPolicy != "" {
@@ -118,7 +115,7 @@ func setupSecurityHarness(t *testing.T, customPolicy oidc.LinkingPolicy, tokenOv
 
 	oidcModule := oidc.New(opts...)
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: adapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{oidcModule},
 	})

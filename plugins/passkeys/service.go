@@ -11,8 +11,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
-	passkeystore "github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -23,7 +23,6 @@ import (
 type service struct {
 	ctx        *sdk.Context
 	cfg        Config
-	store      passkeystore.Store
 	challenges challenge.Store
 	webauthn   *webauthn.WebAuthn
 	hooks      *Hooks
@@ -65,7 +64,6 @@ func newService(ctx *sdk.Context, cfg Config) (*service, error) {
 	return &service{
 		ctx:        ctx,
 		cfg:        cfg,
-		store:      cfg.Store,
 		challenges: cfg.ChallengeStore,
 		webauthn:   wa,
 		hooks:      cfg.Hooks,
@@ -134,7 +132,7 @@ func (s *service) BeginRegistration(ctx context.Context, in BeginRegistrationInp
 		return nil, err
 	}
 
-	existing, err := s.store.ListCredentialsByUser(ctx, u.ID)
+	existing, err := s.listCredentialsByUser(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +242,7 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 		return nil, err
 	}
 
-	existing, err := s.store.ListCredentialsByUser(ctx, u.ID)
+	existing, err := s.listCredentialsByUser(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +255,7 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 	}
 
 	// Prevent duplicate credential registration
-	if _, err := s.store.GetCredentialByID(ctx, cred.ID); err == nil {
+	if _, err := s.getCredentialByID(ctx, cred.ID); err == nil {
 		return nil, ErrCredentialAlreadyExists
 	}
 
@@ -270,10 +268,7 @@ func (s *service) FinishRegistration(ctx context.Context, in FinishRegistrationI
 	pass := FromWebAuthn(u.ID, friendlyName, cred, now)
 
 	// Persist to passkey store
-	if err := s.store.SaveCredential(ctx, pass); err != nil {
-		if errors.Is(err, passkeystore.ErrConflict) {
-			return nil, ErrCredentialAlreadyExists
-		}
+	if err := s.saveCredential(ctx, pass); err != nil {
 		return nil, err
 	}
 
@@ -338,7 +333,7 @@ func (s *service) BeginAuthentication(ctx context.Context, in BeginAuthenticatio
 			return nil, errUser
 		}
 
-		creds, errCreds := s.store.ListCredentialsByUser(ctx, u.ID)
+		creds, errCreds := s.listCredentialsByUser(ctx, u.ID)
 		if errCreds != nil {
 			return nil, errCreds
 		}
@@ -435,7 +430,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 			return nil, err
 		}
 
-		creds, err := s.store.ListCredentialsByUser(ctx, u.ID)
+		creds, err := s.listCredentialsByUser(ctx, u.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -455,7 +450,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 			if len(userHandle) > 0 {
 				targetUserID = string(userHandle)
 			} else {
-				credRecord, err := s.store.GetCredentialByID(ctx, rawID)
+				credRecord, err := s.getCredentialByID(ctx, rawID)
 				if err != nil {
 					return nil, err
 				}
@@ -467,7 +462,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 				return nil, err
 			}
 
-			creds, err := s.store.ListCredentialsByUser(ctx, u.ID)
+			creds, err := s.listCredentialsByUser(ctx, u.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -490,11 +485,8 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 	}
 
 	// Sign counter verification and clone detection
-	storedPasskey, err := s.store.GetCredentialByID(ctx, validatedCred.ID)
+	storedPasskey, err := s.getCredentialByID(ctx, validatedCred.ID)
 	if err != nil {
-		if errors.Is(err, passkeystore.ErrNotFound) {
-			return nil, ErrCredentialNotFound
-		}
 		return nil, err
 	}
 
@@ -520,7 +512,7 @@ func (s *service) FinishAuthentication(ctx context.Context, in FinishAuthenticat
 	storedPasskey.LastUsedAt = &now
 	storedPasskey.UpdatedAt = now
 
-	if err := s.store.UpdateCredential(ctx, storedPasskey); err != nil {
+	if err := s.updateCredential(ctx, storedPasskey); err != nil {
 		s.ctx.Logger().ErrorContext(ctx, "passkey: failed to update credential sign counter", "error", err)
 	}
 
@@ -560,7 +552,7 @@ func (s *service) ListCredentials(ctx context.Context, userID string) ([]*Passke
 	if userID == "" {
 		return nil, ErrUserIDRequired
 	}
-	return s.store.ListCredentialsByUser(ctx, userID)
+	return s.listCredentialsByUser(ctx, userID)
 }
 
 // GetCredential returns a single passkey by credential ID with ownership verification.
@@ -572,11 +564,8 @@ func (s *service) GetCredential(ctx context.Context, userID string, credentialID
 		return nil, ErrCredentialIDRequired
 	}
 
-	cred, err := s.store.GetCredentialByID(ctx, credentialID)
+	cred, err := s.getCredentialByID(ctx, credentialID)
 	if err != nil {
-		if errors.Is(err, passkeystore.ErrNotFound) {
-			return nil, ErrCredentialNotFound
-		}
 		return nil, err
 	}
 
@@ -596,11 +585,8 @@ func (s *service) UpdateCredential(ctx context.Context, in UpdateCredentialInput
 		return nil, ErrCredentialIDRequired
 	}
 
-	cred, err := s.store.GetCredentialByID(ctx, in.CredentialID)
+	cred, err := s.getCredentialByID(ctx, in.CredentialID)
 	if err != nil {
-		if errors.Is(err, passkeystore.ErrNotFound) {
-			return nil, ErrCredentialNotFound
-		}
 		return nil, err
 	}
 
@@ -611,7 +597,7 @@ func (s *service) UpdateCredential(ctx context.Context, in UpdateCredentialInput
 	cred.FriendlyName = in.FriendlyName
 	cred.UpdatedAt = s.ctx.Now()
 
-	if err := s.store.UpdateCredential(ctx, cred); err != nil {
+	if err := s.updateCredential(ctx, cred); err != nil {
 		return nil, err
 	}
 
@@ -627,11 +613,8 @@ func (s *service) DeleteCredential(ctx context.Context, in DeleteCredentialInput
 		return ErrCredentialIDRequired
 	}
 
-	cred, err := s.store.GetCredentialByID(ctx, in.CredentialID)
+	cred, err := s.getCredentialByID(ctx, in.CredentialID)
 	if err != nil {
-		if errors.Is(err, passkeystore.ErrNotFound) {
-			return ErrCredentialNotFound
-		}
 		return err
 	}
 
@@ -639,7 +622,7 @@ func (s *service) DeleteCredential(ctx context.Context, in DeleteCredentialInput
 		return ErrCredentialNotFound
 	}
 
-	if err := s.store.DeleteCredential(ctx, in.CredentialID); err != nil {
+	if err := s.deleteCredential(ctx, cred.ID); err != nil {
 		return err
 	}
 
@@ -716,4 +699,83 @@ func generateSecureToken() (string, error) {
 		return "", fmt.Errorf("passkey: read crypto/rand: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func (s *service) listCredentialsByUser(ctx context.Context, userID string) ([]*Passkey, error) {
+	repo := sdk.Model[Passkey](s.ctx, ModelPasskeys)
+	creds, err := repo.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{
+			adapter.Eq("user_id", userID),
+			adapter.IsNull("revoked_at"),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*Passkey, len(creds))
+	for i := range creds {
+		res[i] = &creds[i]
+	}
+	return res, nil
+}
+
+func (s *service) getCredentialByID(ctx context.Context, credentialID []byte) (*Passkey, error) {
+	idStr := base64.RawURLEncoding.EncodeToString(credentialID)
+	repo := sdk.Model[Passkey](s.ctx, ModelPasskeys)
+	cred, err := repo.FindOne(ctx, adapter.Eq("id", idStr))
+	if err == nil {
+		return cred, nil
+	}
+	if !errors.Is(err, adapter.ErrNotFound) {
+		return nil, err
+	}
+
+	cred, err = repo.FindOne(ctx, adapter.Eq("credential_id", credentialID))
+	if err == nil {
+		return cred, nil
+	}
+	if !errors.Is(err, adapter.ErrNotFound) {
+		return nil, err
+	}
+
+	cred, err = repo.FindOne(ctx, adapter.Eq("id", string(credentialID)))
+	if err == nil {
+		return cred, nil
+	}
+	if errors.Is(err, adapter.ErrNotFound) {
+		return nil, ErrCredentialNotFound
+	}
+	return nil, err
+}
+
+func (s *service) saveCredential(ctx context.Context, p *Passkey) error {
+	repo := sdk.Model[Passkey](s.ctx, ModelPasskeys)
+	err := repo.Create(ctx, p)
+	if err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
+			return ErrCredentialAlreadyExists
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *service) updateCredential(ctx context.Context, p *Passkey) error {
+	repo := sdk.Model[Passkey](s.ctx, ModelPasskeys)
+	_, err := repo.Update(ctx, []adapter.Condition{adapter.Eq("id", p.ID)}, map[string]any{
+		"friendly_name": p.FriendlyName,
+		"sign_count":    p.SignCount,
+		"clone_warning": p.CloneWarning,
+		"backup_state":  p.BackupState,
+		"last_used_at":  p.LastUsedAt,
+		"updated_at":    p.UpdatedAt,
+		"revoked_at":    p.RevokedAt,
+	})
+	return err
+}
+
+func (s *service) deleteCredential(ctx context.Context, id string) error {
+	repo := sdk.Model[Passkey](s.ctx, ModelPasskeys)
+	_, err := repo.Delete(ctx, adapter.Eq("id", id))
+	return err
 }

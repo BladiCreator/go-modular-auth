@@ -3,6 +3,7 @@ package rbac
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -14,7 +15,10 @@ type Module struct {
 	svc *service
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
 
 // New creates an installable RBAC PluginModule configured with options.
 func New(opts ...Option) *Module {
@@ -28,6 +32,11 @@ func New(opts ...Option) *Module {
 // ID returns the module's unique identifier.
 func (m *Module) ID() string {
 	return PluginID
+}
+
+// RegisterSchema contributes rbac_roles and rbac_assignments models to the compiled schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
 }
 
 // Init configures infrastructure and registers the strongly typed RBAC capability.

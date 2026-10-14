@@ -9,29 +9,13 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	rbac "github.com/BladiCreator/go-modular-auth-rbac"
 	"github.com/BladiCreator/go-modular-auth-rbac/cache"
-	"github.com/BladiCreator/go-modular-auth-rbac/store/memory"
 )
 
 func TestSecurity_RoleInUseProtection(t *testing.T) {
 	ctx := context.Background()
-	rbacStore := memory.NewStore()
-	plugin := rbac.New(rbac.WithStore(rbacStore))
-
-	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t)
 
 	role := &rbac.Role{
 		ID:          "role-locked",
@@ -51,7 +35,7 @@ func TestSecurity_RoleInUseProtection(t *testing.T) {
 	_ = rbacSvc.AssignRole(ctx, assign)
 
 	// Attempt to delete role while assigned must fail with ErrRoleInUse
-	err = rbacSvc.DeleteRole(ctx, role.ID)
+	err := rbacSvc.DeleteRole(ctx, role.ID)
 	if !errors.Is(err, rbac.ErrRoleInUse) {
 		t.Fatalf("expected ErrRoleInUse, got: %v", err)
 	}
@@ -66,21 +50,7 @@ func TestSecurity_RoleInUseProtection(t *testing.T) {
 
 func TestSecurity_PrincipalTypeSegregation(t *testing.T) {
 	ctx := context.Background()
-	rbacStore := memory.NewStore()
-	plugin := rbac.New(rbac.WithStore(rbacStore))
-
-	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t)
 
 	role := &rbac.Role{
 		ID:          "role-svc",
@@ -116,26 +86,9 @@ func TestSecurity_PrincipalTypeSegregation(t *testing.T) {
 
 func TestSecurity_ConcurrentEvaluationAndMutations(t *testing.T) {
 	ctx := context.Background()
-	rbacStore := memory.NewStore()
 	memCache := cache.NewMemoryCache(5 * time.Minute)
 
-	plugin := rbac.New(
-		rbac.WithStore(rbacStore),
-		rbac.WithCache(memCache),
-	)
-
-	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t, rbac.WithCache(memCache))
 
 	role := &rbac.Role{
 		ID:          "role-concurrent",

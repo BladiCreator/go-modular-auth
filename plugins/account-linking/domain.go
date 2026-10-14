@@ -4,13 +4,55 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-account-linking/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
-// LinkingTicket represents the ephemeral linking ticket stored in persistence.
-type LinkingTicket = store.LinkingTicket
+// LinkingTicket holds ephemeral single-use state for two-step account linking ceremonies.
+type LinkingTicket struct {
+	ID             string            `json:"id"`
+	TokenHash      string            `json:"token_hash"`
+	UserID         string            `json:"user_id"`
+	TargetProvider string            `json:"target_provider,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	ConsumedAt     *time.Time        `json:"consumed_at,omitempty"`
+	ExpiresAt      time.Time         `json:"expires_at"`
+	CreatedAt      time.Time         `json:"created_at"`
+}
+
+// Expired reports whether the ticket is expired relative to the given time.
+func (t *LinkingTicket) Expired(now time.Time) bool {
+	return t != nil && !now.Before(t.ExpiresAt)
+}
+
+// IsConsumed reports whether the ticket has already been used.
+func (t *LinkingTicket) IsConsumed() bool {
+	return t != nil && t.ConsumedAt != nil
+}
+
+const (
+	ModelLinkingTickets = "linking_tickets"
+)
+
+// RegisterSchema registers the linking tickets model in the compiled schema.
+func RegisterSchema(s *schema.Schema) error {
+	m := schema.NewModel(ModelLinkingTickets, ModelLinkingTickets, "id")
+	_ = m.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "token_hash", Type: schema.TypeString, Required: true, Unique: true})
+	_ = m.AddField(schema.Field{Name: "user_id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "target_provider", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "metadata", Type: schema.TypeJSON})
+	_ = m.AddField(schema.Field{Name: "consumed_at", Type: schema.TypeTime})
+	_ = m.AddField(schema.Field{Name: "expires_at", Type: schema.TypeTime, Required: true})
+	_ = m.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	m.Indexes = []schema.Index{
+		{Name: "idx_linking_tickets_hash", Fields: []string{"token_hash"}, Unique: true},
+		{Name: "idx_linking_tickets_user", Fields: []string{"user_id"}},
+		{Name: "idx_linking_tickets_expires", Fields: []string{"expires_at"}},
+	}
+	return s.AddModel(m)
+}
 
 // Account is an alias to Core Account entity.
 type Account = account.Account

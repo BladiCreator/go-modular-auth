@@ -16,8 +16,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-oidc/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -28,6 +28,7 @@ type service struct {
 	cfg       Config
 	logger    *slog.Logger
 	jwksCache *jwksCache
+	states    *sdk.Repository[StateSession]
 	mu        sync.RWMutex
 	providers map[string]ProviderConfig
 }
@@ -36,8 +37,10 @@ var _ OIDC = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	var logger *slog.Logger
+	var states *sdk.Repository[StateSession]
 	if ctx != nil {
 		logger = ctx.Logger()
+		states = sdk.Model[StateSession](ctx, ModelOIDCStates)
 	} else {
 		logger = slog.Default()
 	}
@@ -47,6 +50,7 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 		cfg:       cfg,
 		logger:    logger,
 		jwksCache: newJWKSCache(),
+		states:    states,
 		providers: make(map[string]ProviderConfig),
 	}
 
@@ -116,7 +120,7 @@ func (s *service) beginFlow(ctx context.Context, providerID, redirectURI string,
 		CreatedAt:    now,
 	}
 
-	if err := s.cfg.Store.SaveState(ctx, stateSess); err != nil {
+	if err := s.states.Create(ctx, stateSess); err != nil {
 		return nil, fmt.Errorf("oidc: save state session: %w", err)
 	}
 
@@ -169,14 +173,8 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 	}
 
 	now := s.cfg.Clock()
-	stateSess, err := s.cfg.Store.ConsumeState(ctx, in.State, now)
+	stateSess, err := s.consumeState(ctx, in.State, now)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrInvalidState
-		}
-		if errors.Is(err, store.ErrStateConsumed) {
-			return nil, ErrStateConsumed
-		}
 		return nil, err
 	}
 
@@ -410,12 +408,9 @@ func (s *service) CompleteLink(ctx context.Context, in CompleteLinkInput) (*Link
 	}
 
 	now := s.cfg.Clock()
-	stateSess, err := s.cfg.Store.ConsumeState(ctx, in.State, now)
+	stateSess, err := s.consumeState(ctx, in.State, now)
 	if err != nil {
-		return nil, ErrInvalidState
-	}
-	if stateSess.Expired(now) {
-		return nil, ErrStateExpired
+		return nil, err
 	}
 	if stateSess.Action != ActionLink || stateSess.UserID == "" {
 		return nil, fmt.Errorf("%w: state token was not issued for account linking", ErrInvalidState)
@@ -717,4 +712,32 @@ func newRecordID(prefix string) string {
 	b := make([]byte, 12)
 	_, _ = rand.Read(b)
 	return prefix + "_" + hex.EncodeToString(b)
+}
+
+func (s *service) consumeState(ctx context.Context, state string, now time.Time) (*StateSession, error) {
+	if s.states == nil {
+		return nil, ErrInvalidState
+	}
+	sess, err := s.states.FindOne(ctx, adapter.Eq("state", state))
+	if errors.Is(err, adapter.ErrNotFound) || sess == nil {
+		return nil, ErrInvalidState
+	}
+	if sess.IsConsumed() {
+		return nil, ErrStateConsumed
+	}
+	if sess.Expired(now) {
+		return nil, ErrStateExpired
+	}
+
+	n, err := s.states.Update(ctx, []adapter.Condition{
+		adapter.Eq("state", state),
+		adapter.IsNull("consumed_at"),
+	}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil || n == 0 {
+		return nil, ErrStateConsumed
+	}
+	sess.ConsumedAt = &now
+	return sess, nil
 }

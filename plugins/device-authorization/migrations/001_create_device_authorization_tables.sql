@@ -1,7 +1,7 @@
 -- Migration: 001_create_device_authorization_tables.sql
--- Description: Creates auth_device_grants table for RFC 8628 OAuth 2.0 Device Authorization Grant sessions.
+-- Description: Creates device_grants table for RFC 8628 OAuth 2.0 Device Authorization Grant sessions.
 
-CREATE TABLE IF NOT EXISTS auth_device_grants (
+CREATE TABLE IF NOT EXISTS device_grants (
     id VARCHAR(64) PRIMARY KEY,
     client_id VARCHAR(255) NOT NULL,
     device_code_hash VARCHAR(64) NOT NULL UNIQUE,
@@ -20,14 +20,14 @@ CREATE TABLE IF NOT EXISTS auth_device_grants (
     updated_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_device_grants_device_hash
-    ON auth_device_grants (device_code_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_grants_device_hash
+    ON device_grants (device_code_hash);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_device_grants_user_code
-    ON auth_device_grants (user_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_grants_user_code
+    ON device_grants (user_code);
 
-CREATE INDEX IF NOT EXISTS idx_auth_device_grants_client_id
-    ON auth_device_grants (client_id);
+CREATE INDEX IF NOT EXISTS idx_device_grants_client_id
+    ON device_grants (client_id);
 
-CREATE INDEX IF NOT EXISTS idx_auth_device_grants_expires_at
-    ON auth_device_grants (expires_at);
+CREATE INDEX IF NOT EXISTS idx_device_grants_expires_at
+    ON device_grants (expires_at);

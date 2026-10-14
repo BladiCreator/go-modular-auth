@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	memoryStore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 type TestCapability interface {
@@ -22,7 +22,7 @@ func (testCapabilityImpl) Greet(name string) string {
 
 type testModule struct {
 	initialized bool
-	gotStore    bool
+	gotAdapter  bool
 	gotEvents   bool
 }
 
@@ -32,8 +32,8 @@ func (m *testModule) ID() string {
 
 func (m *testModule) Init(ctx *sdk.Context) error {
 	m.initialized = true
-	if ctx.Store() != nil {
-		m.gotStore = true
+	if ctx.Adapter() != nil && ctx.DB() != nil {
+		m.gotAdapter = true
 	}
 	if ctx.Events() != nil {
 		m.gotEvents = true
@@ -47,7 +47,7 @@ func TestPluginSDKIntegration(t *testing.T) {
 	adapted := sdk.Adapt(tm)
 
 	cfg := auth.Config{
-		Store:   memoryStore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{adapted},
 	}
 
@@ -59,8 +59,8 @@ func TestPluginSDKIntegration(t *testing.T) {
 	if !tm.initialized {
 		t.Fatal("expected module to be initialized")
 	}
-	if !tm.gotStore {
-		t.Fatal("expected context to provide store")
+	if !tm.gotAdapter {
+		t.Fatal("expected context to provide adapter and db")
 	}
 	if !tm.gotEvents {
 		t.Fatal("expected context to provide events")

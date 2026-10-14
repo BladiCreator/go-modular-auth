@@ -5,7 +5,6 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
-	"github.com/BladiCreator/go-modular-auth-oauth/store"
 	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -165,6 +164,3 @@ type LinkResult struct {
 	// Profile is the normalized profile claims fetched from the provider.
 	Profile *provider.ProviderProfile
 }
-
-// StateSession is an alias to store.StateSession for consumer convenience.
-type StateSession = store.StateSession

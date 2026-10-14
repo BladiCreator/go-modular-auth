@@ -17,19 +17,18 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	jwt "github.com/BladiCreator/go-modular-auth-jwt"
 	"github.com/BladiCreator/go-modular-auth-jwt/plugins"
-	"github.com/BladiCreator/go-modular-auth-jwt/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func setupTestAuth(t *testing.T, opts ...jwt.Option) (*auth.Auth, jwt.JWT) {
 	t.Helper()
 
 	cacheAdapter := corecpmem.New()
-	storeAdapter := storememory.New()
+	dbAdapter := adaptermem.New()
 
 	app, err := auth.New(auth.Config{
-		Store:   storeAdapter,
+		Adapter: dbAdapter,
 		Cache:   cacheAdapter,
 		Plugins: []auth.PluginModule{jwt.New(opts...)},
 	})
@@ -299,12 +298,10 @@ func TestJWT_AsymmetricAlgorithms(t *testing.T) {
 }
 
 func TestJWT_Revocation(t *testing.T) {
-	memStore := memory.New()
 	k := defaultHMACKey(t, "key-1")
 
 	_, plugin := setupTestAuth(t,
 		jwt.WithKey(k),
-		jwt.WithStore(memStore),
 		jwt.WithDefaultTTL(10*time.Minute),
 	)
 	ctx := context.Background()

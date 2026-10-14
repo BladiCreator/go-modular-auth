@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-multisession/cache"
-	"github.com/BladiCreator/go-modular-auth-multisession/store"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
@@ -20,10 +19,10 @@ func TestCache_Metadata(t *testing.T) {
 		t.Fatal("expected cache miss")
 	}
 
-	rec := &store.MetadataRecord{
+	rec := &cache.CachedMetadataRecord{
 		SessionID: "session_123",
 		UserID:    "user_456",
-		Device: store.DeviceRecord{
+		Device: cache.CachedDeviceRecord{
 			Name: "Pixel 8",
 			OS:   "Android",
 		},
@@ -48,8 +47,8 @@ func TestCache_Metadata(t *testing.T) {
 	}
 
 	// InvalidateBulk
-	adapter.SetMetadata(ctx, &store.MetadataRecord{SessionID: "s1"})
-	adapter.SetMetadata(ctx, &store.MetadataRecord{SessionID: "s2"})
+	adapter.SetMetadata(ctx, &cache.CachedMetadataRecord{SessionID: "s1"})
+	adapter.SetMetadata(ctx, &cache.CachedMetadataRecord{SessionID: "s2"})
 	adapter.InvalidateBulkMetadata(ctx, []string{"s1", "s2"})
 
 	if _, ok := adapter.GetMetadata(ctx, "s1"); ok {
@@ -67,7 +66,7 @@ func TestCache_NilGracefulHandling(t *testing.T) {
 	if _, ok := adapter.GetMetadata(ctx, "any"); ok {
 		t.Fatal("nil cache should gracefully return false")
 	}
-	adapter.SetMetadata(ctx, &store.MetadataRecord{})
+	adapter.SetMetadata(ctx, &cache.CachedMetadataRecord{})
 	adapter.InvalidateMetadata(ctx, "any")
 	adapter.InvalidateBulkMetadata(ctx, []string{"any"})
 }

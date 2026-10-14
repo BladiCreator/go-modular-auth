@@ -1,11 +1,35 @@
 package passwordpolicy
 
 import (
-	"github.com/BladiCreator/go-modular-auth-password-policy/store"
+	"time"
+
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PasswordHistory records a historical password hash for reuse prevention.
-type PasswordHistory = store.PasswordHistory
+type PasswordHistory struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+const (
+	ModelPasswordHistory = "password_history"
+)
+
+// RegisterSchema registers the password history model in the compiled schema.
+func RegisterSchema(s *schema.Schema) error {
+	m := schema.NewModel(ModelPasswordHistory, ModelPasswordHistory, "id")
+	_ = m.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "user_id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "password_hash", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	m.Indexes = []schema.Index{
+		{Name: "idx_password_history_user_created", Fields: []string{"user_id", "created_at"}},
+	}
+	return s.AddModel(m)
+}
 
 // Policy specifies password strength, complexity, history, and compromised checks.
 type Policy struct {

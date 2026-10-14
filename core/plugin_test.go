@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
@@ -48,7 +48,7 @@ func TestTypedPluginAccess(t *testing.T) {
 	ctx := context.Background()
 	var order []string
 	a, err := auth.New(auth.Config{
-		Store:  memstore.New(),
+		Adapter: adaptermem.New(),
 		Hasher: fastHasher,
 		Plugins: []auth.PluginModule{
 			greeterModule{id: "greeter", deps: []string{"base"}, init: &order},
@@ -81,14 +81,14 @@ func TestTypedPluginAccess(t *testing.T) {
 func TestPluginDependencyValidation(t *testing.T) {
 	var order []string
 	_, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{greeterModule{id: "a", deps: []string{"ghost"}, init: &order}},
 	})
 	if !errors.Is(err, auth.ErrPluginDependency) {
 		t.Fatalf("want ErrPluginDependency, got %v", err)
 	}
 	_, err = auth.New(auth.Config{
-		Store: memstore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			greeterModule{id: "a", deps: []string{"b"}, init: &order},
 			greeterModule{id: "b", deps: []string{"a"}, init: &order},
@@ -98,7 +98,7 @@ func TestPluginDependencyValidation(t *testing.T) {
 		t.Fatalf("cycle must be rejected, got %v", err)
 	}
 	_, err = auth.New(auth.Config{
-		Store: memstore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			greeterModule{id: "a", init: &order},
 			greeterModule{id: "a", init: &order},

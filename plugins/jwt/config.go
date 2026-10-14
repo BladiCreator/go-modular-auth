@@ -4,7 +4,6 @@ import (
 	"time"
 
 	jwtcache "github.com/BladiCreator/go-modular-auth-jwt/cache"
-	"github.com/BladiCreator/go-modular-auth-jwt/store"
 )
 
 // Config configures the JWT plugin module.
@@ -23,9 +22,6 @@ type Config struct {
 
 	// KeyManager manages cryptographic keys, key rotation, and kid resolution.
 	KeyManager KeyManager
-
-	// Store provides persistent revocation tracking for JTIs and subjects.
-	Store store.Store
 
 	// Cache accelerates revocation verification lookups.
 	Cache jwtcache.RevocationCache
@@ -84,13 +80,6 @@ func WithKey(key Key) Option {
 			c.KeyManager = NewKeyManager()
 		}
 		_ = c.KeyManager.AddKey(key)
-	}
-}
-
-// WithStore sets the persistent revocation store.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
 	}
 }
 

@@ -4,9 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-username/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
+
+// CachedRecord is the cached representation of a username mapping.
+type CachedRecord struct {
+	UserID     string    `json:"user_id"`
+	Username   string    `json:"username"`
+	Normalized string    `json:"normalized"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
 
 // KeyNormalized returns the namespaced cache key for a normalized username.
 // Format: gomodularauth:username:norm:<normalized>
@@ -39,11 +47,11 @@ func New(c corecache.Cache, ttl time.Duration) *Cache {
 }
 
 // GetByNormalized returns the cached username record for a normalized username, if present.
-func (c *Cache) GetByNormalized(ctx context.Context, norm string) (*store.Record, bool) {
+func (c *Cache) GetByNormalized(ctx context.Context, norm string) (*CachedRecord, bool) {
 	if c == nil || c.c == nil {
 		return nil, false
 	}
-	var rec store.Record
+	var rec CachedRecord
 	if err := c.c.Get(ctx, KeyNormalized(norm), &rec); err != nil {
 		return nil, false
 	}
@@ -51,11 +59,11 @@ func (c *Cache) GetByNormalized(ctx context.Context, norm string) (*store.Record
 }
 
 // GetByUserID returns the cached username record for a user ID, if present.
-func (c *Cache) GetByUserID(ctx context.Context, userID string) (*store.Record, bool) {
+func (c *Cache) GetByUserID(ctx context.Context, userID string) (*CachedRecord, bool) {
 	if c == nil || c.c == nil {
 		return nil, false
 	}
-	var rec store.Record
+	var rec CachedRecord
 	if err := c.c.Get(ctx, KeyUserID(userID), &rec); err != nil {
 		return nil, false
 	}
@@ -63,7 +71,7 @@ func (c *Cache) GetByUserID(ctx context.Context, userID string) (*store.Record, 
 }
 
 // Set stores the record in both normalized and user ID cache entries.
-func (c *Cache) Set(ctx context.Context, rec *store.Record) {
+func (c *Cache) Set(ctx context.Context, rec *CachedRecord) {
 	if c == nil || c.c == nil || rec == nil {
 		return
 	}

@@ -2,29 +2,36 @@ package oauthprovider
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth-provider/events"
-	"github.com/BladiCreator/go-modular-auth-oauth-provider/store"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 type service struct {
-	ctx   *sdk.Context
-	cfg   Config
-	store store.Store
+	ctx           *sdk.Context
+	cfg           Config
+	clients       *sdk.Repository[Client]
+	codes         *sdk.Repository[AuthorizationCode]
+	accessTokens  *sdk.Repository[AccessToken]
+	refreshTokens *sdk.Repository[RefreshToken]
 }
 
 var _ OAuthProvider = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		ctx:   ctx,
-		cfg:   cfg,
-		store: cfg.Store,
+		ctx:           ctx,
+		cfg:           cfg,
+		clients:       sdk.Model[Client](ctx, ModelOAuthClients),
+		codes:         sdk.Model[AuthorizationCode](ctx, ModelOAuthAuthorizationCodes),
+		accessTokens:  sdk.Model[AccessToken](ctx, ModelOAuthAccessTokens),
+		refreshTokens: sdk.Model[RefreshToken](ctx, ModelOAuthRefreshTokens),
 	}
 }
 
@@ -84,22 +91,22 @@ func (s *service) RegisterClient(ctx context.Context, in RegisterClientInput) (*
 	client := &Client{
 		ID:                clientID,
 		SecretHash:        secretHash,
-		Name:              in.Name,
+		Name:              strings.TrimSpace(in.Name),
 		ClientType:        in.ClientType,
-		RedirectURIs:      slices.Clone(in.RedirectURIs),
-		AllowedGrantTypes: slices.Clone(grants),
-		AllowedScopes:     slices.Clone(in.AllowedScopes),
+		RedirectURIs:      in.RedirectURIs,
+		AllowedGrantTypes: grants,
+		AllowedScopes:     in.AllowedScopes,
 		Status:            ClientStatusActive,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
 
-	if err := s.store.Clients().Create(ctx, client); err != nil {
+	if err := s.clients.Create(ctx, client); err != nil {
 		return nil, err
 	}
 
-	s.publish(ctx, events.EventClientRegistered, client.ID, events.ClientRegisteredPayload{
-		ClientID:   client.ID,
+	s.publish(ctx, events.EventClientRegistered, clientID, events.ClientRegisteredPayload{
+		ClientID:   clientID,
 		ClientName: client.Name,
 		ClientType: string(client.ClientType),
 	})
@@ -115,7 +122,7 @@ func (s *service) GetClient(ctx context.Context, id string) (*Client, error) {
 	if id == "" {
 		return nil, ErrInvalidRequest
 	}
-	client, err := s.store.Clients().GetByID(ctx, id)
+	client, err := s.clients.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
 		return nil, ErrInvalidClient
 	}
@@ -128,10 +135,20 @@ func (s *service) RevokeClient(ctx context.Context, id string) error {
 		return ErrInvalidRequest
 	}
 	now := s.now()
-	if err := s.store.Clients().Revoke(ctx, id, now); err != nil {
+	affected, err := s.clients.Update(ctx, []adapter.Condition{adapter.Eq("id", id)}, map[string]any{
+		"status":     string(ClientStatusRevoked),
+		"updated_at": now,
+	})
+	if err != nil || affected == 0 {
 		return ErrInvalidClient
 	}
-	_ = s.store.Tokens().RevokeTokensByClient(ctx, id, now)
+
+	_, _ = s.accessTokens.Update(ctx, []adapter.Condition{adapter.Eq("client_id", id), adapter.IsNull("revoked_at")}, map[string]any{
+		"revoked_at": now,
+	})
+	_, _ = s.refreshTokens.Update(ctx, []adapter.Condition{adapter.Eq("client_id", id), adapter.IsNull("revoked_at")}, map[string]any{
+		"revoked_at": now,
+	})
 
 	s.publish(ctx, events.EventTokenRevoked, id, events.TokenRevokedPayload{
 		ClientID: id,
@@ -149,7 +166,7 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) (*AuthorizeO
 		return nil, ErrUnsupportedResponseType
 	}
 
-	client, err := s.store.Clients().GetByID(ctx, in.ClientID)
+	client, err := s.clients.FindOne(ctx, adapter.Eq("id", in.ClientID))
 	if err != nil {
 		return nil, ErrInvalidClient
 	}
@@ -162,26 +179,33 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) (*AuthorizeO
 		return nil, ErrRedirectURIMismatch
 	}
 
-	// PKCE is strictly required for public clients per OAuth 2.1
-	if client.ClientType == ClientTypePublic || s.cfg.RequirePKCEForPublicClients {
-		if in.CodeChallenge == "" || in.CodeChallengeMethod == "" {
+	// Scope validation
+	if len(in.Scopes) > 0 && len(client.AllowedScopes) > 0 {
+		for _, sc := range in.Scopes {
+			if !slices.Contains(client.AllowedScopes, sc) {
+				return nil, ErrInvalidScope
+			}
+		}
+	}
+
+	// PKCE is required for public clients by default in OAuth 2.1
+	if s.cfg.RequirePKCEForPublicClients && client.ClientType == ClientTypePublic {
+		if in.CodeChallenge == "" {
 			return nil, ErrPKCERequired
 		}
 	}
-	if in.CodeChallengeMethod != "" && in.CodeChallengeMethod != CodeChallengeMethodS256 {
+
+	// Reject plain PKCE method unless explicitly allowed by config
+	if in.CodeChallenge != "" {
 		if in.CodeChallengeMethod == CodeChallengeMethodPlain && !s.cfg.AllowPlainPKCE {
+			return nil, ErrInvalidPKCE
+		}
+		if in.CodeChallengeMethod != CodeChallengeMethodS256 && in.CodeChallengeMethod != CodeChallengeMethodPlain {
 			return nil, ErrInvalidPKCE
 		}
 	}
 
-	// Validate scopes
-	for _, sc := range in.Scopes {
-		if len(client.AllowedScopes) > 0 && !slices.Contains(client.AllowedScopes, sc) {
-			return nil, ErrInvalidScope
-		}
-	}
-
-	// User consent validation
+	// User consent enforcement
 	if !in.UserConsent {
 		return nil, ErrConsentRequired
 	}
@@ -190,23 +214,23 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) (*AuthorizeO
 	if err != nil {
 		return nil, err
 	}
-	codeHash := hashToken(rawCode)
-	now := s.now()
 
+	now := s.now()
+	codeHash := hashToken(rawCode)
 	authCode := &AuthorizationCode{
 		ID:                  codeHash,
 		CodeHash:            codeHash,
 		ClientID:            in.ClientID,
 		UserID:              in.UserID,
 		RedirectURI:         in.RedirectURI,
-		Scopes:              slices.Clone(in.Scopes),
+		Scopes:              in.Scopes,
 		CodeChallenge:       in.CodeChallenge,
 		CodeChallengeMethod: in.CodeChallengeMethod,
 		ExpiresAt:           now.Add(s.cfg.AuthorizationCodeTTL),
 		CreatedAt:           now,
 	}
 
-	if err := s.store.Codes().Create(ctx, authCode); err != nil {
+	if err := s.codes.Create(ctx, authCode); err != nil {
 		return nil, err
 	}
 
@@ -222,7 +246,7 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) (*AuthorizeO
 	}, nil
 }
 
-// Token handles OAuth 2.1 token issuance.
+// Token handles the OAuth 2.1 token endpoint (authorization_code, client_credentials, refresh_token).
 func (s *service) Token(ctx context.Context, in TokenInput) (*TokenOutput, error) {
 	switch in.GrantType {
 	case GrantTypeAuthorizationCode:
@@ -241,7 +265,7 @@ func (s *service) handleAuthorizationCodeGrant(ctx context.Context, in TokenInpu
 		return nil, ErrInvalidRequest
 	}
 
-	client, err := s.store.Clients().GetByID(ctx, in.ClientID)
+	client, err := s.clients.FindOne(ctx, adapter.Eq("id", in.ClientID))
 	if err != nil {
 		return nil, ErrInvalidClient
 	}
@@ -262,8 +286,11 @@ func (s *service) handleAuthorizationCodeGrant(ctx context.Context, in TokenInpu
 	// Atomically consume authorization code
 	now := s.now()
 	codeHash := hashToken(in.Code)
-	code, err := s.store.Codes().Consume(ctx, codeHash, now)
-	if err != nil {
+	code, err := s.codes.FindOne(ctx, adapter.Eq("code_hash", codeHash))
+	if errors.Is(err, adapter.ErrNotFound) || code == nil {
+		return nil, ErrInvalidGrant
+	}
+	if code.ConsumedAt != nil {
 		return nil, ErrInvalidGrant
 	}
 
@@ -271,6 +298,18 @@ func (s *service) handleAuthorizationCodeGrant(ctx context.Context, in TokenInpu
 	if !now.Before(code.ExpiresAt) {
 		return nil, ErrInvalidGrant
 	}
+
+	// Consume code atomically
+	n, err := s.codes.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", code.ID),
+		adapter.IsNull("consumed_at"),
+	}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil || n == 0 {
+		return nil, ErrInvalidGrant
+	}
+	code.ConsumedAt = &now
 
 	// Verify client match and exact redirect URI match
 	if code.ClientID != in.ClientID || code.RedirectURI != in.RedirectURI {
@@ -294,7 +333,7 @@ func (s *service) handleClientCredentialsGrant(ctx context.Context, in TokenInpu
 		return nil, ErrInvalidRequest
 	}
 
-	client, err := s.store.Clients().GetByID(ctx, in.ClientID)
+	client, err := s.clients.FindOne(ctx, adapter.Eq("id", in.ClientID))
 	if err != nil {
 		return nil, ErrInvalidClient
 	}
@@ -311,36 +350,34 @@ func (s *service) handleClientCredentialsGrant(ctx context.Context, in TokenInpu
 		return nil, ErrInvalidClient
 	}
 
-	// Validate scopes
-	for _, sc := range in.Scopes {
-		if len(client.AllowedScopes) > 0 && !slices.Contains(client.AllowedScopes, sc) {
-			return nil, ErrInvalidScope
+	// Scope validation if requested
+	scopes := client.AllowedScopes
+	if len(in.Scopes) > 0 {
+		for _, sc := range in.Scopes {
+			if !slices.Contains(client.AllowedScopes, sc) {
+				return nil, ErrInvalidScope
+			}
 		}
+		scopes = in.Scopes
 	}
 
-	scopes := in.Scopes
-	if len(scopes) == 0 {
-		scopes = client.AllowedScopes
-	}
-
-	// Client credentials grant produces client-bound access tokens without refresh tokens
+	now := s.now()
 	rawAccessToken, err := generateRandomToken(32)
 	if err != nil {
 		return nil, err
 	}
-	now := s.now()
-	accessTokenHash := hashToken(rawAccessToken)
+	accessHash := hashToken(rawAccessToken)
 	access := &AccessToken{
-		ID:        accessTokenHash,
-		TokenHash: accessTokenHash,
+		ID:        accessHash,
+		TokenHash: accessHash,
 		ClientID:  client.ID,
-		UserID:    "", // Principal is the client
+		UserID:    "", // Empty for client_credentials
 		Scopes:    slices.Clone(scopes),
 		ExpiresAt: now.Add(s.cfg.AccessTokenTTL),
 		CreatedAt: now,
 	}
 
-	if err := s.store.Tokens().CreateAccessToken(ctx, access); err != nil {
+	if err := s.accessTokens.Create(ctx, access); err != nil {
 		return nil, err
 	}
 
@@ -363,7 +400,7 @@ func (s *service) handleRefreshTokenGrant(ctx context.Context, in TokenInput) (*
 		return nil, ErrInvalidRequest
 	}
 
-	client, err := s.store.Clients().GetByID(ctx, in.ClientID)
+	client, err := s.clients.FindOne(ctx, adapter.Eq("id", in.ClientID))
 	if err != nil {
 		return nil, ErrInvalidClient
 	}
@@ -378,8 +415,8 @@ func (s *service) handleRefreshTokenGrant(ctx context.Context, in TokenInput) (*
 
 	now := s.now()
 	tokenHash := hashToken(in.RefreshToken)
-	rf, err := s.store.Tokens().GetRefreshTokenByHash(ctx, tokenHash)
-	if err != nil {
+	rf, err := s.refreshTokens.FindOne(ctx, adapter.Eq("token_hash", tokenHash))
+	if errors.Is(err, adapter.ErrNotFound) || rf == nil {
 		return nil, ErrInvalidGrant
 	}
 	if rf.RevokedAt != nil || !now.Before(rf.ExpiresAt) || rf.ClientID != in.ClientID {
@@ -399,7 +436,9 @@ func (s *service) handleRefreshTokenGrant(ctx context.Context, in TokenInput) (*
 
 	// Revoke old refresh token on rotation
 	if s.cfg.RotateRefreshTokens {
-		_ = s.store.Tokens().RevokeRefreshToken(ctx, tokenHash, now)
+		_, _ = s.refreshTokens.Update(ctx, []adapter.Condition{adapter.Eq("token_hash", tokenHash)}, map[string]any{
+			"revoked_at": now,
+		})
 	}
 
 	res, err := s.issueTokens(ctx, client.ID, rf.UserID, scopes, GrantTypeRefreshToken)
@@ -434,7 +473,7 @@ func (s *service) issueTokens(ctx context.Context, clientID, userID string, scop
 		CreatedAt: now,
 	}
 
-	if err := s.store.Tokens().CreateAccessToken(ctx, access); err != nil {
+	if err := s.accessTokens.Create(ctx, access); err != nil {
 		return nil, err
 	}
 
@@ -454,7 +493,7 @@ func (s *service) issueTokens(ctx context.Context, clientID, userID string, scop
 		CreatedAt:     now,
 	}
 
-	if err := s.store.Tokens().CreateRefreshToken(ctx, refresh); err != nil {
+	if err := s.refreshTokens.Create(ctx, refresh); err != nil {
 		return nil, err
 	}
 
@@ -484,8 +523,8 @@ func (s *service) RevokeToken(ctx context.Context, in RevokeTokenInput) error {
 	h := hashToken(in.Token)
 
 	// RFC 7009 requires revoking without failing if already revoked or non-existent
-	_ = s.store.Tokens().RevokeAccessToken(ctx, h, now)
-	_ = s.store.Tokens().RevokeRefreshToken(ctx, h, now)
+	_, _ = s.accessTokens.Update(ctx, []adapter.Condition{adapter.Eq("token_hash", h), adapter.IsNull("revoked_at")}, map[string]any{"revoked_at": now})
+	_, _ = s.refreshTokens.Update(ctx, []adapter.Condition{adapter.Eq("token_hash", h), adapter.IsNull("revoked_at")}, map[string]any{"revoked_at": now})
 
 	s.publish(ctx, events.EventTokenRevoked, in.ClientID, events.TokenRevokedPayload{
 		ClientID: in.ClientID,
@@ -504,7 +543,7 @@ func (s *service) IntrospectToken(ctx context.Context, in IntrospectTokenInput) 
 	h := hashToken(in.Token)
 
 	// Check access token first
-	if acc, err := s.store.Tokens().GetAccessTokenByHash(ctx, h); err == nil {
+	if acc, err := s.accessTokens.FindOne(ctx, adapter.Eq("token_hash", h)); err == nil && acc != nil {
 		if acc.RevokedAt != nil || !now.Before(acc.ExpiresAt) {
 			return &IntrospectTokenOutput{Active: false}, nil
 		}
@@ -525,7 +564,7 @@ func (s *service) IntrospectToken(ctx context.Context, in IntrospectTokenInput) 
 	}
 
 	// Check refresh token
-	if rf, err := s.store.Tokens().GetRefreshTokenByHash(ctx, h); err == nil {
+	if rf, err := s.refreshTokens.FindOne(ctx, adapter.Eq("token_hash", h)); err == nil && rf != nil {
 		if rf.RevokedAt != nil || !now.Before(rf.ExpiresAt) {
 			return &IntrospectTokenOutput{Active: false}, nil
 		}

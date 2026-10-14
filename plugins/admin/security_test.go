@@ -6,24 +6,21 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	admin "github.com/BladiCreator/go-modular-auth-admin"
 	"github.com/BladiCreator/go-modular-auth-admin/plugins"
-	"github.com/BladiCreator/go-modular-auth-admin/store/memory"
 	orgplugin "github.com/BladiCreator/go-modular-auth-organizations"
-	orgstore "github.com/BladiCreator/go-modular-auth-organizations/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func TestAdmin_Security_AuthorizationEnforced(t *testing.T) {
 	ctx := context.Background()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	aStore := memory.New()
 
-	adminModule := admin.New(admin.WithStore(aStore))
+	adminModule := admin.New()
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{adminModule},
 	})
@@ -77,14 +74,14 @@ func TestAdmin_Security_AuthorizationEnforced(t *testing.T) {
 
 func TestAdmin_Security_SelfProtection(t *testing.T) {
 	ctx := context.Background()
-	a, adm, aStore := setupTestAuth(t)
+	a, adm, ad := setupTestAuth(t)
 
 	adminRes, _ := a.SignUp(ctx, auth.SignUpInput{
 		Email:    "admin_self@example.com",
 		Password: "Password123!",
 	})
 	adminPrincipal := adminRes.Principal()
-	_ = aStore.SetAdminRole(ctx, adminPrincipal.Subject, true, "superadmin")
+	_ = bootstrapAdmin(ctx, ad, adminPrincipal.Subject, "admin_self@example.com")
 
 	// 1. Cannot disable self
 	err := adm.DisableUser(ctx, adminPrincipal, adminPrincipal.Subject, "lockout")
@@ -101,14 +98,14 @@ func TestAdmin_Security_SelfProtection(t *testing.T) {
 
 func TestAdmin_Security_NeverExposeSecrets(t *testing.T) {
 	ctx := context.Background()
-	a, adm, aStore := setupTestAuth(t)
+	a, adm, ad := setupTestAuth(t)
 
 	adminRes, _ := a.SignUp(ctx, auth.SignUpInput{
 		Email:    "admin_secret_check@example.com",
 		Password: "Password123!",
 	})
 	adminPrincipal := adminRes.Principal()
-	_ = aStore.SetAdminRole(ctx, adminPrincipal.Subject, true, "superadmin")
+	_ = bootstrapAdmin(ctx, ad, adminPrincipal.Subject, "admin_secret_check@example.com")
 
 	userRes, _ := a.SignUp(ctx, auth.SignUpInput{
 		Email:    "target_secret@example.com",
@@ -140,15 +137,14 @@ func TestAdmin_Security_NeverExposeSecrets(t *testing.T) {
 
 func TestAdmin_Security_AuditEvents(t *testing.T) {
 	ctx := context.Background()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	aStore := memory.New()
 
 	var eventsEmitted []auth.Event
-	adminModule := admin.New(admin.WithStore(aStore))
+	adminModule := admin.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{adminModule},
 	})
@@ -167,7 +163,7 @@ func TestAdmin_Security_AuditEvents(t *testing.T) {
 
 	adminRes, _ := a.SignUp(ctx, auth.SignUpInput{Email: "admin_audit@example.com", Password: "Password123!"})
 	adminPrincipal := adminRes.Principal()
-	_ = aStore.SetAdminRole(ctx, adminPrincipal.Subject, true, "superadmin")
+	_ = bootstrapAdmin(ctx, ad, adminPrincipal.Subject, "admin_audit@example.com")
 
 	userRes, _ := a.SignUp(ctx, auth.SignUpInput{Email: "target_audit@example.com", Password: "Password123!"})
 
@@ -195,16 +191,14 @@ func TestAdmin_Security_AuditEvents(t *testing.T) {
 
 func TestAdmin_Organizations_ScopedAdministration(t *testing.T) {
 	ctx := context.Background()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	aStore := memory.New()
-	oStore := orgstore.New()
 
-	orgModule := orgplugin.New(orgplugin.WithStore(oStore))
-	adminModule := admin.New(admin.WithStore(aStore))
+	orgModule := orgplugin.New()
+	adminModule := admin.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{orgModule, adminModule},
 	})
@@ -222,17 +216,13 @@ func TestAdmin_Organizations_ScopedAdministration(t *testing.T) {
 		t.Fatalf("failed to get Admin capability: %v", err)
 	}
 
-	// Wire Organizations into Admin via config option or helper
-	// Note: since adm was initialized, let's create a configured admin module with WithOrganizations
-	aStore2 := memory.New()
 	adminWithOrg := admin.New(
-		admin.WithStore(aStore2),
 		admin.WithOrganizations(orgCap),
 	)
 	a2, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
-		Plugins: []auth.PluginModule{adminWithOrg},
+		Plugins: []auth.PluginModule{orgModule, adminWithOrg},
 	})
 	if err != nil {
 		t.Fatalf("auth.New failed: %v", err)

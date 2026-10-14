@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-anonymous/cache"
-	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 
@@ -27,8 +26,8 @@ func (m *mockCoreCache) Get(ctx context.Context, key string, val any) error {
 	if !ok {
 		return corecache.ErrMiss
 	}
-	if target, ok := val.(*store.Identity); ok {
-		if id, ok := v.(store.Identity); ok {
+	if target, ok := val.(*cache.CachedIdentity); ok {
+		if id, ok := v.(cache.CachedIdentity); ok {
 			*target = id
 			return nil
 		}
@@ -39,9 +38,9 @@ func (m *mockCoreCache) Get(ctx context.Context, key string, val any) error {
 func (m *mockCoreCache) Set(ctx context.Context, key string, val any, ttl time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if id, ok := val.(*store.Identity); ok {
+	if id, ok := val.(*cache.CachedIdentity); ok {
 		m.data[key] = *id
-	} else if id, ok := val.(store.Identity); ok {
+	} else if id, ok := val.(cache.CachedIdentity); ok {
 		m.data[key] = id
 	}
 	return nil
@@ -60,7 +59,7 @@ func TestCache_Identity(t *testing.T) {
 	c := cache.New(mock)
 
 	now := time.Now().UTC()
-	ident := &store.Identity{
+	ident := &cache.CachedIdentity{
 		ID:        "anon-1",
 		UserID:    "user-1",
 		ExpiresAt: now.Add(time.Hour),
@@ -98,7 +97,7 @@ func TestCache_NilCore(t *testing.T) {
 	}
 
 	// Should not panic or fail
-	_ = c.SetIdentity(ctx, &store.Identity{UserID: "u1"}, time.Hour)
+	_ = c.SetIdentity(ctx, &cache.CachedIdentity{UserID: "u1"}, time.Hour)
 	if _, err := c.GetIdentity(ctx, "u1"); err != corecache.ErrMiss {
 		t.Fatalf("expected ErrMiss on nil cache, got %v", err)
 	}

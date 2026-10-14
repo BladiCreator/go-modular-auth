@@ -5,8 +5,6 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-audit/store"
-	"github.com/BladiCreator/go-modular-auth-audit/store/memory"
 )
 
 // EventFilter is a predicate function to decide if an event should be audited.
@@ -18,7 +16,6 @@ type OrgResolver func(ctx context.Context, ev auth.Event) string
 
 // Config holds settings for the audit plugin.
 type Config struct {
-	Store         store.Store
 	Filter        EventFilter
 	AsyncWorkers  int
 	BufferSize    int
@@ -29,7 +26,6 @@ type Config struct {
 
 func defaultConfig() Config {
 	return Config{
-		Store:         memory.New(),
 		AsyncWorkers:  0, // synchronous by default for immediate consistency
 		BufferSize:    1024,
 		BatchSize:     50,
@@ -39,15 +35,6 @@ func defaultConfig() Config {
 
 // Option configures audit plugin behavior.
 type Option func(*Config)
-
-// WithStore sets the underlying persistence adapter for audit logs.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithFilter configures a predicate to selectively filter out events from being audited.
 func WithFilter(f EventFilter) Option {

@@ -1,15 +1,15 @@
 // Package cache provides performance acceleration for bearer token validation
 // using GoModularAuth's core cache adapter.
 //
-// The Store remains the source of truth at all times; Cache is derived and ephemeral.
+// The database adapter remains the source of truth at all times; Cache is derived and ephemeral.
 // Cache keys are strictly derived from cryptographic token hashes or IDs, never from plaintext secrets.
 package cache
 
 import (
 	"context"
+	"slices"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-bearer/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 
@@ -17,6 +17,43 @@ const (
 	// SubNamespace is the plugin sub-namespace within GoModularAuth cache keys.
 	SubNamespace = "bearer"
 )
+
+// CachedToken represents the cached attributes of a bearer token.
+type CachedToken struct {
+	ID            string            `json:"id"`
+	TokenHash     string            `json:"token_hash"`
+	Subject       string            `json:"subject"`
+	PrincipalType string            `json:"principal_type"`
+	Scopes        []string          `json:"scopes"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	ExpiresAt     time.Time         `json:"expires_at"`
+	RevokedAt     *time.Time        `json:"revoked_at,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+}
+
+// Expired reports whether the token has expired relative to the given time.
+func (r *CachedToken) Expired(now time.Time) bool {
+	if r.ExpiresAt.IsZero() {
+		return false
+	}
+	return !now.Before(r.ExpiresAt)
+}
+
+// Revoked reports whether the token has been marked as revoked.
+func (r *CachedToken) Revoked() bool {
+	return r.RevokedAt != nil
+}
+
+// Active reports whether the token is neither expired nor revoked.
+func (r *CachedToken) Active(now time.Time) bool {
+	return !r.Revoked() && !r.Expired(now)
+}
+
+// HasScope reports whether the record contains the specified scope.
+func (r *CachedToken) HasScope(scope string) bool {
+	return slices.Contains(r.Scopes, scope)
+}
 
 // Cache wraps the core cache adapter for bearer token lookups.
 type Cache struct {
@@ -42,7 +79,7 @@ func tokenIDKey(id string) string {
 }
 
 // Set stores a token record in cache for fast lookup by token hash and id.
-func (c *Cache) Set(ctx context.Context, record *store.TokenRecord, ttl time.Duration) error {
+func (c *Cache) Set(ctx context.Context, record *CachedToken, ttl time.Duration) error {
 	if !c.Available() || record == nil || ttl <= 0 {
 		return nil
 	}
@@ -55,11 +92,11 @@ func (c *Cache) Set(ctx context.Context, record *store.TokenRecord, ttl time.Dur
 }
 
 // GetByHash retrieves a token record by the SHA-256 hash of its token.
-func (c *Cache) GetByHash(ctx context.Context, tokenHash string) (*store.TokenRecord, error) {
+func (c *Cache) GetByHash(ctx context.Context, tokenHash string) (*CachedToken, error) {
 	if !c.Available() || tokenHash == "" {
 		return nil, corecache.ErrMiss
 	}
-	var rec store.TokenRecord
+	var rec CachedToken
 	if err := c.core.Get(ctx, tokenHashKey(tokenHash), &rec); err != nil {
 		return nil, err
 	}

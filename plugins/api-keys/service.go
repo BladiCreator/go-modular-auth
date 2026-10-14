@@ -11,13 +11,15 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-apikeys/cache"
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 type service struct {
 	ctx     *sdk.Context
-	store   store.Store
+	keys    *sdk.Repository[APIKey]
 	limiter *cache.Limiter
 	cfg     Config
 	hooks   *Hooks
@@ -26,16 +28,34 @@ type service struct {
 var _ APIKeys = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
-	limiter := cache.NewLimiter(
-		ctx.Cache(),
-		cfg.MaxFailedAttempts,
-		cfg.BruteForceWindow,
-		cfg.CacheTTL,
-	)
+	if ctx == nil {
+		memAdapter := adaptermem.New()
+		s := schema.New()
+		_ = RegisterSchema(s)
+		_ = memAdapter.RegisterSchema(context.Background(), s)
+		ctx = sdk.NewTestContext(memAdapter, nil, nil)
+	}
+
+	var limiter *cache.Limiter
+	if ctx.Cache() != nil {
+		limiter = cache.NewLimiter(
+			ctx.Cache(),
+			cfg.MaxFailedAttempts,
+			cfg.BruteForceWindow,
+			cfg.CacheTTL,
+		)
+	} else {
+		limiter = cache.NewLimiter(
+			nil,
+			cfg.MaxFailedAttempts,
+			cfg.BruteForceWindow,
+			cfg.CacheTTL,
+		)
+	}
 
 	return &service{
 		ctx:     ctx,
-		store:   cfg.Store,
+		keys:    sdk.Model[APIKey](ctx, ModelAPIKeys),
 		limiter: limiter,
 		cfg:     cfg,
 		hooks:   &Hooks{},
@@ -44,6 +64,13 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 
 func (s *service) Hooks() *Hooks {
 	return s.hooks
+}
+
+func (s *service) now() time.Time {
+	if s.ctx != nil {
+		return s.ctx.Now()
+	}
+	return time.Now().UTC()
 }
 
 func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, error) {
@@ -66,7 +93,7 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, er
 		return nil, err
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 
 	var expiresAt *time.Time
 	if in.ExpiresAt != nil {
@@ -79,7 +106,7 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, er
 		expiresAt = &exp
 	}
 
-	key := &store.APIKey{
+	key := &APIKey{
 		ID:             GenerateID("ak_"),
 		Name:           name,
 		Prefix:         publicPrefix,
@@ -95,36 +122,39 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*CreateResult, er
 		UpdatedAt:      now,
 	}
 
-	if err := s.store.Create(ctx, key); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+	if err := s.keys.Create(ctx, key); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			return nil, ErrConflict
 		}
 		return nil, fmt.Errorf("apikeys: failed to persist API key: %w", err)
 	}
 
-	s.ctx.Events().Publish(ctx, auth.Event{
-		Name:    EventAPIKeyCreated,
-		Time:    now,
-		Subject: key.ID,
-		Payload: CreatedPayload{
-			ID:             key.ID,
-			Name:           key.Name,
-			Prefix:         key.Prefix,
-			UserID:         key.UserID,
-			OrganizationID: key.OrganizationID,
-			ServiceID:      key.ServiceID,
-			Scopes:         key.Scopes,
-			Permissions:    key.Permissions,
-			ExpiresAt:      key.ExpiresAt,
-		},
-	})
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
+			Name:    EventAPIKeyCreated,
+			Time:    now,
+			Subject: key.ID,
+			Payload: CreatedPayload{
+				ID:             key.ID,
+				Name:           key.Name,
+				Prefix:         key.Prefix,
+				UserID:         key.UserID,
+				OrganizationID: key.OrganizationID,
+				ServiceID:      key.ServiceID,
+				Scopes:         key.Scopes,
+				Permissions:    key.Permissions,
+				ExpiresAt:      key.ExpiresAt,
+			},
+		})
+	}
 
-	s.hooks.afterCreate.run(ctx, key)
-
-	return &CreateResult{
+	result := &CreateResult{
 		Key:    key,
 		RawKey: rawKey,
-	}, nil
+	}
+
+	s.hooks.afterCreate.run(ctx, key)
+	return result, nil
 }
 
 func (s *service) Get(ctx context.Context, id string) (*APIKey, error) {
@@ -133,9 +163,9 @@ func (s *service) Get(ctx context.Context, id string) (*APIKey, error) {
 		return nil, fmt.Errorf("%w: ID cannot be empty", ErrInvalidInput)
 	}
 
-	key, err := s.store.GetByID(ctx, id)
+	key, err := s.keys.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -144,7 +174,36 @@ func (s *service) Get(ctx context.Context, id string) (*APIKey, error) {
 }
 
 func (s *service) List(ctx context.Context, filter ListFilter) ([]*APIKey, error) {
-	return s.store.List(ctx, filter)
+	where := make([]adapter.Condition, 0)
+	if filter.UserID != "" {
+		where = append(where, adapter.Eq("user_id", filter.UserID))
+	}
+	if filter.OrganizationID != "" {
+		where = append(where, adapter.Eq("organization_id", filter.OrganizationID))
+	}
+	if filter.ServiceID != "" {
+		where = append(where, adapter.Eq("service_id", filter.ServiceID))
+	}
+	if !filter.IncludeRevoked {
+		where = append(where, adapter.IsNull("revoked_at"))
+	}
+
+	keys, err := s.keys.FindMany(ctx, adapter.Query{
+		Where:  where,
+		Limit:  filter.Limit,
+		Offset: filter.Offset,
+		SortBy: "created_at",
+		Desc:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*APIKey, len(keys))
+	for i := range keys {
+		results[i] = &keys[i]
+	}
+	return results, nil
 }
 
 func (s *service) Revoke(ctx context.Context, id string) error {
@@ -157,17 +216,24 @@ func (s *service) Revoke(ctx context.Context, id string) error {
 		return err
 	}
 
-	key, err := s.store.GetByID(ctx, id)
+	key, err := s.keys.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrKeyNotFound
 		}
 		return err
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 	if !key.IsRevoked() {
-		if err := s.store.Revoke(ctx, id, now); err != nil {
+		_, err := s.keys.Update(ctx, []adapter.Condition{
+			adapter.Eq("id", id),
+			adapter.IsNull("revoked_at"),
+		}, map[string]any{
+			"revoked_at": now,
+			"updated_at": now,
+		})
+		if err != nil {
 			return err
 		}
 		key.RevokedAt = &now
@@ -175,21 +241,25 @@ func (s *service) Revoke(ctx context.Context, id string) error {
 	}
 
 	// Immediate cache invalidation
-	_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+	if s.limiter != nil {
+		_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+	}
 
-	s.ctx.Events().Publish(ctx, auth.Event{
-		Name:    EventAPIKeyRevoked,
-		Time:    now,
-		Subject: key.ID,
-		Payload: RevokedPayload{
-			ID:             key.ID,
-			Prefix:         key.Prefix,
-			UserID:         key.UserID,
-			OrganizationID: key.OrganizationID,
-			ServiceID:      key.ServiceID,
-			RevokedAt:      now,
-		},
-	})
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
+			Name:    EventAPIKeyRevoked,
+			Time:    now,
+			Subject: key.ID,
+			Payload: RevokedPayload{
+				ID:             key.ID,
+				Prefix:         key.Prefix,
+				UserID:         key.UserID,
+				OrganizationID: key.OrganizationID,
+				ServiceID:      key.ServiceID,
+				RevokedAt:      now,
+			},
+		})
+	}
 
 	s.hooks.afterRevoke.run(ctx, key)
 	return nil
@@ -205,15 +275,15 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		return nil, err
 	}
 
-	oldKey, err := s.store.GetByID(ctx, id)
+	oldKey, err := s.keys.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 	if oldKey.IsRevoked() {
 		return nil, ErrKeyRevoked
 	}
@@ -251,7 +321,6 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		exp := now.Add(*rotCfg.newExpiresIn)
 		newExpiresAt = &exp
 	} else if oldKey.ExpiresAt != nil {
-		// Retain remaining lifetime or calculate equivalent
 		newExpiresAt = oldKey.ExpiresAt
 	}
 
@@ -260,7 +329,7 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		return nil, err
 	}
 
-	newKey := &store.APIKey{
+	newKey := &APIKey{
 		ID:             GenerateID("ak_"),
 		Name:           name,
 		Prefix:         publicPrefix,
@@ -276,30 +345,42 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		UpdatedAt:      now,
 	}
 
-	if err := s.store.Create(ctx, newKey); err != nil {
+	if err := s.keys.Create(ctx, newKey); err != nil {
 		return nil, fmt.Errorf("apikeys: failed to persist rotated key: %w", err)
 	}
 
 	var gracePeriodEnd *time.Time
 	if rotCfg.gracePeriod > 0 {
-		// Old key remains valid during grace period
 		grace := now.Add(rotCfg.gracePeriod)
 		gracePeriodEnd = &grace
 		oldKey.ExpiresAt = &grace
 		oldKey.UpdatedAt = now
-		if err := s.store.Update(ctx, oldKey); err != nil {
+		_, err := s.keys.Update(ctx, []adapter.Condition{adapter.Eq("id", oldKey.ID)}, map[string]any{
+			"expires_at": grace,
+			"updated_at": now,
+		})
+		if err != nil {
 			return nil, fmt.Errorf("apikeys: failed to update old key grace period: %w", err)
 		}
-		// Refresh cache with new expiration
-		_ = s.limiter.SetKey(ctx, oldKey)
+		if s.limiter != nil {
+			_ = s.limiter.SetKey(ctx, toCacheRecord(oldKey))
+		}
 	} else {
-		// Immediately revoke old key
-		if err := s.store.Revoke(ctx, oldKey.ID, now); err != nil {
+		_, err := s.keys.Update(ctx, []adapter.Condition{
+			adapter.Eq("id", oldKey.ID),
+			adapter.IsNull("revoked_at"),
+		}, map[string]any{
+			"revoked_at": now,
+			"updated_at": now,
+		})
+		if err != nil {
 			return nil, fmt.Errorf("apikeys: failed to revoke old key: %w", err)
 		}
 		oldKey.RevokedAt = &now
 		oldKey.UpdatedAt = now
-		_ = s.limiter.Invalidate(ctx, oldKey.ID, oldKey.KeyHash)
+		if s.limiter != nil {
+			_ = s.limiter.Invalidate(ctx, oldKey.ID, oldKey.KeyHash)
+		}
 	}
 
 	result := &RotateResult{
@@ -308,20 +389,22 @@ func (s *service) Rotate(ctx context.Context, id string, opts ...RotateOption) (
 		OldKey: oldKey,
 	}
 
-	s.ctx.Events().Publish(ctx, auth.Event{
-		Name:    EventAPIKeyRotated,
-		Time:    now,
-		Subject: newKey.ID,
-		Payload: RotatedPayload{
-			OldKeyID:       oldKey.ID,
-			NewKeyID:       newKey.ID,
-			Prefix:         newKey.Prefix,
-			UserID:         newKey.UserID,
-			OrganizationID: newKey.OrganizationID,
-			ServiceID:      newKey.ServiceID,
-			GracePeriod:    gracePeriodEnd,
-		},
-	})
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
+			Name:    EventAPIKeyRotated,
+			Time:    now,
+			Subject: newKey.ID,
+			Payload: RotatedPayload{
+				OldKeyID:       oldKey.ID,
+				NewKeyID:       newKey.ID,
+				Prefix:         newKey.Prefix,
+				UserID:         newKey.UserID,
+				OrganizationID: newKey.OrganizationID,
+				ServiceID:      newKey.ServiceID,
+				GracePeriod:    gracePeriodEnd,
+			},
+		})
+	}
 
 	s.hooks.afterRotate.run(ctx, result)
 	return result, nil
@@ -338,10 +421,11 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 		opt(&authCfg)
 	}
 
-	// 1. Brute-force check
 	clientIdentifier := authCfg.ipAddress
-	if blocked, _ := s.limiter.CheckRateLimit(ctx, clientIdentifier); blocked {
-		return nil, ErrRateLimited
+	if s.limiter != nil {
+		if blocked, _ := s.limiter.CheckRateLimit(ctx, clientIdentifier); blocked {
+			return nil, ErrRateLimited
+		}
 	}
 
 	if err := s.hooks.beforeAuthenticate.run(ctx, &rawKey); err != nil {
@@ -349,43 +433,53 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 	}
 
 	keyHash := HashKey(rawKey)
-	now := s.ctx.Now()
+	now := s.now()
 
-	// 2. Cache lookup
-	key, err := s.limiter.GetKey(ctx, keyHash)
-	if err != nil {
-		// Cache miss: query Store (source of truth)
-		key, err = s.store.GetByHash(ctx, keyHash)
+	var key *APIKey
+	if s.limiter != nil {
+		cached, err := s.limiter.GetKey(ctx, keyHash)
+		if err == nil && cached != nil {
+			key = fromCacheRecord(cached)
+		}
+	}
+
+	if key == nil {
+		var err error
+		key, err = s.keys.FindOne(ctx, adapter.Eq("key_hash", keyHash))
 		if err != nil {
-			// Equalize timing via dummy verification
 			DummyHashVerification(rawKey)
-			_ = s.limiter.RecordFailure(ctx, clientIdentifier)
-			if errors.Is(err, store.ErrNotFound) {
+			if s.limiter != nil {
+				_ = s.limiter.RecordFailure(ctx, clientIdentifier)
+			}
+			if errors.Is(err, adapter.ErrNotFound) {
 				return nil, ErrInvalidKey
 			}
 			return nil, err
 		}
 	}
 
-	// 3. Constant-time validation
 	if !ConstantTimeEqual(key.KeyHash, keyHash) {
 		DummyHashVerification(rawKey)
-		_ = s.limiter.RecordFailure(ctx, clientIdentifier)
+		if s.limiter != nil {
+			_ = s.limiter.RecordFailure(ctx, clientIdentifier)
+		}
 		return nil, ErrInvalidKey
 	}
 
-	// 4. Status checks
 	if key.IsRevoked() {
-		_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+		if s.limiter != nil {
+			_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+		}
 		return nil, ErrKeyRevoked
 	}
 
 	if key.IsExpired(now) {
-		_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+		if s.limiter != nil {
+			_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+		}
 		return nil, ErrKeyExpired
 	}
 
-	// 5. Scopes and Permissions checks
 	if len(authCfg.requiredScopes) > 0 && !key.HasAllScopes(authCfg.requiredScopes...) {
 		return nil, ErrInsufficientScope
 	}
@@ -394,19 +488,22 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 		return nil, ErrInsufficientPermission
 	}
 
-	// 6. Update cache
-	_ = s.limiter.SetKey(ctx, key)
+	if s.limiter != nil {
+		_ = s.limiter.SetKey(ctx, toCacheRecord(key))
+	}
 
-	// 7. Last used telemetry update (debounced)
 	shouldTouch := key.LastUsedAt == nil || now.Sub(*key.LastUsedAt) >= s.cfg.TouchLastUsedThreshold
 	if shouldTouch {
-		_ = s.store.TouchLastUsed(ctx, key.ID, now, authCfg.ipAddress, authCfg.userAgent)
+		_, _ = s.keys.Update(ctx, []adapter.Condition{adapter.Eq("id", key.ID)}, map[string]any{
+			"last_used_at": now,
+			"last_used_ip": authCfg.ipAddress,
+			"last_used_ua": authCfg.userAgent,
+		})
 		key.LastUsedAt = &now
 		key.LastUsedIP = authCfg.ipAddress
 		key.LastUsedUA = authCfg.userAgent
 	}
 
-	// 8. Resolve to Core Principal
 	subject := key.ID
 	if s.cfg.SubjectStrategy == SubjectStrategyOwner {
 		if key.UserID != "" {
@@ -426,25 +523,26 @@ func (s *service) Authenticate(ctx context.Context, rawKey string, opts ...AuthO
 		Key:       key,
 	}
 
-	s.ctx.Events().Publish(ctx, auth.Event{
-		Name:    EventAPIKeyAuthenticated,
-		Time:    now,
-		Subject: key.ID,
-		Payload: AuthenticatedPayload{
-			ID:             key.ID,
-			Prefix:         key.Prefix,
-			UserID:         key.UserID,
-			OrganizationID: key.OrganizationID,
-			ServiceID:      key.ServiceID,
-			IPAddress:      authCfg.ipAddress,
-			UserAgent:      authCfg.userAgent,
-			PrincipalType:  string(principal.Type),
-			Subject:        principal.Subject,
-		},
-	})
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
+			Name:    EventAPIKeyAuthenticated,
+			Time:    now,
+			Subject: key.ID,
+			Payload: AuthenticatedPayload{
+				ID:             key.ID,
+				Prefix:         key.Prefix,
+				UserID:         key.UserID,
+				OrganizationID: key.OrganizationID,
+				ServiceID:      key.ServiceID,
+				IPAddress:      authCfg.ipAddress,
+				UserAgent:      authCfg.userAgent,
+				PrincipalType:  string(principal.Type),
+				Subject:        principal.Subject,
+			},
+		})
+	}
 
 	s.hooks.afterAuthenticate.run(ctx, result)
-
 	return result, nil
 }
 
@@ -454,36 +552,91 @@ func (s *service) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("%w: ID cannot be empty", ErrInvalidInput)
 	}
 
-	key, err := s.store.GetByID(ctx, id)
+	key, err := s.keys.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrKeyNotFound
 		}
 		return err
 	}
 
-	if err := s.store.Delete(ctx, id); err != nil {
+	if _, err := s.keys.Delete(ctx, adapter.Eq("id", id)); err != nil {
 		return err
 	}
 
-	_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+	if s.limiter != nil {
+		_ = s.limiter.Invalidate(ctx, key.ID, key.KeyHash)
+	}
 
-	s.ctx.Events().Publish(ctx, auth.Event{
-		Name:    EventAPIKeyDeleted,
-		Time:    s.ctx.Now(),
-		Subject: key.ID,
-		Payload: DeletedPayload{
-			ID:             key.ID,
-			Prefix:         key.Prefix,
-			UserID:         key.UserID,
-			OrganizationID: key.OrganizationID,
-			ServiceID:      key.ServiceID,
-		},
-	})
+	if s.ctx != nil && s.ctx.Events() != nil {
+		s.ctx.Events().Publish(ctx, auth.Event{
+			Name:    EventAPIKeyDeleted,
+			Time:    s.now(),
+			Subject: key.ID,
+			Payload: DeletedPayload{
+				ID:             key.ID,
+				Prefix:         key.Prefix,
+				UserID:         key.UserID,
+				OrganizationID: key.OrganizationID,
+				ServiceID:      key.ServiceID,
+			},
+		})
+	}
 
 	return nil
 }
 
 func (s *service) PurgeExpired(ctx context.Context) (int, error) {
-	return s.store.DeleteExpired(ctx, s.ctx.Now())
+	affected, err := s.keys.Delete(ctx, adapter.Lt("expires_at", s.now()), adapter.IsNotNull("expires_at"))
+	return int(affected), err
+}
+
+func toCacheRecord(k *APIKey) *cache.KeyRecord {
+	if k == nil {
+		return nil
+	}
+	return &cache.KeyRecord{
+		ID:             k.ID,
+		Name:           k.Name,
+		Prefix:         k.Prefix,
+		KeyHash:        k.KeyHash,
+		UserID:         k.UserID,
+		OrganizationID: k.OrganizationID,
+		ServiceID:      k.ServiceID,
+		Scopes:         k.Scopes,
+		Permissions:    k.Permissions,
+		Metadata:       k.Metadata,
+		ExpiresAt:      k.ExpiresAt,
+		RevokedAt:      k.RevokedAt,
+		LastUsedAt:     k.LastUsedAt,
+		LastUsedIP:     k.LastUsedIP,
+		LastUsedUA:     k.LastUsedUA,
+		CreatedAt:      k.CreatedAt,
+		UpdatedAt:      k.UpdatedAt,
+	}
+}
+
+func fromCacheRecord(r *cache.KeyRecord) *APIKey {
+	if r == nil {
+		return nil
+	}
+	return &APIKey{
+		ID:             r.ID,
+		Name:           r.Name,
+		Prefix:         r.Prefix,
+		KeyHash:        r.KeyHash,
+		UserID:         r.UserID,
+		OrganizationID: r.OrganizationID,
+		ServiceID:      r.ServiceID,
+		Scopes:         r.Scopes,
+		Permissions:    r.Permissions,
+		Metadata:       r.Metadata,
+		ExpiresAt:      r.ExpiresAt,
+		RevokedAt:      r.RevokedAt,
+		LastUsedAt:     r.LastUsedAt,
+		LastUsedIP:     r.LastUsedIP,
+		LastUsedUA:     r.LastUsedUA,
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
+	}
 }

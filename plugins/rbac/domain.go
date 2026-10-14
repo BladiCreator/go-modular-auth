@@ -4,6 +4,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // Scope defines the operational boundary where a role or assignment applies.
@@ -100,4 +101,43 @@ type Decision struct {
 	PrincipalSubject string             `json:"principal_subject"`
 	PrincipalType    auth.PrincipalType `json:"principal_type"`
 	EvaluatedAt      time.Time          `json:"evaluated_at"`
+}
+
+const (
+	ModelRBACRoles       = "rbac_roles"
+	ModelRBACAssignments = "rbac_assignments"
+)
+
+// RegisterSchema registers the rbac_roles and rbac_assignments models in the compiled schema.
+func RegisterSchema(s *schema.Schema) error {
+	roleModel := schema.NewModel(ModelRBACRoles, ModelRBACRoles, "id")
+	_ = roleModel.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = roleModel.AddField(schema.Field{Name: "name", Type: schema.TypeString, Required: true, Unique: true})
+	_ = roleModel.AddField(schema.Field{Name: "description", Type: schema.TypeString})
+	_ = roleModel.AddField(schema.Field{Name: "scope", Type: schema.TypeString, Required: true})
+	_ = roleModel.AddField(schema.Field{Name: "permissions", Type: schema.TypeJSON, Required: true})
+	_ = roleModel.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	_ = roleModel.AddField(schema.Field{Name: "updated_at", Type: schema.TypeTime, Required: true})
+	roleModel.Indexes = []schema.Index{
+		{Name: "idx_rbac_roles_name", Fields: []string{"name"}, Unique: true},
+		{Name: "idx_rbac_roles_scope", Fields: []string{"scope"}},
+	}
+	if err := s.AddModel(roleModel); err != nil {
+		return err
+	}
+
+	asgnModel := schema.NewModel(ModelRBACAssignments, ModelRBACAssignments, "id")
+	_ = asgnModel.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = asgnModel.AddField(schema.Field{Name: "role_id", Type: schema.TypeString, Required: true})
+	_ = asgnModel.AddField(schema.Field{Name: "principal_subject", Type: schema.TypeString, Required: true})
+	_ = asgnModel.AddField(schema.Field{Name: "principal_type", Type: schema.TypeString, Required: true})
+	_ = asgnModel.AddField(schema.Field{Name: "scope", Type: schema.TypeString, Required: true})
+	_ = asgnModel.AddField(schema.Field{Name: "scope_id", Type: schema.TypeString})
+	_ = asgnModel.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	asgnModel.Indexes = []schema.Index{
+		{Name: "idx_rbac_assignments_principal", Fields: []string{"principal_subject", "principal_type"}},
+		{Name: "idx_rbac_assignments_role", Fields: []string{"role_id"}},
+		{Name: "idx_rbac_assignments_scope", Fields: []string{"scope", "scope_id"}},
+	}
+	return s.AddModel(asgnModel)
 }

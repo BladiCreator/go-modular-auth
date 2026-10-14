@@ -19,9 +19,8 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	oidc "github.com/BladiCreator/go-modular-auth-oidc"
 	"github.com/BladiCreator/go-modular-auth-oidc/plugins"
-	oidcmemory "github.com/BladiCreator/go-modular-auth-oidc/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 type mockOIDCServer struct {
@@ -162,9 +161,8 @@ func (m *mockOIDCServer) createIDToken(t *testing.T, sub, email, nonce string, v
 
 func setupTestAuth(t *testing.T, mock *mockOIDCServer) (*auth.Auth, plugins.OIDC) {
 	t.Helper()
-	cStore := corememory.New()
+	adapter := adaptermem.New()
 	cCache := corecache.New()
-	oidcStore := oidcmemory.New()
 
 	providerCfg := oidc.ProviderConfig{
 		ID:           "google",
@@ -177,12 +175,11 @@ func setupTestAuth(t *testing.T, mock *mockOIDCServer) (*auth.Auth, plugins.OIDC
 
 	oidcModule := oidc.New(
 		oidc.WithProvider(providerCfg),
-		oidc.WithStore(oidcStore),
 		oidc.WithHTTPClient(mock.server.Client()),
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: adapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{oidcModule},
 	})

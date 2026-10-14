@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-organizations"
-	"github.com/BladiCreator/go-modular-auth-sso/store"
-	"github.com/BladiCreator/go-modular-auth-sso/store/memory"
 )
 
 // HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.
@@ -16,7 +14,6 @@ type HTTPClient interface {
 
 // Config holds runtime configuration options for the SSO plugin.
 type Config struct {
-	Store         store.Store
 	StateTTL      time.Duration
 	Clock         func() time.Time
 	HTTPClient    HTTPClient
@@ -30,7 +27,6 @@ type Option func(*Config)
 
 func newConfig(opts ...Option) Config {
 	c := Config{
-		Store:      memory.New(),
 		StateTTL:   10 * time.Minute,
 		Clock:      func() time.Time { return time.Now().UTC() },
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
@@ -41,15 +37,6 @@ func newConfig(opts ...Option) Config {
 		opt(&c)
 	}
 	return c
-}
-
-// WithStore sets the persistence adapter for SSO configurations and state sessions.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
 }
 
 // WithStateTTL configures how long in-flight SSO state sessions remain valid.

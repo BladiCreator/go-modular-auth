@@ -15,7 +15,7 @@ func Migrations() []sdk.Migration {
 	return []sdk.Migration{
 		{
 			Version:     1,
-			Description: "create auth_admin_users table",
+			Description: "create admin_users table",
 		},
 	}
 }

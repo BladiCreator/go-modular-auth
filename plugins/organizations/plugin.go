@@ -3,6 +3,7 @@ package organizations
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -14,7 +15,10 @@ type Module struct {
 	svc *service
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
 
 // New creates an installable organizations PluginModule with optional configurations.
 func New(opts ...Option) *Module {
@@ -30,12 +34,13 @@ func (m *Module) ID() string {
 	return PluginID
 }
 
+// RegisterSchema contributes organizations models to the compiled schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
+
 // Init configures infrastructure and provides the typed Capability into GoModularAuth via plugin-sdk.
 func (m *Module) Init(h *auth.Host) error {
-	if m.cfg.Store == nil {
-		return ErrStoreRequired
-	}
-
 	ctx := sdk.NewContext(h)
 	m.svc = newService(ctx, m.cfg)
 

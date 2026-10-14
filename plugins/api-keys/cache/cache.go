@@ -9,9 +9,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
+
+// KeyRecord represents cached API key attributes.
+type KeyRecord struct {
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Prefix         string            `json:"prefix"`
+	KeyHash        string            `json:"key_hash"`
+	UserID         string            `json:"user_id,omitempty"`
+	OrganizationID string            `json:"organization_id,omitempty"`
+	ServiceID      string            `json:"service_id,omitempty"`
+	Scopes         []string          `json:"scopes,omitempty"`
+	Permissions    []string          `json:"permissions,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	ExpiresAt      *time.Time        `json:"expires_at,omitempty"`
+	RevokedAt      *time.Time        `json:"revoked_at,omitempty"`
+	LastUsedAt     *time.Time        `json:"last_used_at,omitempty"`
+	LastUsedIP     string            `json:"last_used_ip,omitempty"`
+	LastUsedUA     string            `json:"last_used_ua,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+}
 
 // Default settings for caching and abuse mitigation.
 const (
@@ -141,13 +161,13 @@ func (l *Limiter) RecordFailure(ctx context.Context, identifier string) error {
 }
 
 // GetKey retrieves a cached API key by its SHA-256 hash.
-func (l *Limiter) GetKey(ctx context.Context, keyHash string) (*store.APIKey, error) {
+func (l *Limiter) GetKey(ctx context.Context, keyHash string) (*KeyRecord, error) {
 	if l.cache == nil {
 		return nil, corecache.ErrMiss
 	}
 
 	cacheKey := corecache.Key("apikeys", "hash", keyHash)
-	var k store.APIKey
+	var k KeyRecord
 	if err := l.cache.Get(ctx, cacheKey, &k); err != nil {
 		return nil, err
 	}
@@ -155,7 +175,7 @@ func (l *Limiter) GetKey(ctx context.Context, keyHash string) (*store.APIKey, er
 }
 
 // SetKey stores an active API key in cache by both hash and ID to enable fast lookup and invalidation.
-func (l *Limiter) SetKey(ctx context.Context, key *store.APIKey) error {
+func (l *Limiter) SetKey(ctx context.Context, key *KeyRecord) error {
 	if l.cache == nil || key == nil {
 		return nil
 	}

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-admin/store"
 	"github.com/BladiCreator/go-modular-auth-organizations"
 )
 
@@ -39,7 +38,6 @@ func (f AuthorizerFunc) Authorize(ctx context.Context, p auth.Principal, action 
 
 // Config encapsulates configuration settings for the admin plugin.
 type Config struct {
-	Store         store.Store
 	Authorizer    Authorizer
 	Organizations organizations.Organization
 	CacheTTL      time.Duration
@@ -47,13 +45,6 @@ type Config struct {
 
 // Option configures administrative plugin settings.
 type Option func(*Config)
-
-// WithStore sets the persistence adapter for the admin plugin.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithAuthorizer provides a custom authorization policy implementation.
 func WithAuthorizer(a Authorizer) Option {

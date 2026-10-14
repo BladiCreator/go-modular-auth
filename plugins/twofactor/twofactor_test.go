@@ -8,7 +8,6 @@ import (
 	"time"
 
 	twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
-	"github.com/BladiCreator/go-modular-auth-twofactor/store/memory"
 )
 
 func newTestService(t *testing.T) twofactor.TwoFactor {
@@ -23,7 +22,6 @@ func newTestService(t *testing.T) twofactor.TwoFactor {
 	}
 
 	cfg := twofactor.Config{
-		Store:                     memory.New(),
 		Protector:                 protector,
 		Issuer:                    "TestApp",
 		StepDuration:              30 * time.Second,
@@ -32,18 +30,7 @@ func newTestService(t *testing.T) twofactor.TwoFactor {
 		DefaultRecoveryCodesCount: 8,
 	}
 
-	// Build service using module init pattern or internal constructor
-	mod := twofactor.New(
-		twofactor.WithStore(cfg.Store),
-		twofactor.WithSecretProtector(protector),
-		twofactor.WithIssuer("TestApp"),
-		twofactor.WithSkewSteps(1),
-		twofactor.WithDefaultRecoveryCodesCount(8),
-	)
-	_ = mod
-
-	// We can test the capability via the module or direct mock host
-	return createServiceForTest(cfg)
+	return twofactor.NewServiceForTesting(cfg)
 }
 
 func createServiceForTest(cfg twofactor.Config) twofactor.TwoFactor {

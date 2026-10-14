@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
-	"github.com/BladiCreator/go-modular-auth-email-otp/store"
-	"github.com/BladiCreator/go-modular-auth-email-otp/store/memory"
 	"github.com/BladiCreator/go-modular-auth/email"
 )
 
@@ -24,9 +22,6 @@ type RateLimitConfig struct {
 
 // Config defines the configuration for the Email OTP plugin.
 type Config struct {
-	// Store is the authoritative storage adapter for OTP records.
-	// Defaults to an in-memory store if nil.
-	Store store.Store
 
 	// EmailSender physically delivers email messages.
 	// If nil, the host's configured email sender is used.
@@ -58,9 +53,6 @@ type Config struct {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.TTL <= 0 {
 		c.TTL = 10 * time.Minute
 	}
@@ -97,15 +89,6 @@ func defaultMessageBuilder(to, code string, ttl time.Duration) email.Message {
 
 // Option applies a functional configuration option.
 type Option func(*Config)
-
-// WithStore sets the authoritative Store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithEmailSender sets a custom email sender for OTP delivery.
 func WithEmailSender(s email.Sender) Option {

@@ -15,7 +15,7 @@ func Migrations() []sdk.Migration {
 	return []sdk.Migration{
 		{
 			Version:     1,
-			Description: "create auth_device_grants table",
+			Description: "create device_grants table",
 		},
 	}
 }

@@ -19,13 +19,11 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	organizations "github.com/BladiCreator/go-modular-auth-organizations"
-	orgmemory "github.com/BladiCreator/go-modular-auth-organizations/store/memory"
 	sso "github.com/BladiCreator/go-modular-auth-sso"
 	"github.com/BladiCreator/go-modular-auth-sso/oidc"
 	"github.com/BladiCreator/go-modular-auth-sso/plugins"
-	ssomemory "github.com/BladiCreator/go-modular-auth-sso/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 type mockIdPServer struct {
@@ -128,20 +126,17 @@ func newMockIdPServer(t *testing.T, clientID string) *mockIdPServer {
 func setupSSOHarness(t *testing.T, mock *mockIdPServer) (*auth.Auth, plugins.SSO, organizations.Organization) {
 	t.Helper()
 
-	cStore := corememory.New()
+	adapter := adaptermem.New()
 	cCache := corecache.New()
-	sStore := ssomemory.New()
-	orgStore := orgmemory.New()
 
-	orgModule := organizations.New(organizations.WithStore(orgStore))
+	orgModule := organizations.New()
 	ssoModule := sso.New(
-		sso.WithStore(sStore),
 		sso.WithHTTPClient(mock.server.Client()),
 		sso.WithSPEntityID("urn:myapp:sp"),
 	)
 
 	engine, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: adapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{orgModule, ssoModule},
 	})

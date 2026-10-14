@@ -1,7 +1,7 @@
 -- Migration: 001_create_twofactor_tables.sql
 -- Description: Create persistent tables for factors, recovery codes and MFA challenges.
 
-CREATE TABLE IF NOT EXISTS auth_twofactor_factors (
+CREATE TABLE IF NOT EXISTS twofactor_factors (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,
     type VARCHAR(32) NOT NULL,
@@ -15,10 +15,10 @@ CREATE TABLE IF NOT EXISTS auth_twofactor_factors (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_twofactor_factors_user ON auth_twofactor_factors (user_id);
-CREATE INDEX IF NOT EXISTS idx_twofactor_factors_user_confirmed ON auth_twofactor_factors (user_id, confirmed);
+CREATE INDEX IF NOT EXISTS idx_twofactor_factors_user ON twofactor_factors (user_id);
+CREATE INDEX IF NOT EXISTS idx_twofactor_factors_user_confirmed ON twofactor_factors (user_id, confirmed);
 
-CREATE TABLE IF NOT EXISTS auth_twofactor_recovery_codes (
+CREATE TABLE IF NOT EXISTS twofactor_recovery_codes (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,
     code_hash VARCHAR(128) NOT NULL,
@@ -26,10 +26,10 @@ CREATE TABLE IF NOT EXISTS auth_twofactor_recovery_codes (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_twofactor_recovery_codes_user ON auth_twofactor_recovery_codes (user_id);
-CREATE INDEX IF NOT EXISTS idx_twofactor_recovery_codes_hash ON auth_twofactor_recovery_codes (user_id, code_hash);
+CREATE INDEX IF NOT EXISTS idx_twofactor_recovery_codes_user ON twofactor_recovery_codes (user_id);
+CREATE INDEX IF NOT EXISTS idx_twofactor_recovery_codes_hash ON twofactor_recovery_codes (user_id, code_hash);
 
-CREATE TABLE IF NOT EXISTS auth_twofactor_challenges (
+CREATE TABLE IF NOT EXISTS twofactor_challenges (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -37,4 +37,4 @@ CREATE TABLE IF NOT EXISTS auth_twofactor_challenges (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_twofactor_challenges_user ON auth_twofactor_challenges (user_id);
+CREATE INDEX IF NOT EXISTS idx_twofactor_challenges_user ON twofactor_challenges (user_id);

@@ -3,6 +3,7 @@ package jwt
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // Module implements auth.PluginModule for GoModularAuth JWT stateless tokens using plugin-sdk.
@@ -10,7 +11,15 @@ type Module struct {
 	cfg Config
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
+
+// RegisterSchema registers the database models for JWT revocations.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
 
 // New constructs a new JWT plugin module.
 func New(opts ...Option) *Module {

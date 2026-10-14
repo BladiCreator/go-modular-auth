@@ -1,15 +1,17 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
 	"github.com/BladiCreator/go-modular-auth/plugin"
-	"github.com/BladiCreator/go-modular-auth/store"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginModule is an installable plugin. Plugins depend on the core; the core
@@ -21,6 +23,12 @@ import (
 type PluginModule interface {
 	ID() string
 	Init(host *Host) error
+}
+
+// SchemaProvider is optionally implemented by PluginModule instances that contribute
+// to the persistent database schema (registering new models or extending existing models).
+type SchemaProvider interface {
+	RegisterSchema(s *schema.Schema) error
 }
 
 // Dependent is implemented by modules that require other modules. Required
@@ -42,8 +50,11 @@ func (h *Host) Auth() *Auth { return h.a }
 // ModuleID returns the ID of the module owning this host.
 func (h *Host) ModuleID() string { return h.module }
 
-// Store returns the core store adapter.
-func (h *Host) Store() store.Store { return h.a.store }
+// Adapter returns the generic storage adapter, or nil if none is configured.
+func (h *Host) Adapter() adapter.Adapter { return h.a.adapter }
+
+// Schema returns the compiled database schema, or nil if schema compilation is not active.
+func (h *Host) Schema() *schema.Schema { return h.a.schema }
 
 // Cache returns the shared cache adapter, or nil when none is configured.
 // Plugins must namespace their keys: cache.Key(h.ModuleID(), ...).
@@ -81,6 +92,28 @@ func (a *Auth) initPlugins(modules []PluginModule) error {
 			return err
 		}
 		byID[m.ID()] = m
+	}
+
+	// Schema compilation (BetterAuth pattern)
+	s, err := schema.DefaultCoreSchema()
+	if err != nil {
+		return fmt.Errorf("auth: default core schema error: %w", err)
+	}
+	for _, m := range modules {
+		if sp, ok := m.(SchemaProvider); ok {
+			if err := sp.RegisterSchema(s); err != nil {
+				return fmt.Errorf("auth: plugin %q schema registration: %w", m.ID(), err)
+			}
+		}
+	}
+	if err := s.Validate(); err != nil {
+		return fmt.Errorf("auth: compiled schema validation: %w", err)
+	}
+	a.schema = s
+	if a.adapter != nil {
+		if err := a.adapter.RegisterSchema(context.Background(), s); err != nil {
+			return fmt.Errorf("auth: adapter register schema: %w", err)
+		}
 	}
 	order, err := initOrder(modules, byID)
 	if err != nil {

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth-device-authorization/cache"
-	"github.com/BladiCreator/go-modular-auth-device-authorization/store"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/session"
 )
@@ -17,7 +17,6 @@ import (
 type service struct {
 	ctx         *sdk.Context
 	cfg         Config
-	store       store.Store
 	rateLimiter cache.RateLimiter
 }
 
@@ -34,7 +33,6 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
 		ctx:         ctx,
 		cfg:         cfg,
-		store:       cfg.Store,
 		rateLimiter: c,
 	}
 }
@@ -84,7 +82,7 @@ func (s *service) Start(ctx context.Context, in DeviceAuthorizationRequestInput)
 			intervalSeconds = 5
 		}
 
-		grant := &store.DeviceGrant{
+		grant := &DeviceGrant{
 			ID:              generateID(),
 			ClientID:        in.ClientID,
 			DeviceCodeHash:  deviceCodeHash,
@@ -98,11 +96,12 @@ func (s *service) Start(ctx context.Context, in DeviceAuthorizationRequestInput)
 			UpdatedAt:       now,
 		}
 
-		err = s.store.Create(ctx, grant)
+		repo := sdk.Model[DeviceGrant](s.ctx, ModelDeviceGrants)
+		err = repo.Create(ctx, grant)
 		if err == nil {
 			break
 		}
-		if !errors.Is(err, store.ErrConflict) {
+		if !errors.Is(err, adapter.ErrConflict) {
 			return nil, err
 		}
 	}
@@ -147,15 +146,16 @@ func (s *service) Poll(ctx context.Context, in PollInput) (*PollResponse, error)
 	codeHash := hashDeviceCode(in.DeviceCode)
 	now := s.now()
 
-	var grant *store.DeviceGrant
+	var grant *DeviceGrant
 	var sessionResult *auth.IssuedSession
 	var statusErr error
 
-	err := s.store.Transaction(ctx, func(txCtx context.Context) error {
+	err := s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		repo := sdk.FromAdapter[DeviceGrant](tx, ModelDeviceGrants)
 		var err error
-		grant, err = s.store.GetByDeviceCodeHash(txCtx, codeHash)
+		grant, err = repo.FindOne(txCtx, adapter.Eq("device_code_hash", codeHash))
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return ErrInvalidGrant
 			}
 			return err
@@ -189,7 +189,11 @@ func (s *service) Poll(ctx context.Context, in PollInput) (*PollResponse, error)
 					grant.PollingInterval += int(s.cfg.SlowDownIncrement.Seconds())
 					grant.LastPolledAt = &now
 					grant.UpdatedAt = now
-					_ = s.store.Update(txCtx, grant)
+					_, _ = repo.Update(txCtx, []adapter.Condition{adapter.Eq("id", grant.ID)}, map[string]any{
+						"polling_interval": grant.PollingInterval,
+						"last_polled_at":   grant.LastPolledAt,
+						"updated_at":       grant.UpdatedAt,
+					})
 					statusErr = ErrSlowDown
 					return nil // Commit polling interval increment!
 				}
@@ -197,7 +201,10 @@ func (s *service) Poll(ctx context.Context, in PollInput) (*PollResponse, error)
 
 			grant.LastPolledAt = &now
 			grant.UpdatedAt = now
-			_ = s.store.Update(txCtx, grant)
+			_, _ = repo.Update(txCtx, []adapter.Condition{adapter.Eq("id", grant.ID)}, map[string]any{
+				"last_polled_at": grant.LastPolledAt,
+				"updated_at":     grant.UpdatedAt,
+			})
 			statusErr = ErrAuthorizationPending
 			return nil // Commit LastPolledAt!
 
@@ -206,7 +213,11 @@ func (s *service) Poll(ctx context.Context, in PollInput) (*PollResponse, error)
 			grant.Status = StatusConsumed
 			grant.ConsumedAt = &now
 			grant.UpdatedAt = now
-			if err := s.store.Update(txCtx, grant); err != nil {
+			if _, err := repo.Update(txCtx, []adapter.Condition{adapter.Eq("id", grant.ID)}, map[string]any{
+				"status":      grant.Status,
+				"consumed_at": grant.ConsumedAt,
+				"updated_at":  grant.UpdatedAt,
+			}); err != nil {
 				return err
 			}
 
@@ -280,9 +291,10 @@ func (s *service) VerifyUserCode(ctx context.Context, in VerifyUserCodeInput) (*
 		}
 	}
 
-	grant, err := s.store.GetByUserCode(ctx, cleanCode)
+	repo := sdk.Model[DeviceGrant](s.ctx, ModelDeviceGrants)
+	grant, err := repo.FindOne(ctx, adapter.Eq("user_code", cleanCode))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrInvalidUserCode
 		}
 		return nil, err
@@ -324,13 +336,14 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) error {
 	}
 
 	now := s.now()
-	var grant *store.DeviceGrant
+	var grant *DeviceGrant
 
-	err := s.store.Transaction(ctx, func(txCtx context.Context) error {
+	err := s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		repo := sdk.FromAdapter[DeviceGrant](tx, ModelDeviceGrants)
 		var err error
-		grant, err = s.store.GetByUserCode(txCtx, cleanCode)
+		grant, err = repo.FindOne(txCtx, adapter.Eq("user_code", cleanCode))
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return ErrInvalidUserCode
 			}
 			return err
@@ -361,7 +374,14 @@ func (s *service) Authorize(ctx context.Context, in AuthorizeInput) error {
 		grant.AuthorizedAt = &now
 		grant.UpdatedAt = now
 
-		return s.store.Update(txCtx, grant)
+		_, err = repo.Update(txCtx, []adapter.Condition{adapter.Eq("id", grant.ID)}, map[string]any{
+			"status":        grant.Status,
+			"user_id":       grant.UserID,
+			"scope":         grant.Scope,
+			"authorized_at": grant.AuthorizedAt,
+			"updated_at":    grant.UpdatedAt,
+		})
+		return err
 	})
 	if err != nil {
 		return err
@@ -386,13 +406,14 @@ func (s *service) Deny(ctx context.Context, in DenyInput) error {
 	}
 
 	now := s.now()
-	var grant *store.DeviceGrant
+	var grant *DeviceGrant
 
-	err := s.store.Transaction(ctx, func(txCtx context.Context) error {
+	err := s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		repo := sdk.FromAdapter[DeviceGrant](tx, ModelDeviceGrants)
 		var err error
-		grant, err = s.store.GetByUserCode(txCtx, cleanCode)
+		grant, err = repo.FindOne(txCtx, adapter.Eq("user_code", cleanCode))
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return ErrInvalidUserCode
 			}
 			return err
@@ -414,7 +435,11 @@ func (s *service) Deny(ctx context.Context, in DenyInput) error {
 		grant.Status = StatusDenied
 		grant.UpdatedAt = now
 
-		return s.store.Update(txCtx, grant)
+		_, err = repo.Update(txCtx, []adapter.Condition{adapter.Eq("id", grant.ID)}, map[string]any{
+			"status":     grant.Status,
+			"updated_at": grant.UpdatedAt,
+		})
+		return err
 	})
 	if err != nil {
 		return err

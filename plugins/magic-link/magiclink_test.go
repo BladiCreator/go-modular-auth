@@ -14,7 +14,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth-magiclink/plugins"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 var fastHasher = password.NewArgon2id(password.Argon2idParams{
@@ -28,12 +28,12 @@ var fastHasher = password.NewArgon2id(password.Argon2idParams{
 func setupTestAuth(t *testing.T, opts ...magiclink.Option) (*auth.Auth, *mememail.Sender, magiclink.MagicLink) {
 	t.Helper()
 	emailSender := mememail.New()
-	store := memstore.New()
+	store := adaptermem.New()
 
 	pluginModule := magiclink.New(opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   store,
+		Adapter: store,
 		Email:   emailSender,
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{pluginModule},
@@ -78,7 +78,7 @@ func TestPluginRegistration(t *testing.T) {
 
 	// Verify missing email sender returns error during Init
 	_, err = auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{magiclink.New()},
 	})
@@ -232,10 +232,10 @@ func TestExpirationEnforcement(t *testing.T) {
 	clock := func() time.Time { return fakeNow }
 
 	emailSender := mememail.New()
-	store := memstore.New()
+	store := adaptermem.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   store,
+		Adapter: store,
 		Email:   emailSender,
 		Hasher:  fastHasher,
 		Now:     clock,

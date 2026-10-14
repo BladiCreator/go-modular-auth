@@ -23,9 +23,18 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-sso/store"
 )
+
+// OIDCConfig contains OpenID Connect specific parameters.
+type OIDCConfig struct {
+	Issuer          string   `json:"issuer"`
+	ClientID        string   `json:"client_id"`
+	ClientSecret    string   `json:"client_secret"`
+	RedirectURI     string   `json:"redirect_uri"`
+	Scopes          []string `json:"scopes"`
+	DiscoveryURL    string   `json:"discovery_url,omitempty"`
+	SkipIssuerCheck bool     `json:"skip_issuer_check,omitempty"`
+}
 
 var (
 	ErrDiscoveryFailed   = errors.New("sso oidc: provider discovery failed")
@@ -138,7 +147,7 @@ func (c *Client) Discover(ctx context.Context, issuer, discoveryURL string) (*Di
 }
 
 // BuildAuthURL constructs the provider authorization URL with PKCE and Nonce.
-func (c *Client) BuildAuthURL(authEndpoint string, cfg *store.OIDCConfig, state, nonce, challenge string) string {
+func (c *Client) BuildAuthURL(authEndpoint string, cfg *OIDCConfig, state, nonce, challenge string) string {
 	q := url.Values{}
 	q.Set("response_type", "code")
 	q.Set("client_id", cfg.ClientID)
@@ -168,7 +177,7 @@ type TokenResponse struct {
 }
 
 // ExchangeCode exchanges an authorization code for tokens.
-func (c *Client) ExchangeCode(ctx context.Context, tokenEndpoint string, cfg *store.OIDCConfig, code, verifier, redirectURI string) (*TokenResponse, error) {
+func (c *Client) ExchangeCode(ctx context.Context, tokenEndpoint string, cfg *OIDCConfig, code, verifier, redirectURI string) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
@@ -254,7 +263,7 @@ type IDTokenClaims struct {
 }
 
 // VerifyIDToken strictly verifies signature, issuer, audience, expiration, and nonce.
-func (c *Client) VerifyIDToken(rawToken string, jwks *JWKS, cfg *store.OIDCConfig, expectedNonce string, now time.Time) (*IDTokenClaims, error) {
+func (c *Client) VerifyIDToken(rawToken string, jwks *JWKS, cfg *OIDCConfig, expectedNonce string, now time.Time) (*IDTokenClaims, error) {
 	parts := strings.Split(rawToken, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("%w: token must have 3 segments", ErrInvalidIDToken)

@@ -3,9 +3,6 @@ package oidc
 import (
 	"net/http"
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-oidc/store"
-	"github.com/BladiCreator/go-modular-auth-oidc/store/memory"
 )
 
 // HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.
@@ -16,7 +13,6 @@ type HTTPClient interface {
 // Config holds the configuration settings for the OIDC plugin.
 type Config struct {
 	Providers     map[string]ProviderConfig
-	Store         store.Store
 	StateTTL      time.Duration
 	LinkingPolicy LinkingPolicy
 	HTTPClient    HTTPClient
@@ -26,7 +22,6 @@ type Config struct {
 func defaultConfig() Config {
 	return Config{
 		Providers:     make(map[string]ProviderConfig),
-		Store:         memory.New(),
 		StateTTL:      15 * time.Minute,
 		LinkingPolicy: LinkingPolicyVerifiedEmail,
 		HTTPClient: &http.Client{
@@ -49,15 +44,6 @@ func WithProvider(p ProviderConfig) Option {
 			p.Scopes = []string{"openid", "profile", "email"}
 		}
 		c.Providers[p.ID] = p
-	}
-}
-
-// WithStore sets the state session persistence adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
 	}
 }
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth-username/cache"
-	"github.com/BladiCreator/go-modular-auth-username/store"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
@@ -66,10 +66,10 @@ type Capability interface {
 type Username = Capability
 
 type service struct {
-	cfg   Config
-	ctx   *sdk.Context
-	store store.Store
-	cache *cache.Cache
+	cfg     Config
+	ctx     *sdk.Context
+	records *sdk.Repository[Record]
+	cache   *cache.Cache
 }
 
 func (s *service) Validate(rawUsername string) error {
@@ -78,6 +78,32 @@ func (s *service) Validate(rawUsername string) error {
 
 func (s *service) Normalize(rawUsername string) (string, error) {
 	return s.cfg.Normalizer(rawUsername)
+}
+
+func recordToCached(r *Record) *cache.CachedRecord {
+	if r == nil {
+		return nil
+	}
+	return &cache.CachedRecord{
+		UserID:     r.UserID,
+		Username:   r.Username,
+		Normalized: r.Normalized,
+		CreatedAt:  r.CreatedAt,
+		UpdatedAt:  r.UpdatedAt,
+	}
+}
+
+func cachedToRecord(c *cache.CachedRecord) *Record {
+	if c == nil {
+		return nil
+	}
+	return &Record{
+		UserID:     c.UserID,
+		Username:   c.Username,
+		Normalized: c.Normalized,
+		CreatedAt:  c.CreatedAt,
+		UpdatedAt:  c.UpdatedAt,
+	}
 }
 
 func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth.AuthResult, error) {
@@ -89,7 +115,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*auth
 	}
 
 	rec, err := s.getNormalized(ctx, norm)
-	if errors.Is(err, ErrNotFound) || errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, adapter.ErrNotFound) {
 		// Timing equalization: username does not exist
 		s.dummyTimingVerification(ctx, in.Password, in.Session)
 		return nil, ErrInvalidCredentials
@@ -135,9 +161,9 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 	}
 
 	// Pre-check availability before invoking Core SignUp to fail fast if taken
-	if _, err := s.store.GetByNormalized(ctx, norm); err == nil {
+	if _, err := s.records.FindOne(ctx, adapter.Eq("normalized", norm)); err == nil {
 		return nil, ErrTaken
-	} else if !errors.Is(err, store.ErrNotFound) {
+	} else if !errors.Is(err, adapter.ErrNotFound) {
 		return nil, err
 	}
 
@@ -146,9 +172,9 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 
 	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		// Re-check inside transaction to prevent TOCTOU race
-		if _, err := s.store.GetByNormalized(txCtx, norm); err == nil {
+		if _, err := s.records.FindOne(txCtx, adapter.Eq("normalized", norm)); err == nil {
 			return ErrTaken
-		} else if !errors.Is(err, store.ErrNotFound) {
+		} else if !errors.Is(err, adapter.ErrNotFound) {
 			return err
 		}
 
@@ -163,7 +189,7 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 		}
 
 		now := s.ctx.Now()
-		rec := &store.Record{
+		rec := &Record{
 			UserID:     res.User.ID,
 			Username:   cleanUsername,
 			Normalized: norm,
@@ -171,8 +197,8 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 			UpdatedAt:  now,
 		}
 
-		if err := s.store.Create(txCtx, rec); err != nil {
-			if errors.Is(err, store.ErrConflict) {
+		if err := s.records.Create(txCtx, rec); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
 				return ErrTaken
 			}
 			return err
@@ -184,22 +210,23 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 	}
 
 	now := s.ctx.Now()
-	rec := &store.Record{
+	rec := &Record{
 		UserID:     res.User.ID,
 		Username:   cleanUsername,
 		Normalized: norm,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
-	s.cache.Set(ctx, rec)
+	s.cache.Set(ctx, recordToCached(rec))
+
 	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventCreated,
 		Time:    now,
 		Subject: res.User.ID,
 		Payload: CreatedPayload{
 			UserID:     res.User.ID,
-			Username:   rec.Username,
-			Normalized: rec.Normalized,
+			Username:   cleanUsername,
+			Normalized: norm,
 		},
 	})
 
@@ -207,6 +234,9 @@ func (s *service) Register(ctx context.Context, in RegisterInput) (*auth.AuthRes
 }
 
 func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
+	if userID == "" {
+		return errors.New("username: user ID cannot be empty")
+	}
 	if err := s.Validate(rawUsername); err != nil {
 		return err
 	}
@@ -215,17 +245,17 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 		return err
 	}
 
-	// Verify user exists in Core
+	// Verify that the user exists in Core
 	if _, err := s.ctx.Core().GetUser(ctx, userID); err != nil {
 		if errors.Is(err, auth.ErrUserNotFound) {
-			return ErrUserNotFound
+			return ErrNotFound
 		}
 		return err
 	}
 
 	now := s.ctx.Now()
 	cleanUsername := strings.TrimSpace(rawUsername)
-	rec := &store.Record{
+	rec := &Record{
 		UserID:     userID,
 		Username:   cleanUsername,
 		Normalized: norm,
@@ -235,14 +265,14 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 
 	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 		// Ensure user doesn't already have an assigned username
-		if _, err := s.store.GetByUserID(txCtx, userID); err == nil {
+		if _, err := s.records.FindOne(txCtx, adapter.Eq("user_id", userID)); err == nil {
 			return ErrAlreadyAssigned
-		} else if !errors.Is(err, store.ErrNotFound) {
+		} else if !errors.Is(err, adapter.ErrNotFound) {
 			return err
 		}
 
-		if err := s.store.Create(txCtx, rec); err != nil {
-			if errors.Is(err, store.ErrConflict) {
+		if err := s.records.Create(txCtx, rec); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
 				return ErrTaken
 			}
 			return err
@@ -253,7 +283,7 @@ func (s *service) Set(ctx context.Context, userID, rawUsername string) error {
 		return err
 	}
 
-	s.cache.Set(ctx, rec)
+	s.cache.Set(ctx, recordToCached(rec))
 	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventCreated,
 		Time:    now,
@@ -276,14 +306,14 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 		return err
 	}
 
-	var oldRec *store.Record
-	var updatedRec *store.Record
+	var oldRec *Record
+	var updatedRec *Record
 	now := s.ctx.Now()
 	cleanUsername := strings.TrimSpace(newRawUsername)
 
 	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
-		existing, err := s.store.GetByUserID(txCtx, userID)
-		if errors.Is(err, store.ErrNotFound) {
+		existing, err := s.records.FindOne(txCtx, adapter.Eq("user_id", userID))
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrNotFound
 		}
 		if err != nil {
@@ -292,14 +322,14 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 		oldRec = existing
 
 		if existing.Normalized != newNorm {
-			if _, err := s.store.GetByNormalized(txCtx, newNorm); err == nil {
+			if _, err := s.records.FindOne(txCtx, adapter.Eq("normalized", newNorm)); err == nil {
 				return ErrTaken
-			} else if !errors.Is(err, store.ErrNotFound) {
+			} else if !errors.Is(err, adapter.ErrNotFound) {
 				return err
 			}
 		}
 
-		updatedRec = &store.Record{
+		updatedRec = &Record{
 			UserID:     userID,
 			Username:   cleanUsername,
 			Normalized: newNorm,
@@ -307,8 +337,12 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 			UpdatedAt:  now,
 		}
 
-		if err := s.store.Update(txCtx, updatedRec); err != nil {
-			if errors.Is(err, store.ErrConflict) {
+		if _, err := s.records.Update(txCtx, []adapter.Condition{adapter.Eq("user_id", userID)}, map[string]any{
+			"username":   cleanUsername,
+			"normalized": newNorm,
+			"updated_at": now,
+		}); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
 				return ErrTaken
 			}
 			return err
@@ -320,7 +354,7 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 	}
 
 	s.cache.Invalidate(ctx, oldRec.Normalized, userID)
-	s.cache.Set(ctx, updatedRec)
+	s.cache.Set(ctx, recordToCached(updatedRec))
 
 	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventUpdated,
@@ -338,10 +372,10 @@ func (s *service) Change(ctx context.Context, userID, newRawUsername string) err
 }
 
 func (s *service) Delete(ctx context.Context, userID string) error {
-	var oldRec *store.Record
+	var oldRec *Record
 	err := s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
-		existing, err := s.store.GetByUserID(txCtx, userID)
-		if errors.Is(err, store.ErrNotFound) {
+		existing, err := s.records.FindOne(txCtx, adapter.Eq("user_id", userID))
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrNotFound
 		}
 		if err != nil {
@@ -349,7 +383,8 @@ func (s *service) Delete(ctx context.Context, userID string) error {
 		}
 		oldRec = existing
 
-		return s.store.Delete(txCtx, userID)
+		_, err = s.records.Delete(txCtx, adapter.Eq("user_id", userID))
+		return err
 	})
 	if err != nil {
 		return err
@@ -371,18 +406,18 @@ func (s *service) Delete(ctx context.Context, userID string) error {
 
 func (s *service) GetByUserID(ctx context.Context, userID string) (*Record, error) {
 	if rec, ok := s.cache.GetByUserID(ctx, userID); ok {
-		return rec, nil
+		return cachedToRecord(rec), nil
 	}
 
-	rec, err := s.store.GetByUserID(ctx, userID)
+	rec, err := s.records.FindOne(ctx, adapter.Eq("user_id", userID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 
-	s.cache.Set(ctx, rec)
+	s.cache.Set(ctx, recordToCached(rec))
 	return rec, nil
 }
 
@@ -404,18 +439,18 @@ func (s *service) Lookup(ctx context.Context, rawUsername string) (string, error
 
 func (s *service) getNormalized(ctx context.Context, norm string) (*Record, error) {
 	if rec, ok := s.cache.GetByNormalized(ctx, norm); ok {
-		return rec, nil
+		return cachedToRecord(rec), nil
 	}
 
-	rec, err := s.store.GetByNormalized(ctx, norm)
+	rec, err := s.records.FindOne(ctx, adapter.Eq("normalized", norm))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 
-	s.cache.Set(ctx, rec)
+	s.cache.Set(ctx, recordToCached(rec))
 	return rec, nil
 }
 

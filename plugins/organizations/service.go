@@ -9,28 +9,37 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-organizations/cache"
-	"github.com/BladiCreator/go-modular-auth-organizations/store"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
 var slugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 type service struct {
-	ctx   *sdk.Context
-	cfg   Config
-	cache *cache.Cache
-	hooks *Hooks
+	ctx         *sdk.Context
+	cfg         Config
+	cache       *Cache
+	hooks       *Hooks
+	orgs        *sdk.Repository[OrganizationRecord]
+	memberships *sdk.Repository[Membership]
+	teams       *sdk.Repository[Team]
+	teamMembers *sdk.Repository[TeamMembership]
+	invitations *sdk.Repository[Invitation]
 }
 
 var _ Organization = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		ctx:   ctx,
-		cfg:   cfg,
-		cache: cache.New(ctx.Cache()),
-		hooks: NewHooks(),
+		ctx:         ctx,
+		cfg:         cfg,
+		cache:       NewCache(ctx.Cache()),
+		hooks:       NewHooks(),
+		orgs:        sdk.Model[OrganizationRecord](ctx, ModelOrganizations),
+		memberships: sdk.Model[Membership](ctx, ModelOrganizationMemberships),
+		teams:       sdk.Model[Team](ctx, ModelOrganizationTeams),
+		teamMembers: sdk.Model[TeamMembership](ctx, ModelOrganizationTeamMembers),
+		invitations: sdk.Model[Invitation](ctx, ModelOrganizationInvitations),
 	}
 }
 
@@ -50,6 +59,13 @@ func (s *service) publish(ctx context.Context, name auth.EventName, subject stri
 			Payload: payload,
 		})
 	}
+}
+
+func (s *service) transaction(ctx context.Context, fn func(txCtx context.Context, tx adapter.Adapter) error) error {
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		return s.ctx.Adapter().Transaction(ctx, fn)
+	}
+	return fn(ctx, nil)
 }
 
 func validateSlug(slug string) error {
@@ -107,15 +123,22 @@ func (s *service) CreateOrganization(ctx context.Context, in CreateOrganizationI
 		UpdatedAt:      now,
 	}
 
-	err := s.cfg.Store.Transaction(ctx, func(txCtx context.Context) error {
-		if err := s.cfg.Store.CreateOrganization(txCtx, org); err != nil {
-			if errors.Is(err, store.ErrConflict) {
+	err := s.transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		txOrgs := s.orgs
+		txMems := s.memberships
+		if tx != nil {
+			txOrgs = sdk.FromAdapter[OrganizationRecord](tx, ModelOrganizations)
+			txMems = sdk.FromAdapter[Membership](tx, ModelOrganizationMemberships)
+		}
+
+		if err := txOrgs.Create(txCtx, org); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
 				return ErrOrganizationAlreadyExists
 			}
 			return err
 		}
-		if err := s.cfg.Store.CreateMembership(txCtx, ownerMembership); err != nil {
-			if errors.Is(err, store.ErrConflict) {
+		if err := txMems.Create(txCtx, ownerMembership); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
 				return ErrMemberAlreadyExists
 			}
 			return err
@@ -157,9 +180,9 @@ func (s *service) GetOrganization(ctx context.Context, orgID string) (*Organizat
 		return cached, nil
 	}
 
-	org, err := s.cfg.Store.GetOrganizationByID(ctx, orgID)
+	org, err := s.orgs.FindOne(ctx, adapter.Eq("id", orgID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrOrganizationNotFound
 		}
 		return nil, err
@@ -180,9 +203,9 @@ func (s *service) GetOrganizationBySlug(ctx context.Context, slug string) (*Orga
 		return cached, nil
 	}
 
-	org, err := s.cfg.Store.GetOrganizationBySlug(ctx, slug)
+	org, err := s.orgs.FindOne(ctx, adapter.Eq("slug", slug))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrOrganizationNotFound
 		}
 		return nil, err
@@ -203,19 +226,24 @@ func (s *service) UpdateOrganization(ctx context.Context, orgID string, in Updat
 		return nil, err
 	}
 
+	updates := map[string]any{}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" {
 			return nil, fmt.Errorf("%w: organization name cannot be empty", ErrInvalidInput)
 		}
 		org.Name = name
+		updates["name"] = name
 	}
 	if in.Metadata != nil {
 		org.Metadata = in.Metadata
+		updates["metadata"] = in.Metadata
 	}
 	org.UpdatedAt = s.now()
+	updates["updated_at"] = org.UpdatedAt
 
-	if err := s.cfg.Store.UpdateOrganization(ctx, org); err != nil {
+	_, err = s.orgs.Update(ctx, []adapter.Condition{adapter.Eq("id", org.ID)}, updates)
+	if err != nil {
 		return nil, err
 	}
 
@@ -241,7 +269,47 @@ func (s *service) DeleteOrganization(ctx context.Context, orgID string) error {
 		return err
 	}
 
-	if err := s.cfg.Store.DeleteOrganization(ctx, orgID); err != nil {
+	err = s.transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		txOrgs := s.orgs
+		txMems := s.memberships
+		txTeams := s.teams
+		txTeamMembers := s.teamMembers
+		txInvs := s.invitations
+		if tx != nil {
+			txOrgs = sdk.FromAdapter[OrganizationRecord](tx, ModelOrganizations)
+			txMems = sdk.FromAdapter[Membership](tx, ModelOrganizationMemberships)
+			txTeams = sdk.FromAdapter[Team](tx, ModelOrganizationTeams)
+			txTeamMembers = sdk.FromAdapter[TeamMembership](tx, ModelOrganizationTeamMembers)
+			txInvs = sdk.FromAdapter[Invitation](tx, ModelOrganizationInvitations)
+		}
+
+		// Delete teams and team members
+		teams, _ := txTeams.FindMany(txCtx, adapter.Query{
+			Model: ModelOrganizationTeams,
+			Where: []adapter.Condition{adapter.Eq("organization_id", orgID)},
+		})
+		for _, t := range teams {
+			_, _ = txTeamMembers.Delete(txCtx, adapter.Eq("team_id", t.ID))
+		}
+		_, _ = txTeams.Delete(txCtx, adapter.Eq("organization_id", orgID))
+
+		// Delete memberships
+		_, _ = txMems.Delete(txCtx, adapter.Eq("organization_id", orgID))
+
+		// Delete invitations
+		_, _ = txInvs.Delete(txCtx, adapter.Eq("organization_id", orgID))
+
+		// Delete org
+		affected, err := txOrgs.Delete(txCtx, adapter.Eq("id", orgID))
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrOrganizationNotFound
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
@@ -261,7 +329,26 @@ func (s *service) ListUserOrganizations(ctx context.Context, userID string) ([]*
 	if userID == "" {
 		return nil, fmt.Errorf("%w: empty user id", ErrInvalidInput)
 	}
-	return s.cfg.Store.ListOrganizationsByUser(ctx, userID)
+
+	mems, err := s.memberships.FindMany(ctx, adapter.Query{
+		Model: ModelOrganizationMemberships,
+		Where: []adapter.Condition{
+			adapter.Eq("user_id", userID),
+			adapter.Eq("status", string(MembershipActive)),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var res []*OrganizationRecord
+	for _, m := range mems {
+		org, err := s.GetOrganization(ctx, m.OrganizationID)
+		if err == nil && org != nil {
+			res = append(res, org)
+		}
+	}
+	return res, nil
 }
 
 // TransferOwnership transfers ownership to an existing active member.
@@ -294,22 +381,41 @@ func (s *service) TransferOwnership(ctx context.Context, orgID, newOwnerUserID s
 	}
 
 	now := s.now()
-	err = s.cfg.Store.Transaction(ctx, func(txCtx context.Context) error {
+	err = s.transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		txOrgs := s.orgs
+		txMems := s.memberships
+		if tx != nil {
+			txOrgs = sdk.FromAdapter[OrganizationRecord](tx, ModelOrganizations)
+			txMems = sdk.FromAdapter[Membership](tx, ModelOrganizationMemberships)
+		}
+
 		oldOwnerMem.Role = RoleAdmin
 		oldOwnerMem.UpdatedAt = now
-		if err := s.cfg.Store.UpdateMembership(txCtx, oldOwnerMem); err != nil {
+		_, err := txMems.Update(txCtx, []adapter.Condition{adapter.Eq("id", oldOwnerMem.ID)}, map[string]any{
+			"role":       string(RoleAdmin),
+			"updated_at": now,
+		})
+		if err != nil {
 			return err
 		}
 
 		newOwnerMem.Role = RoleOwner
 		newOwnerMem.UpdatedAt = now
-		if err := s.cfg.Store.UpdateMembership(txCtx, newOwnerMem); err != nil {
+		_, err = txMems.Update(txCtx, []adapter.Condition{adapter.Eq("id", newOwnerMem.ID)}, map[string]any{
+			"role":       string(RoleOwner),
+			"updated_at": now,
+		})
+		if err != nil {
 			return err
 		}
 
 		org.OwnerID = newOwnerUserID
 		org.UpdatedAt = now
-		return s.cfg.Store.UpdateOrganization(txCtx, org)
+		_, err = txOrgs.Update(txCtx, []adapter.Condition{adapter.Eq("id", org.ID)}, map[string]any{
+			"owner_id":   newOwnerUserID,
+			"updated_at": now,
+		})
+		return err
 	})
 	if err != nil {
 		return err
@@ -358,8 +464,8 @@ func (s *service) AddMember(ctx context.Context, in AddMemberInput) (*Membership
 		UpdatedAt:      now,
 	}
 
-	if err := s.cfg.Store.CreateMembership(ctx, m); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+	if err := s.memberships.Create(ctx, m); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			return nil, ErrMemberAlreadyExists
 		}
 		return nil, err
@@ -390,9 +496,9 @@ func (s *service) GetMember(ctx context.Context, orgID, userID string) (*Members
 		return cached, nil
 	}
 
-	m, err := s.cfg.Store.GetMembership(ctx, orgID, userID)
+	m, err := s.memberships.FindOne(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("user_id", userID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrMemberNotFound
 		}
 		return nil, err
@@ -428,10 +534,15 @@ func (s *service) UpdateMemberRole(ctx context.Context, orgID, userID string, ro
 		return nil, ErrCannotRemoveOwner
 	}
 
+	now := s.now()
 	m.Role = role
-	m.UpdatedAt = s.now()
+	m.UpdatedAt = now
 
-	if err := s.cfg.Store.UpdateMembership(ctx, m); err != nil {
+	_, err = s.memberships.Update(ctx, []adapter.Condition{adapter.Eq("id", m.ID)}, map[string]any{
+		"role":       string(role),
+		"updated_at": now,
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -463,10 +574,15 @@ func (s *service) UpdateMemberStatus(ctx context.Context, orgID, userID string, 
 		return nil, ErrCannotRemoveOwner
 	}
 
+	now := s.now()
 	m.Status = status
-	m.UpdatedAt = s.now()
+	m.UpdatedAt = now
 
-	if err := s.cfg.Store.UpdateMembership(ctx, m); err != nil {
+	_, err = s.memberships.Update(ctx, []adapter.Condition{adapter.Eq("id", m.ID)}, map[string]any{
+		"status":     string(status),
+		"updated_at": now,
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -512,8 +628,12 @@ func (s *service) RemoveMember(ctx context.Context, orgID, userID string) error 
 		return ErrCannotRemoveOwner
 	}
 
-	if err := s.cfg.Store.DeleteMembership(ctx, orgID, userID); err != nil {
+	affected, err := s.memberships.Delete(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("user_id", userID))
+	if err != nil {
 		return err
+	}
+	if affected == 0 {
+		return ErrMemberNotFound
 	}
 
 	_ = s.cache.DeleteMembership(ctx, orgID, userID)
@@ -532,7 +652,20 @@ func (s *service) ListMembers(ctx context.Context, orgID string) ([]*Membership,
 	if orgID == "" {
 		return nil, fmt.Errorf("%w: organization_id is required", ErrInvalidInput)
 	}
-	return s.cfg.Store.ListMembershipsByOrg(ctx, orgID)
+
+	rows, err := s.memberships.FindMany(ctx, adapter.Query{
+		Model: ModelOrganizationMemberships,
+		Where: []adapter.Condition{adapter.Eq("organization_id", orgID)},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*Membership, len(rows))
+	for i := range rows {
+		res[i] = &rows[i]
+	}
+	return res, nil
 }
 
 // CreateTeam creates a new team inside an organization.
@@ -562,8 +695,8 @@ func (s *service) CreateTeam(ctx context.Context, in CreateTeamInput) (*Team, er
 		UpdatedAt:      now,
 	}
 
-	if err := s.cfg.Store.CreateTeam(ctx, t); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+	if err := s.teams.Create(ctx, t); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			return nil, ErrTeamAlreadyExists
 		}
 		return nil, err
@@ -580,9 +713,9 @@ func (s *service) CreateTeam(ctx context.Context, in CreateTeamInput) (*Team, er
 
 // GetTeam retrieves a team by ID within the organization.
 func (s *service) GetTeam(ctx context.Context, orgID, teamID string) (*Team, error) {
-	t, err := s.cfg.Store.GetTeamByID(ctx, orgID, teamID)
+	t, err := s.teams.FindOne(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("id", teamID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrTeamNotFound
 		}
 		return nil, err
@@ -601,19 +734,27 @@ func (s *service) UpdateTeam(ctx context.Context, orgID, teamID string, in Updat
 		return nil, err
 	}
 
+	updates := map[string]any{}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" {
 			return nil, fmt.Errorf("%w: team name cannot be empty", ErrInvalidInput)
 		}
 		t.Name = name
+		updates["name"] = name
 	}
 	if in.Description != nil {
 		t.Description = *in.Description
+		updates["description"] = *in.Description
 	}
 	t.UpdatedAt = s.now()
+	updates["updated_at"] = t.UpdatedAt
 
-	if err := s.cfg.Store.UpdateTeam(ctx, t); err != nil {
+	_, err = s.teams.Update(ctx, []adapter.Condition{
+		adapter.Eq("organization_id", orgID),
+		adapter.Eq("id", teamID),
+	}, updates)
+	if err != nil {
 		return nil, err
 	}
 
@@ -635,7 +776,25 @@ func (s *service) DeleteTeam(ctx context.Context, orgID, teamID string) error {
 		return err
 	}
 
-	if err := s.cfg.Store.DeleteTeam(ctx, orgID, teamID); err != nil {
+	err := s.transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		txTeams := s.teams
+		txTeamMembers := s.teamMembers
+		if tx != nil {
+			txTeams = sdk.FromAdapter[Team](tx, ModelOrganizationTeams)
+			txTeamMembers = sdk.FromAdapter[TeamMembership](tx, ModelOrganizationTeamMembers)
+		}
+
+		_, _ = txTeamMembers.Delete(txCtx, adapter.Eq("team_id", teamID))
+		affected, err := txTeams.Delete(txCtx, adapter.Eq("organization_id", orgID), adapter.Eq("id", teamID))
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrTeamNotFound
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
@@ -649,7 +808,24 @@ func (s *service) DeleteTeam(ctx context.Context, orgID, teamID string) error {
 
 // ListTeams lists all teams in an organization.
 func (s *service) ListTeams(ctx context.Context, orgID string) ([]*Team, error) {
-	return s.cfg.Store.ListTeamsByOrg(ctx, orgID)
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return nil, fmt.Errorf("%w: organization_id is required", ErrInvalidInput)
+	}
+
+	rows, err := s.teams.FindMany(ctx, adapter.Query{
+		Model: ModelOrganizationTeams,
+		Where: []adapter.Condition{adapter.Eq("organization_id", orgID)},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*Team, len(rows))
+	for i := range rows {
+		res[i] = &rows[i]
+	}
+	return res, nil
 }
 
 // AddTeamMember enrolls a member into a team, ensuring they belong to the organization.
@@ -672,13 +848,14 @@ func (s *service) AddTeamMember(ctx context.Context, orgID, teamID, userID strin
 	}
 
 	tm := &TeamMembership{
+		ID:        teamID + ":" + userID,
 		TeamID:    teamID,
 		UserID:    userID,
 		CreatedAt: s.now(),
 	}
 
-	if err := s.cfg.Store.AddTeamMember(ctx, tm); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+	if err := s.teamMembers.Create(ctx, tm); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			return ErrTeamMemberAlreadyExists
 		}
 		return err
@@ -711,11 +888,12 @@ func (s *service) RemoveTeamMember(ctx context.Context, orgID, teamID, userID st
 		return err
 	}
 
-	if err := s.cfg.Store.RemoveTeamMember(ctx, teamID, userID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return ErrTeamMemberNotFound
-		}
+	affected, err := s.teamMembers.Delete(ctx, adapter.Eq("team_id", teamID), adapter.Eq("user_id", userID))
+	if err != nil {
 		return err
+	}
+	if affected == 0 {
+		return ErrTeamMemberNotFound
 	}
 
 	s.publish(ctx, EventTeamMemberRemoved, orgID, TeamMemberPayload{
@@ -732,7 +910,20 @@ func (s *service) ListTeamMembers(ctx context.Context, orgID, teamID string) ([]
 	if _, err := s.GetTeam(ctx, orgID, teamID); err != nil {
 		return nil, err
 	}
-	return s.cfg.Store.ListTeamMembers(ctx, teamID)
+
+	rows, err := s.teamMembers.FindMany(ctx, adapter.Query{
+		Model: ModelOrganizationTeamMembers,
+		Where: []adapter.Condition{adapter.Eq("team_id", teamID)},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]string, len(rows))
+	for i, r := range rows {
+		userIDs[i] = r.UserID
+	}
+	return userIDs, nil
 }
 
 // CreateInvitation generates an invitation and plaintext secret token.
@@ -773,7 +964,7 @@ func (s *service) CreateInvitation(ctx context.Context, in CreateInvitationInput
 		CreatedAt:      now,
 	}
 
-	if err := s.cfg.Store.CreateInvitation(ctx, inv); err != nil {
+	if err := s.invitations.Create(ctx, inv); err != nil {
 		return nil, "", err
 	}
 
@@ -791,9 +982,9 @@ func (s *service) CreateInvitation(ctx context.Context, in CreateInvitationInput
 
 // GetInvitation retrieves an invitation by ID within an organization.
 func (s *service) GetInvitation(ctx context.Context, orgID, invitationID string) (*Invitation, error) {
-	inv, err := s.cfg.Store.GetInvitationByID(ctx, orgID, invitationID)
+	inv, err := s.invitations.FindOne(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("id", invitationID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrInvitationNotFound
 		}
 		return nil, err
@@ -803,7 +994,24 @@ func (s *service) GetInvitation(ctx context.Context, orgID, invitationID string)
 
 // ListInvitations lists pending invitations for an organization.
 func (s *service) ListInvitations(ctx context.Context, orgID string) ([]*Invitation, error) {
-	return s.cfg.Store.ListInvitationsByOrg(ctx, orgID)
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return nil, fmt.Errorf("%w: organization_id is required", ErrInvalidInput)
+	}
+
+	rows, err := s.invitations.FindMany(ctx, adapter.Query{
+		Model: ModelOrganizationInvitations,
+		Where: []adapter.Condition{adapter.Eq("organization_id", orgID)},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*Invitation, len(rows))
+	for i := range rows {
+		res[i] = &rows[i]
+	}
+	return res, nil
 }
 
 // AcceptInvitation validates token and redeems invitation atomically.
@@ -821,10 +1029,17 @@ func (s *service) AcceptInvitation(ctx context.Context, rawToken, userID string)
 	var orgID string
 	var invID string
 
-	err := s.cfg.Store.Transaction(ctx, func(txCtx context.Context) error {
-		inv, err := s.cfg.Store.GetInvitationByTokenHash(txCtx, tokenHash)
+	err := s.transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+		txInvs := s.invitations
+		txMems := s.memberships
+		if tx != nil {
+			txInvs = sdk.FromAdapter[Invitation](tx, ModelOrganizationInvitations)
+			txMems = sdk.FromAdapter[Membership](tx, ModelOrganizationMemberships)
+		}
+
+		inv, err := txInvs.FindOne(txCtx, adapter.Eq("token_hash", tokenHash))
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return ErrInvitationNotFound
 			}
 			return err
@@ -838,12 +1053,15 @@ func (s *service) AcceptInvitation(ctx context.Context, rawToken, userID string)
 		}
 
 		// Verify not already member
-		if _, err := s.cfg.Store.GetMembership(txCtx, inv.OrganizationID, userID); err == nil {
+		if existingMem, _ := txMems.FindOne(txCtx, adapter.Eq("organization_id", inv.OrganizationID), adapter.Eq("user_id", userID)); existingMem != nil {
 			return ErrMemberAlreadyExists
 		}
 
 		inv.AcceptedAt = &now
-		if err := s.cfg.Store.UpdateInvitation(txCtx, inv); err != nil {
+		_, err = txInvs.Update(txCtx, []adapter.Condition{adapter.Eq("id", inv.ID)}, map[string]any{
+			"accepted_at": now,
+		})
+		if err != nil {
 			return err
 		}
 
@@ -860,7 +1078,7 @@ func (s *service) AcceptInvitation(ctx context.Context, rawToken, userID string)
 		orgID = inv.OrganizationID
 		invID = inv.ID
 
-		return s.cfg.Store.CreateMembership(txCtx, m)
+		return txMems.Create(txCtx, m)
 	})
 	if err != nil {
 		return nil, err
@@ -893,8 +1111,12 @@ func (s *service) RevokeInvitation(ctx context.Context, orgID, invitationID stri
 		return err
 	}
 
-	if err := s.cfg.Store.DeleteInvitation(ctx, orgID, invitationID); err != nil {
+	affected, err := s.invitations.Delete(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("id", invitationID))
+	if err != nil {
 		return err
+	}
+	if affected == 0 {
+		return ErrInvitationNotFound
 	}
 
 	s.publish(ctx, EventInvitationRevoked, orgID, InvitationRevokedPayload{

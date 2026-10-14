@@ -9,9 +9,9 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	deviceauth "github.com/BladiCreator/go-modular-auth-device-authorization"
 	"github.com/BladiCreator/go-modular-auth-device-authorization/plugins"
-	devicememory "github.com/BladiCreator/go-modular-auth-device-authorization/store/memory"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func TestDeviceAuth_Security_SlowDown(t *testing.T) {
@@ -46,17 +46,15 @@ func TestDeviceAuth_Security_SlowDown(t *testing.T) {
 
 func TestDeviceAuth_Security_Expiration(t *testing.T) {
 	ctx := context.Background()
-	cStore := corememory.New()
+	cAdapter := adaptermem.New()
 	cCache := corecache.New()
-	devStore := devicememory.New()
 
 	devModule := deviceauth.New(
-		deviceauth.WithStore(devStore),
 		deviceauth.WithExpiresIn(50*time.Millisecond), // Short TTL for testing
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cAdapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{devModule},
 	})
@@ -117,18 +115,16 @@ func TestDeviceAuth_Security_ClientBinding(t *testing.T) {
 
 func TestDeviceAuth_Security_BruteForceProtection(t *testing.T) {
 	ctx := context.Background()
-	cStore := corememory.New()
+	cAdapter := adaptermem.New()
 	cCache := corecache.New()
-	devStore := devicememory.New()
 
 	devModule := deviceauth.New(
-		deviceauth.WithStore(devStore),
 		deviceauth.WithMaxFailedAttempts(3),
 		deviceauth.WithRateLimit(5),
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cAdapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{devModule},
 	})
@@ -145,10 +141,8 @@ func TestDeviceAuth_Security_BruteForceProtection(t *testing.T) {
 		t.Fatalf("Start failed: %v", err)
 	}
 
-	// Simulate 3 failed attempts on store for that code
-	_, _ = devStore.IncrementFailedAttempts(ctx, startResp.UserCode)
-	_, _ = devStore.IncrementFailedAttempts(ctx, startResp.UserCode)
-	_, _ = devStore.IncrementFailedAttempts(ctx, startResp.UserCode)
+	// Simulate 3 failed attempts on adapter for that code
+	_, _ = cAdapter.Update(ctx, deviceauth.ModelDeviceGrants, []adapter.Condition{adapter.Eq("user_code", startResp.UserCode)}, map[string]any{"failed_attempts": 3})
 
 	// Now verification must be locked with ErrMaxAttemptsExceeded
 	_, err = devAuth.VerifyUserCode(ctx, deviceauth.VerifyUserCodeInput{
@@ -161,18 +155,15 @@ func TestDeviceAuth_Security_BruteForceProtection(t *testing.T) {
 
 func TestDeviceAuth_Security_AuditEvents(t *testing.T) {
 	ctx := context.Background()
-	cStore := corememory.New()
+	cAdapter := adaptermem.New()
 	cCache := corecache.New()
-	devStore := devicememory.New()
 
 	var eventsEmitted []auth.Event
 
-	devModule := deviceauth.New(
-		deviceauth.WithStore(devStore),
-	)
+	devModule := deviceauth.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cAdapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{devModule},
 	})

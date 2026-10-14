@@ -6,26 +6,23 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	phone "github.com/BladiCreator/go-modular-auth-phone"
 	"github.com/BladiCreator/go-modular-auth-phone/plugins"
-	phonemem "github.com/BladiCreator/go-modular-auth-phone/store/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func setupTestAuth(t *testing.T, opts ...phone.Option) (*auth.Auth, phone.Phone, *phone.MockProvider) {
 	provider := phone.NewMockProvider()
-	pStore := phonemem.New()
 
 	defaultOpts := []phone.Option{
 		phone.WithProvider(provider),
-		phone.WithStore(pStore),
 		phone.WithTTL(5 * time.Minute),
 		phone.WithAllowSignUp(true),
 	}
 	allOpts := append(defaultOpts, opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{phone.New(allOpts...)},
 	})
 	if err != nil {

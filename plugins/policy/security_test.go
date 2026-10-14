@@ -23,7 +23,7 @@ func TestSecurity_AuthenticationBypassPrevention(t *testing.T) {
 	plugin := policy.New(policy.WithInitialPolicies(authPolicy))
 
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestSecurity_TenantBoundaryEnforcement(t *testing.T) {
 	plugin := policy.New(policy.WithInitialPolicies(orgPolicy))
 
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {
@@ -113,7 +113,7 @@ func TestSecurity_ConcurrentEvaluationAndRuleMutations(t *testing.T) {
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {

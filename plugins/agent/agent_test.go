@@ -6,7 +6,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	agent "github.com/BladiCreator/go-modular-auth-agent"
 )
 
@@ -15,7 +15,7 @@ func TestAgent_Lifecycle(t *testing.T) {
 	mod := agent.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   storememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

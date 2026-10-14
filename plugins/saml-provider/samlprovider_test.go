@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 	samlprovider "github.com/BladiCreator/go-modular-auth-saml-provider"
 )
@@ -20,7 +20,7 @@ func TestSAMLProvider_Lifecycle(t *testing.T) {
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   storememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

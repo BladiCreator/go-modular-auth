@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-organizations"
 	"github.com/BladiCreator/go-modular-auth-sso/oidc"
 	"github.com/BladiCreator/go-modular-auth-sso/saml"
-	"github.com/BladiCreator/go-modular-auth-sso/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -25,14 +26,23 @@ type service struct {
 	cfg        Config
 	logger     *slog.Logger
 	oidcClient *oidc.Client
+	configs    *sdk.Repository[SSOConfig]
+	domains    *sdk.Repository[DomainMapping]
+	states     *sdk.Repository[SSOStateSession]
 }
 
 var _ SSO = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	var logger *slog.Logger
+	var configs *sdk.Repository[SSOConfig]
+	var domains *sdk.Repository[DomainMapping]
+	var states *sdk.Repository[SSOStateSession]
 	if ctx != nil {
 		logger = ctx.Logger()
+		configs = sdk.Model[SSOConfig](ctx, ModelSSOConfigs)
+		domains = sdk.Model[DomainMapping](ctx, ModelSSODomainMappings)
+		states = sdk.Model[SSOStateSession](ctx, ModelSSOStates)
 	} else {
 		logger = slog.Default()
 	}
@@ -42,6 +52,9 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 		cfg:        cfg,
 		logger:     logger,
 		oidcClient: oidc.NewClient(cfg.HTTPClient),
+		configs:    configs,
+		domains:    domains,
+		states:     states,
 	}
 }
 
@@ -111,7 +124,15 @@ func (s *service) CreateConfig(ctx context.Context, in CreateConfigInput) (*SSOC
 		}
 	}
 
-	record := &store.SSOConfig{
+	// Verify domain ownership
+	for _, d := range cleanDomains {
+		existingDomain, err := s.domains.FindOne(ctx, adapter.Eq("domain", d))
+		if err == nil && existingDomain != nil {
+			return nil, ErrDomainConflict
+		}
+	}
+
+	record := &SSOConfig{
 		ID:               cfgID,
 		OrganizationID:   in.OrganizationID,
 		Name:             in.Name,
@@ -128,11 +149,17 @@ func (s *service) CreateConfig(ctx context.Context, in CreateConfigInput) (*SSOC
 		UpdatedAt:        now,
 	}
 
-	if err := s.cfg.Store.SaveConfig(ctx, record); err != nil {
-		if errors.Is(err, store.ErrDomainClaimed) {
-			return nil, ErrDomainConflict
-		}
+	if err := s.configs.Create(ctx, record); err != nil {
 		return nil, err
+	}
+
+	for _, d := range cleanDomains {
+		_ = s.domains.Create(ctx, &DomainMapping{
+			ID:             d,
+			Domain:         d,
+			OrganizationID: in.OrganizationID,
+			ConfigID:       cfgID,
+		})
 	}
 
 	s.emitAudit(ctx, EventConfigCreated, ConfigAuditPayload{
@@ -153,9 +180,9 @@ func (s *service) GetConfig(ctx context.Context, orgID, configID string) (*SSOCo
 	if orgID == "" || configID == "" {
 		return nil, ErrInvalidInput
 	}
-	cfg, err := s.cfg.Store.GetConfig(ctx, orgID, configID)
+	cfg, err := s.configs.FindOne(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("id", configID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrConfigNotFound
 		}
 		return nil, err
@@ -168,7 +195,18 @@ func (s *service) ListConfigsByOrganization(ctx context.Context, orgID string) (
 	if orgID == "" {
 		return nil, ErrInvalidInput
 	}
-	return s.cfg.Store.ListConfigsByOrganization(ctx, orgID)
+	items, err := s.configs.FindMany(ctx, adapter.Query{
+		Model: ModelSSOConfigs,
+		Where: []adapter.Condition{adapter.Eq("organization_id", orgID)},
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*SSOConfig, len(items))
+	for i := range items {
+		results[i] = &items[i]
+	}
+	return results, nil
 }
 
 // UpdateConfig modifies an existing organization SSO configuration.
@@ -218,11 +256,28 @@ func (s *service) UpdateConfig(ctx context.Context, in UpdateConfigInput) (*SSOC
 	}
 	existing.UpdatedAt = s.cfg.Clock()
 
-	if err := s.cfg.Store.UpdateConfig(ctx, existing); err != nil {
-		if errors.Is(err, store.ErrDomainClaimed) {
+	// Check domain conflicts for new/updated domains
+	for _, d := range existing.Domains {
+		claimed, err := s.domains.FindOne(ctx, adapter.Eq("domain", d))
+		if err == nil && claimed != nil && (claimed.ConfigID != in.ConfigID || claimed.OrganizationID != in.OrganizationID) {
 			return nil, ErrDomainConflict
 		}
+	}
+
+	_, _ = s.configs.Delete(ctx, adapter.Eq("organization_id", in.OrganizationID), adapter.Eq("id", in.ConfigID))
+	if err := s.configs.Create(ctx, existing); err != nil {
 		return nil, err
+	}
+
+	// Resync domain mappings
+	_, _ = s.domains.Delete(ctx, adapter.Eq("config_id", in.ConfigID))
+	for _, d := range existing.Domains {
+		_ = s.domains.Create(ctx, &DomainMapping{
+			ID:             d,
+			Domain:         d,
+			OrganizationID: in.OrganizationID,
+			ConfigID:       in.ConfigID,
+		})
 	}
 
 	s.emitAudit(ctx, EventConfigUpdated, ConfigAuditPayload{
@@ -249,9 +304,10 @@ func (s *service) DeleteConfig(ctx context.Context, orgID, configID string) erro
 		return err
 	}
 
-	if err := s.cfg.Store.DeleteConfig(ctx, orgID, configID); err != nil {
+	if _, err := s.configs.Delete(ctx, adapter.Eq("organization_id", orgID), adapter.Eq("id", configID)); err != nil {
 		return err
 	}
+	_, _ = s.domains.Delete(ctx, adapter.Eq("config_id", configID))
 
 	s.emitAudit(ctx, EventConfigDeleted, ConfigAuditPayload{
 		OrganizationID: orgID,
@@ -273,12 +329,23 @@ func (s *service) DiscoverByDomain(ctx context.Context, domain string) (*DomainD
 		return nil, fmt.Errorf("%w: domain cannot be empty", ErrInvalidInput)
 	}
 
-	cfg, err := s.cfg.Store.GetConfigByDomain(ctx, d)
+	mapping, err := s.domains.FindOne(ctx, adapter.Eq("domain", d))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrDomainNotFound
 		}
 		return nil, err
+	}
+
+	cfg, err := s.configs.FindOne(ctx, adapter.Eq("id", mapping.ConfigID))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrDomainNotFound
+		}
+		return nil, err
+	}
+	if !cfg.Enabled {
+		return nil, ErrDomainNotFound
 	}
 
 	endpoint := ""
@@ -394,7 +461,7 @@ func (s *service) InitiateSSO(ctx context.Context, in InitiateSSOInput) (*Initia
 		return nil, ErrInvalidProtocol
 	}
 
-	stateSession := &store.SSOStateSession{
+	stateSession := &SSOStateSession{
 		State:          stateToken,
 		OrganizationID: targetCfg.OrganizationID,
 		ConfigID:       targetCfg.ID,
@@ -407,7 +474,7 @@ func (s *service) InitiateSSO(ctx context.Context, in InitiateSSOInput) (*Initia
 		CreatedAt:      now,
 	}
 
-	if err := s.cfg.Store.SaveState(ctx, stateSession); err != nil {
+	if err := s.states.Create(ctx, stateSession); err != nil {
 		return nil, err
 	}
 
@@ -430,14 +497,8 @@ func (s *service) ProcessSSOCallback(ctx context.Context, in ProcessSSOCallbackI
 	now := s.cfg.Clock()
 
 	// 1. Consume state session atomically
-	stateSess, err := s.cfg.Store.ConsumeState(ctx, in.State, now)
+	stateSess, err := s.consumeState(ctx, in.State, now)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrInvalidState
-		}
-		if errors.Is(err, store.ErrStateConsumed) {
-			return nil, ErrStateConsumed
-		}
 		return nil, err
 	}
 
@@ -803,4 +864,32 @@ func (s *service) emitLoginAudit(ctx context.Context, orgID, cfgID, userID, emai
 		eventType = EventLoginFailed
 	}
 	s.emitAudit(ctx, eventType, payload)
+}
+
+func (s *service) consumeState(ctx context.Context, state string, now time.Time) (*SSOStateSession, error) {
+	if s.states == nil {
+		return nil, ErrInvalidState
+	}
+	sess, err := s.states.FindOne(ctx, adapter.Eq("state", state))
+	if errors.Is(err, adapter.ErrNotFound) || sess == nil {
+		return nil, ErrInvalidState
+	}
+	if sess.IsConsumed() {
+		return nil, ErrStateConsumed
+	}
+	if sess.Expired(now) {
+		return nil, ErrStateExpired
+	}
+
+	n, err := s.states.Update(ctx, []adapter.Condition{
+		adapter.Eq("state", state),
+		adapter.IsNull("consumed_at"),
+	}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil || n == 0 {
+		return nil, ErrStateConsumed
+	}
+	sess.ConsumedAt = &now
+	return sess, nil
 }

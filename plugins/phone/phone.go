@@ -4,7 +4,6 @@ import (
 	"context"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-phone/store"
 )
 
 const (
@@ -21,8 +20,8 @@ const (
 	PurposeChange = "phone:change"
 )
 
-// Record is an alias to store.PhoneRecord in the public API.
-type Record = store.PhoneRecord
+// Record is an alias to PhoneRecord in the public API.
+type Record = PhoneRecord
 
 // RequestOTPInput contains parameters for requesting an authentication OTP code.
 type RequestOTPInput struct {

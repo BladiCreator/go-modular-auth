@@ -11,13 +11,11 @@ import (
 	policy "github.com/BladiCreator/go-modular-auth-policy"
 	"github.com/BladiCreator/go-modular-auth-policy/cache"
 	"github.com/BladiCreator/go-modular-auth-policy/plugins"
-	"github.com/BladiCreator/go-modular-auth-policy/store/memory"
 )
 
 func TestPolicy_RegistrationAndBasicEvaluation(t *testing.T) {
 	ctx := context.Background()
-	coreStore := adaptermem.NewStore()
-	policyStore := memory.NewStore()
+	ad := adaptermem.NewAdapter()
 	memCache := cache.NewMemoryCache(5 * time.Minute)
 
 	// Define an owner-or-admin rule
@@ -26,13 +24,12 @@ func TestPolicy_RegistrationAndBasicEvaluation(t *testing.T) {
 	docPolicy := policy.AllOf("doc:access", "Requires auth and ownership", authRule, ownerRule)
 
 	plugin := policy.New(
-		policy.WithStore(policyStore),
 		policy.WithCache(memCache),
 		policy.WithInitialPolicies(docPolicy),
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   coreStore,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {
@@ -91,7 +88,7 @@ func TestPolicy_ChallengeDecision(t *testing.T) {
 	plugin := policy.New(policy.WithInitialPolicies(highValueTransferPolicy))
 
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {
@@ -205,7 +202,7 @@ func TestPolicy_CacheInvalidation(t *testing.T) {
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {

@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-account-linking/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 )
 
@@ -55,7 +56,7 @@ func (s *service) LinkAccount(ctx context.Context, in LinkAccountInput) (*accoun
 func (s *service) linkAccountInternal(ctx context.Context, userID, provider, providerID, actor string) (*account.Account, error) {
 	var linkedAccount *account.Account
 
-	err := s.coreStore.Transaction(ctx, func(txCtx context.Context) error {
+	linkFn := func(txCtx context.Context) error {
 		// 1. Verify target user exists
 		_, err := s.coreStore.Users().GetByID(txCtx, userID)
 		if err != nil {
@@ -105,7 +106,16 @@ func (s *service) linkAccountInternal(ctx context.Context, userID, provider, pro
 
 		linkedAccount = newAcc
 		return nil
-	})
+	}
+
+	var err error
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		err = s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, _ adapter.Adapter) error {
+			return linkFn(txCtx)
+		})
+	} else {
+		err = s.coreStore.Transaction(ctx, linkFn)
+	}
 
 	if err != nil {
 		return nil, err
@@ -143,59 +153,69 @@ func (s *service) UnlinkAccount(ctx context.Context, in UnlinkAccountInput) erro
 		return err
 	}
 
-	var unlinkedID string
-
-	err := s.coreStore.Transaction(ctx, func(txCtx context.Context) error {
-		// 1. Locate the account
-		acc, err := s.coreStore.Accounts().GetByProvider(txCtx, in.Provider, in.ProviderID)
-		if err != nil {
-			if errors.Is(err, corestore.ErrNotFound) {
-				return ErrAccountNotFound
-			}
-			return err
-		}
-
-		if acc.UserID != in.UserID {
+	// 1. Locate the specific account to unlink
+	targetAccount, err := s.coreStore.Accounts().GetByProvider(ctx, in.Provider, in.ProviderID)
+	if err != nil {
+		if errors.Is(err, corestore.ErrNotFound) {
+			s.emitAudit(ctx, EventUnlinkFailed, UnlinkFailedPayload{
+				UserID:       in.UserID,
+				Provider:     in.Provider,
+				ProviderID:   in.ProviderID,
+				Reason:       "account not found",
+				ActorSubject: actor,
+				Timestamp:    s.cfg.Clock(),
+			})
 			return ErrAccountNotFound
 		}
+		return err
+	}
 
-		// 2. Enforce final usable authentication method protection
-		allowOrphan := in.AllowOrphan || s.cfg.AllowOrphanByDefault
-		if !allowOrphan {
-			canUnlink, err := s.checkRemainingMethods(txCtx, in.UserID, acc.ID)
-			if err != nil {
-				return err
-			}
-			if !canUnlink {
-				s.emitAudit(txCtx, EventUnlinkFailed, UnlinkFailedPayload{
-					UserID:       in.UserID,
-					AccountID:    acc.ID,
-					Provider:     in.Provider,
-					ProviderID:   in.ProviderID,
-					Reason:       "attempted to unlink final authentication method",
-					ActorSubject: actor,
-					Timestamp:    s.cfg.Clock(),
-				})
-				return ErrCannotUnlinkFinalAuthMethod
-			}
-		}
+	if targetAccount.UserID != in.UserID {
+		return ErrUnauthorized
+	}
 
-		// 3. Delete the account
-		if err := s.coreStore.Accounts().Delete(txCtx, acc.ID); err != nil {
+	// 2. Lockout prevention verification
+	allowOrphan := in.AllowOrphan || s.cfg.AllowOrphanByDefault
+	if !allowOrphan {
+		canUnlink, err := s.checkRemainingMethods(ctx, in.UserID, targetAccount.ID)
+		if err != nil {
 			return err
 		}
+		if !canUnlink {
+			s.emitAudit(ctx, EventUnlinkFailed, UnlinkFailedPayload{
+				UserID:       in.UserID,
+				AccountID:    targetAccount.ID,
+				Provider:     in.Provider,
+				ProviderID:   in.ProviderID,
+				Reason:       "cannot unlink sole remaining authentication method",
+				ActorSubject: actor,
+				Timestamp:    s.cfg.Clock(),
+			})
+			return ErrCannotUnlinkFinalAuthMethod
+		}
+	}
 
-		unlinkedID = acc.ID
-		return nil
-	})
+	// 3. Atomically delete the Core Account record
+	unlinkFn := func(txCtx context.Context) error {
+		return s.coreStore.Accounts().Delete(txCtx, targetAccount.ID)
+	}
+
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		err = s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, _ adapter.Adapter) error {
+			return unlinkFn(txCtx)
+		})
+	} else {
+		err = s.coreStore.Transaction(ctx, unlinkFn)
+	}
 
 	if err != nil {
 		return err
 	}
 
+	// 4. Emit success audit event
 	s.emitAudit(ctx, EventAccountUnlinked, AccountUnlinkedPayload{
 		UserID:       in.UserID,
-		AccountID:    unlinkedID,
+		AccountID:    targetAccount.ID,
 		Provider:     in.Provider,
 		ProviderID:   in.ProviderID,
 		ActorSubject: actor,
@@ -205,7 +225,7 @@ func (s *service) UnlinkAccount(ctx context.Context, in UnlinkAccountInput) erro
 	return nil
 }
 
-// UnlinkAccountByID detaches an external provider account from a User by Core Account ID.
+// UnlinkAccountByID detaches an external provider account from a User directly by its Core Account ID.
 func (s *service) UnlinkAccountByID(ctx context.Context, in UnlinkAccountByIDInput) error {
 	if in.UserID == "" || in.AccountID == "" {
 		return ErrInvalidInput
@@ -223,52 +243,57 @@ func (s *service) UnlinkAccountByID(ctx context.Context, in UnlinkAccountByIDInp
 		return err
 	}
 
-	var (
-		provider   string
-		providerID string
-	)
-
-	err := s.coreStore.Transaction(ctx, func(txCtx context.Context) error {
-		acc, err := s.coreStore.Accounts().GetByID(txCtx, in.AccountID)
-		if err != nil {
-			if errors.Is(err, corestore.ErrNotFound) {
-				return ErrAccountNotFound
-			}
-			return err
-		}
-
-		if acc.UserID != in.UserID {
+	targetAccount, err := s.coreStore.Accounts().GetByID(ctx, in.AccountID)
+	if err != nil {
+		if errors.Is(err, corestore.ErrNotFound) {
+			s.emitAudit(ctx, EventUnlinkFailed, UnlinkFailedPayload{
+				UserID:       in.UserID,
+				AccountID:    in.AccountID,
+				Reason:       "account not found",
+				ActorSubject: actor,
+				Timestamp:    s.cfg.Clock(),
+			})
 			return ErrAccountNotFound
 		}
+		return err
+	}
 
-		allowOrphan := in.AllowOrphan || s.cfg.AllowOrphanByDefault
-		if !allowOrphan {
-			canUnlink, err := s.checkRemainingMethods(txCtx, in.UserID, acc.ID)
-			if err != nil {
-				return err
-			}
-			if !canUnlink {
-				s.emitAudit(txCtx, EventUnlinkFailed, UnlinkFailedPayload{
-					UserID:       in.UserID,
-					AccountID:    acc.ID,
-					Provider:     acc.Provider,
-					ProviderID:   acc.ProviderID,
-					Reason:       "attempted to unlink final authentication method",
-					ActorSubject: actor,
-					Timestamp:    s.cfg.Clock(),
-				})
-				return ErrCannotUnlinkFinalAuthMethod
-			}
-		}
+	if targetAccount.UserID != in.UserID {
+		return ErrUnauthorized
+	}
 
-		if err := s.coreStore.Accounts().Delete(txCtx, acc.ID); err != nil {
+	// Lockout prevention check
+	allowOrphan := in.AllowOrphan || s.cfg.AllowOrphanByDefault
+	if !allowOrphan {
+		canUnlink, err := s.checkRemainingMethods(ctx, in.UserID, targetAccount.ID)
+		if err != nil {
 			return err
 		}
+		if !canUnlink {
+			s.emitAudit(ctx, EventUnlinkFailed, UnlinkFailedPayload{
+				UserID:       in.UserID,
+				AccountID:    targetAccount.ID,
+				Provider:     targetAccount.Provider,
+				ProviderID:   targetAccount.ProviderID,
+				Reason:       "cannot unlink sole remaining authentication method",
+				ActorSubject: actor,
+				Timestamp:    s.cfg.Clock(),
+			})
+			return ErrCannotUnlinkFinalAuthMethod
+		}
+	}
 
-		provider = acc.Provider
-		providerID = acc.ProviderID
-		return nil
-	})
+	unlinkFn := func(txCtx context.Context) error {
+		return s.coreStore.Accounts().Delete(txCtx, targetAccount.ID)
+	}
+
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		err = s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, _ adapter.Adapter) error {
+			return unlinkFn(txCtx)
+		})
+	} else {
+		err = s.coreStore.Transaction(ctx, unlinkFn)
+	}
 
 	if err != nil {
 		return err
@@ -276,9 +301,9 @@ func (s *service) UnlinkAccountByID(ctx context.Context, in UnlinkAccountByIDInp
 
 	s.emitAudit(ctx, EventAccountUnlinked, AccountUnlinkedPayload{
 		UserID:       in.UserID,
-		AccountID:    in.AccountID,
-		Provider:     provider,
-		ProviderID:   providerID,
+		AccountID:    targetAccount.ID,
+		Provider:     targetAccount.Provider,
+		ProviderID:   targetAccount.ProviderID,
 		ActorSubject: actor,
 		Timestamp:    s.cfg.Clock(),
 	})
@@ -286,7 +311,7 @@ func (s *service) UnlinkAccountByID(ctx context.Context, in UnlinkAccountByIDInp
 	return nil
 }
 
-// CreateLinkingTicket issues a single-use ticket for two-step linking ceremonies.
+// CreateLinkingTicket issues a secure, single-use, time-limited bearer ticket.
 func (s *service) CreateLinkingTicket(ctx context.Context, in CreateTicketInput) (*LinkingTicketResult, error) {
 	if in.UserID == "" {
 		return nil, ErrInvalidInput
@@ -297,7 +322,7 @@ func (s *service) CreateLinkingTicket(ctx context.Context, in CreateTicketInput)
 		return nil, err
 	}
 
-	// Verify user exists
+	// Verify target user exists
 	if _, err := s.coreStore.Users().GetByID(ctx, in.UserID); err != nil {
 		if errors.Is(err, corestore.ErrNotFound) {
 			return nil, ErrUserNotFound
@@ -305,7 +330,7 @@ func (s *service) CreateLinkingTicket(ctx context.Context, in CreateTicketInput)
 		return nil, err
 	}
 
-	rawToken, err := generateSecureToken("link_tkt", 32)
+	rawToken, err := generateSecureToken("link_tok", 32)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +344,7 @@ func (s *service) CreateLinkingTicket(ctx context.Context, in CreateTicketInput)
 	expiresAt := now.Add(ttl)
 	ticketID := generateID("tkt")
 
-	ticket := &store.LinkingTicket{
+	ticket := &LinkingTicket{
 		ID:             ticketID,
 		TokenHash:      hashToken(rawToken),
 		UserID:         in.UserID,
@@ -329,7 +354,7 @@ func (s *service) CreateLinkingTicket(ctx context.Context, in CreateTicketInput)
 		CreatedAt:      now,
 	}
 
-	if err := s.cfg.Store.SaveTicket(ctx, ticket); err != nil {
+	if err := s.saveTicket(ctx, ticket); err != nil {
 		return nil, err
 	}
 
@@ -361,14 +386,8 @@ func (s *service) CompleteLinkingTicket(ctx context.Context, in CompleteTicketIn
 	tokenHash := hashToken(in.TicketToken)
 
 	// 1. Atomically consume the ticket
-	ticket, err := s.cfg.Store.ConsumeTicket(ctx, tokenHash, now)
+	ticket, err := s.consumeTicket(ctx, tokenHash, now)
 	if err != nil {
-		if errors.Is(err, store.ErrTicketConsumed) {
-			return nil, ErrTicketAlreadyUsed
-		}
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrTicketNotFound
-		}
 		return nil, err
 	}
 
@@ -392,11 +411,8 @@ func (s *service) GetLinkingTicket(ctx context.Context, ticketToken string) (*Li
 		return nil, ErrInvalidInput
 	}
 
-	ticket, err := s.cfg.Store.GetTicketByHash(ctx, hashToken(ticketToken))
+	ticket, err := s.getTicketByHash(ctx, hashToken(ticketToken))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrTicketNotFound
-		}
 		return nil, err
 	}
 	return ticket, nil
@@ -408,15 +424,12 @@ func (s *service) RevokeLinkingTicket(ctx context.Context, ticketToken string) e
 		return ErrInvalidInput
 	}
 
-	ticket, err := s.cfg.Store.GetTicketByHash(ctx, hashToken(ticketToken))
+	ticket, err := s.getTicketByHash(ctx, hashToken(ticketToken))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return ErrTicketNotFound
-		}
 		return err
 	}
 
-	return s.cfg.Store.DeleteTicket(ctx, ticket.ID)
+	return s.deleteTicket(ctx, ticket.ID)
 }
 
 // ListLinkedAccounts returns all authentication accounts currently attached to a user.
@@ -482,6 +495,58 @@ func (s *service) checkRemainingMethods(ctx context.Context, userID, accountIDTo
 	}
 
 	return activeCreds > 0, nil
+}
+
+func (s *service) saveTicket(ctx context.Context, ticket *LinkingTicket) error {
+	repo := sdk.Model[LinkingTicket](s.ctx, ModelLinkingTickets)
+	return repo.Create(ctx, ticket)
+}
+
+func (s *service) getTicketByHash(ctx context.Context, tokenHash string) (*LinkingTicket, error) {
+	repo := sdk.Model[LinkingTicket](s.ctx, ModelLinkingTickets)
+	t, err := repo.FindOne(ctx, adapter.Eq("token_hash", tokenHash))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrTicketNotFound
+		}
+		return nil, err
+	}
+	return t, nil
+}
+
+func (s *service) consumeTicket(ctx context.Context, tokenHash string, now time.Time) (*LinkingTicket, error) {
+	repo := sdk.Model[LinkingTicket](s.ctx, ModelLinkingTickets)
+	t, err := repo.FindOne(ctx, adapter.Eq("token_hash", tokenHash))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrTicketNotFound
+		}
+		return nil, err
+	}
+	if t.IsConsumed() {
+		return nil, ErrTicketAlreadyUsed
+	}
+
+	count, err := repo.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", t.ID),
+		adapter.IsNull("consumed_at"),
+	}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, ErrTicketAlreadyUsed
+	}
+	t.ConsumedAt = &now
+	return t, nil
+}
+
+func (s *service) deleteTicket(ctx context.Context, id string) error {
+	repo := sdk.Model[LinkingTicket](s.ctx, ModelLinkingTickets)
+	_, err := repo.Delete(ctx, adapter.Eq("id", id))
+	return err
 }
 
 func (s *service) authorizeUserAccess(ctx context.Context, targetUserID string) error {

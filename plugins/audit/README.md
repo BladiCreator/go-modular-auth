@@ -166,7 +166,7 @@ Any matching properties in metadata maps, structs, or slices are replaced with `
 Audit records are append-only. Run the provided migration in `migrations/001_create_audit_tables.sql`:
 
 ```sql
-CREATE TABLE IF NOT EXISTS auth_audit_records (
+CREATE TABLE IF NOT EXISTS audit_records (
     id VARCHAR(64) PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
     event VARCHAR(255) NOT NULL,

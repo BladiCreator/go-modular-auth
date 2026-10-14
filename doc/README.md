@@ -4,50 +4,91 @@ Welcome to the comprehensive documentation for **GoModularAuth**, a server-only,
 
 ---
 
+## Architecture Overview
+
+GoModularAuth separates identity verification and authentication workflows from infrastructure, web transport, and business authorization logic.
+
+```text
+                               GoModularAuth Engine
+                                        │
+             ┌──────────────────────────┼──────────────────────────┐
+             │                          │                          │
+     Transport Adapters               Core                   Plugin System
+             │                          │                     (33 Plugins)
+      ┌──────┴──────┐            ┌──────┴──────┐                   │
+      │             │            │             │            ┌──────┴──────┐
+     HTTP          gRPC        Store         Cache         OAuth         2FA
+ (Middleware,  (Interceptors,  (Truth)     (Ephemeral)    Passkeys       SCIM
+  Extractors)   Metadata)        │             │         Organizations  Admin
+                                 │             │          SAML / OIDC   Agents
+                                 ▼             ▼             ...         ...
+                           SQLite/Postgres/  Redis/
+                            MySQL/Memory     Valkey/
+                                             Memory
+```
+
+---
+
 ## Documentation Index
 
 1. [**Architecture & Principles**](architecture.md)
-   - Core philosophy: transport-agnostic, server-only, function-first.
-   - Authentication vs Authorization separation.
-   - Component taxonomy: Core vs Adapters vs Plugins.
-   - Authoritative Store vs Ephemeral Cache.
+   - Core philosophy: server-only, transport-agnostic, function-first.
+   - Authentication (who) vs Authorization (what) separation.
+   - Component taxonomy: Core vs Adapters vs Plugin SDK vs Plugins.
+   - Authoritative Store vs Ephemeral Cache invariants.
+   - Cross-module transaction propagation via `sqltx`.
 
-2. [**Core Engine & Operations**](core.md)
-   - Core entities: `User`, `Account`, `Credential`, `Session`, `VerificationToken`, `Principal`.
-   - Operations: `SignUp`, `SignIn`, `SignOut`, `GetSession`, `RequireSession`, `GetUser`, `RequireUser`.
-   - Account recovery & verification: `VerifyEmail`, `ChangePassword`, `ResetPassword`.
-   - Password hashing with Argon2id (OWASP defaults).
-   - Configuration & secure zero-value defaults.
+2. [**Core Engine & Domain Operations**](core.md)
+   - Core domain entities: `User`, `Account`, `Credential`, `Session`, `VerificationToken`, `Principal`.
+   - Engine operations: `SignUp`, `SignIn`, `SignOut`, `GetSession`, `RequireSession`, `CreateSession`.
+   - Credential management & verification: `ChangePassword`, `RequestPasswordReset`, `ResetPassword`, `VerifyEmail`.
+   - Single-use token engine: `IssueToken`, `ConsumeToken`, `PurgeExpired`.
+   - Password hashing with Argon2id (OWASP recommended parameters).
+   - Zero-allocation semantic caching and configuration defaults.
 
-3. [**Store Adapter (Persistence)**](store-adapter.md)
-   - Store as the authoritative source of truth.
+3. [**Store Adapters (Persistence)**](store-adapter.md)
+   - The Store as the authoritative source of truth.
    - Sub-store contracts: `UserStore`, `AccountStore`, `CredentialStore`, `SessionStore`, `TokenStore`.
-   - Transaction semantics & atomic multi-entity mutations.
-   - In-memory reference implementation (`store/memory`).
-   - Guide: How to implement a database adapter (PostgreSQL, SQLite, MySQL).
+   - Atomic database transactions and error normalization (`store.ErrNotFound`, `store.ErrConflict`).
+   - Production SQL adapters:
+     - **PostgreSQL Adapter** (`adapters/postgres`)
+     - **SQLite Adapter** (`adapters/sqlite`)
+     - **MySQL Adapter** (`adapters/mysql`)
+     - **In-Memory Store** (`adapters/memory`)
+   - Cross-plugin transaction sharing via `sqltx.Executor`.
 
-4. [**Cache Adapter (Performance & Ephemeral State)**](cache-adapter.md)
-   - Ephemeral cache vs Authoritative persistence.
-   - Cache-Aside / Read-Through patterns.
+4. [**Cache Adapters (Performance & Ephemeral State)**](cache-adapter.md)
+   - Ephemeral Cache vs Authoritative Persistence.
+   - Cache-Aside and Read-Through patterns with post-commit invalidation.
    - Semantic caches: `SessionCache` and `UserCache`.
-   - Key namespacing and secret hashing.
-   - TTL boundaries (bounding cache TTL to entity expiry).
-   - Atomic counters (`cache.Counter`) for distributed rate limiting.
-   - Fault tolerance: graceful degradation to Store on cache outage.
+   - Distributed atomic counters (`cache.Counter`) for rate limiting.
+   - Production cache adapters:
+     - **Redis Adapter** (`adapters/redis`)
+     - **Valkey Adapter** (`adapters/valkey`)
+     - **In-Memory Cache** (`adapters/memory`)
+   - Fault tolerance and graceful degradation on cache downtime.
 
-5. [**Email Adapter (Transactional Messaging)**](email-adapter.md)
-   - Decoupling message generation from physical delivery.
-   - `email.Sender` contract and transactional email templates.
+5. [**Email Adapters (Transactional Delivery)**](email-adapter.md)
+   - Decoupling notification generation from physical message delivery.
+   - `email.Sender` and `email.SenderFunc` interfaces.
+   - Production **SMTP Adapter** (`adapters/smtp`): TLS, STARTTLS, authentication, and multipart MIME.
    - In-memory mock sender for unit and integration testing.
 
-6. [**Plugin System**](plugins.md)
-   - Distinction between `PluginModule` (installer) and `PluginCapability` (interface).
-   - Strongly typed capability resolution via `auth.Get[T]()`.
-   - Dependency validation and topological initialization order.
-   - Synchronous transactional `Hooks` vs Post-commit `Events`.
+8. [**Official Adapters Directory**](adapters/README.md)
+   - Detailed usage guides for all 9 adapters:
+     - Transport: [HTTP](adapters/http.md), [gRPC](adapters/grpc.md)
+     - Persistence: [PostgreSQL](adapters/postgres.md), [SQLite](adapters/sqlite.md), [MySQL](adapters/mysql.md), [In-Memory Store](adapters/memory.md)
+     - Caching: [Redis](adapters/redis.md), [Valkey](adapters/valkey.md), [In-Memory Cache](adapters/memory.md)
+     - Messaging: [SMTP](adapters/smtp.md), [In-Memory Mock](adapters/memory.md)
 
-7. [**Transport Adapters (HTTP, gRPC, CLI)**](transport.md)
-   - Why GoModularAuth never imports `net/http` or web frameworks directly.
-   - Bridging incoming HTTP requests (cookies, headers, Bearer tokens).
-   - Injecting and consuming `Principal` from `context.Context`.
-   - Examples for standard `net/http`, Gin, and Fiber.
+9. [**Official Plugins Directory**](plugins/README.md)
+   - Comprehensive implementation and usage guides for all 33 plugins:
+     - [Authentication Factors & Passwordless](plugins/auth-factors.md) (Passkeys, 2FA, Magic Link, Email OTP, Phone, etc.)
+     - [Token Protocols & Sessions](plugins/tokens-sessions.md) (JWT, Bearer, Multi-session, One-Time Token)
+     - [SSO & Client Protocols](plugins/sso.md) (OAuth, OIDC, SAML, Unified SSO)
+     - [Identity Provider Servers](plugins/identity-providers.md) (OAuth 2.1 Provider, OIDC IdP, SAML IdP, SCIM 2.0)
+     - [Multi-Tenancy & Organizations](plugins/organizations.md) (Organizations, Teams, Invitations)
+     - [Authorization & Access Control](plugins/authorization.md) (RBAC, Policy/ABAC, API Keys, Admin)
+     - [Autonomous Identities & Agents](plugins/agents.md) (AI Agents / MCP, Device Flow RFC 8628, Service Accounts)
+     - [Governance & Security](plugins/governance.md) (Audit Logging, Rate Limiting, Password Policy, OpenAPI, Last Login)
+

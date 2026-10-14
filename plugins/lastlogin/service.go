@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-lastlogin/store"
 )
 
 // LastLogin defines the service capability to track and query authentication history.
@@ -15,16 +15,16 @@ type LastLogin interface {
 }
 
 type service struct {
-	ctx   *sdk.Context
-	store store.Store
+	ctx     *sdk.Context
+	records *sdk.Repository[Record]
 }
 
 var _ LastLogin = (*service)(nil)
 
-func newService(ctx *sdk.Context, st store.Store) *service {
+func newService(ctx *sdk.Context) *service {
 	return &service{
-		ctx:   ctx,
-		store: st,
+		ctx:     ctx,
+		records: sdk.Model[Record](ctx, ModelLastLogins),
 	}
 }
 
@@ -39,16 +39,19 @@ func (s *service) Record(ctx context.Context, rec *Record) error {
 		rec.LoggedInAt = s.ctx.Now()
 	}
 
-	stRec := &store.Record{
-		UserID:     rec.UserID,
-		AccountID:  rec.AccountID,
-		Method:     rec.Method,
-		IP:         rec.IP,
-		UserAgent:  rec.UserAgent,
-		LoggedInAt: rec.LoggedInAt,
+	existing, err := s.records.FindOne(ctx, adapter.Eq("user_id", rec.UserID))
+	if err == nil && existing != nil {
+		_, err = s.records.Update(ctx, []adapter.Condition{adapter.Eq("user_id", rec.UserID)}, map[string]any{
+			"account_id":   rec.AccountID,
+			"method":       rec.Method,
+			"ip":           rec.IP,
+			"user_agent":   rec.UserAgent,
+			"logged_in_at": rec.LoggedInAt,
+		})
+		return err
 	}
 
-	return s.store.Save(ctx, stRec)
+	return s.records.Create(ctx, rec)
 }
 
 func (s *service) Get(ctx context.Context, userID string) (*Record, error) {
@@ -56,20 +59,13 @@ func (s *service) Get(ctx context.Context, userID string) (*Record, error) {
 		return nil, ErrInvalidUserID
 	}
 
-	rec, err := s.store.GetByUserID(ctx, userID)
-	if errors.Is(err, store.ErrNotFound) {
+	rec, err := s.records.FindOne(ctx, adapter.Eq("user_id", userID))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return &Record{
-		UserID:     rec.UserID,
-		AccountID:  rec.AccountID,
-		Method:     rec.Method,
-		IP:         rec.IP,
-		UserAgent:  rec.UserAgent,
-		LoggedInAt: rec.LoggedInAt,
-	}, nil
+	return rec, nil
 }

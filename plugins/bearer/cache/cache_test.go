@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-bearer/cache"
-	"github.com/BladiCreator/go-modular-auth-bearer/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
@@ -17,7 +16,7 @@ func TestCache_SetAndGet(t *testing.T) {
 	coreMem := corecpmem.New()
 	c := cache.New(coreMem)
 
-	rec := &store.TokenRecord{
+	rec := &cache.CachedToken{
 		ID:            "token-123",
 		TokenHash:     "hash-456",
 		Subject:       "user-789",
@@ -71,7 +70,7 @@ func TestCache_NilCoreDegradation(t *testing.T) {
 		t.Fatal("expected Available() to be false for nil core cache")
 	}
 
-	if err := c.Set(ctx, &store.TokenRecord{ID: "t"}, time.Minute); err != nil {
+	if err := c.Set(ctx, &cache.CachedToken{ID: "t"}, time.Minute); err != nil {
 		t.Fatalf("expected nil error on degraded Set, got %v", err)
 	}
 

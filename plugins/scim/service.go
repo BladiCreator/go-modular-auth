@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
-	"github.com/BladiCreator/go-modular-auth-scim/store"
 	v2 "github.com/BladiCreator/go-modular-auth-scim/v2"
 )
 
@@ -28,16 +29,18 @@ type SCIMProvider interface {
 }
 
 type service struct {
-	ctx   *sdk.Context
-	store store.Store
+	ctx      *sdk.Context
+	userMeta *sdk.Repository[UserMetadata]
+	groups   *sdk.Repository[GroupRecord]
 }
 
 var _ SCIMProvider = (*service)(nil)
 
-func newService(ctx *sdk.Context, st store.Store) *service {
+func newService(ctx *sdk.Context) *service {
 	return &service{
-		ctx:   ctx,
-		store: st,
+		ctx:      ctx,
+		userMeta: sdk.Model[UserMetadata](ctx, ModelSCIMUserMetadata),
+		groups:   sdk.Model[GroupRecord](ctx, ModelSCIMGroups),
 	}
 }
 
@@ -45,6 +48,28 @@ func generateID(prefix string) string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return prefix + "_" + hex.EncodeToString(b)
+}
+
+func (s *service) now() time.Time {
+	if s.ctx != nil {
+		return s.ctx.Now()
+	}
+	return time.Now()
+}
+
+func (s *service) saveUserMetadata(ctx context.Context, meta *UserMetadata) error {
+	existing, _ := s.userMeta.FindOne(ctx, adapter.Eq("user_id", meta.UserID))
+	if existing == nil {
+		return s.userMeta.Create(ctx, meta)
+	}
+	_, err := s.userMeta.Update(ctx, []adapter.Condition{adapter.Eq("user_id", meta.UserID)}, map[string]any{
+		"external_id": meta.ExternalID,
+		"active":      meta.Active,
+		"given_name":  meta.GivenName,
+		"family_name": meta.FamilyName,
+		"updated_at":  meta.UpdatedAt,
+	})
+	return err
 }
 
 func (s *service) CreateUser(ctx context.Context, res *v2.UserResource) (*v2.UserResource, error) {
@@ -57,7 +82,7 @@ func (s *service) CreateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		email = res.Emails[0].Value
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 	uID := generateID("usr")
 	u := &user.User{
 		ID:            uID,
@@ -67,14 +92,16 @@ func (s *service) CreateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		UpdatedAt:     now,
 	}
 
-	if err := s.ctx.Store().Users().Create(ctx, u); err != nil {
-		if errors.Is(err, corestore.ErrConflict) {
-			return nil, ErrConflict
+	if s.ctx != nil && s.ctx.Store() != nil && s.ctx.Store().Users() != nil {
+		if err := s.ctx.Store().Users().Create(ctx, u); err != nil {
+			if errors.Is(err, corestore.ErrConflict) {
+				return nil, ErrConflict
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 
-	meta := &store.UserMetadata{
+	meta := &UserMetadata{
 		UserID:     uID,
 		ExternalID: res.ExternalID,
 		Active:     res.Active,
@@ -85,7 +112,7 @@ func (s *service) CreateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		meta.GivenName = res.Name.GivenName
 		meta.FamilyName = res.Name.FamilyName
 	}
-	_ = s.store.SaveUserMetadata(ctx, meta)
+	_ = s.saveUserMetadata(ctx, meta)
 
 	return s.GetUser(ctx, uID)
 }
@@ -94,8 +121,13 @@ func (s *service) GetUser(ctx context.Context, id string) (*v2.UserResource, err
 	if id == "" {
 		return nil, ErrNotFound
 	}
-	u, err := s.ctx.Store().Users().GetByID(ctx, id)
-	if err != nil {
+
+	var u *user.User
+	var err error
+	if s.ctx != nil && s.ctx.Store() != nil && s.ctx.Store().Users() != nil {
+		u, err = s.ctx.Store().Users().GetByID(ctx, id)
+	}
+	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
 
@@ -114,8 +146,8 @@ func (s *service) GetUser(ctx context.Context, id string) (*v2.UserResource, err
 		},
 	}
 
-	meta, err := s.store.GetUserMetadata(ctx, id)
-	if err == nil {
+	meta, err := s.userMeta.FindOne(ctx, adapter.Eq("user_id", id))
+	if err == nil && meta != nil {
 		res.ExternalID = meta.ExternalID
 		res.Active = meta.Active
 		if meta.GivenName != "" || meta.FamilyName != "" {
@@ -135,12 +167,16 @@ func (s *service) UpdateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		return nil, ErrNotFound
 	}
 
-	u, err := s.ctx.Store().Users().GetByID(ctx, res.ID)
-	if err != nil {
+	if s.ctx == nil || s.ctx.Store() == nil || s.ctx.Store().Users() == nil {
 		return nil, ErrNotFound
 	}
 
-	now := s.ctx.Now()
+	u, err := s.ctx.Store().Users().GetByID(ctx, res.ID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+
+	now := s.now()
 	if res.UserName != "" && res.UserName != u.Email {
 		u.Email = res.UserName
 		u.UpdatedAt = now
@@ -149,9 +185,9 @@ func (s *service) UpdateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		}
 	}
 
-	meta, _ := s.store.GetUserMetadata(ctx, res.ID)
+	meta, _ := s.userMeta.FindOne(ctx, adapter.Eq("user_id", res.ID))
 	if meta == nil {
-		meta = &store.UserMetadata{
+		meta = &UserMetadata{
 			UserID:    res.ID,
 			CreatedAt: now,
 		}
@@ -163,7 +199,7 @@ func (s *service) UpdateUser(ctx context.Context, res *v2.UserResource) (*v2.Use
 		meta.GivenName = res.Name.GivenName
 		meta.FamilyName = res.Name.FamilyName
 	}
-	_ = s.store.SaveUserMetadata(ctx, meta)
+	_ = s.saveUserMetadata(ctx, meta)
 
 	return s.GetUser(ctx, res.ID)
 }
@@ -172,8 +208,11 @@ func (s *service) DeleteUser(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrNotFound
 	}
-	_ = s.store.DeleteUserMetadata(ctx, id)
-	return s.ctx.Store().Users().Delete(ctx, id)
+	_, _ = s.userMeta.Delete(ctx, adapter.Eq("user_id", id))
+	if s.ctx != nil && s.ctx.Store() != nil && s.ctx.Store().Users() != nil {
+		return s.ctx.Store().Users().Delete(ctx, id)
+	}
+	return nil
 }
 
 func (s *service) ListUsers(ctx context.Context, startIndex, count int) (*v2.ListResponse, error) {
@@ -184,7 +223,6 @@ func (s *service) ListUsers(ctx context.Context, startIndex, count int) (*v2.Lis
 		startIndex = 1
 	}
 
-	// For SCIM compliance we construct a ListResponse
 	return &v2.ListResponse{
 		Schemas:      []string{v2.SchemaListResponse},
 		TotalResults: 0,
@@ -199,9 +237,9 @@ func (s *service) CreateGroup(ctx context.Context, res *v2.GroupResource) (*v2.G
 		return nil, ErrInvalidRequest
 	}
 
-	now := s.ctx.Now()
+	now := s.now()
 	gID := generateID("grp")
-	rec := &store.GroupRecord{
+	rec := &GroupRecord{
 		ID:          gID,
 		DisplayName: res.DisplayName,
 		CreatedAt:   now,
@@ -211,7 +249,7 @@ func (s *service) CreateGroup(ctx context.Context, res *v2.GroupResource) (*v2.G
 		rec.MemberIDs = append(rec.MemberIDs, m.Value)
 	}
 
-	if err := s.store.CreateGroup(ctx, rec); err != nil {
+	if err := s.groups.Create(ctx, rec); err != nil {
 		return nil, err
 	}
 
@@ -222,9 +260,12 @@ func (s *service) GetGroup(ctx context.Context, id string) (*v2.GroupResource, e
 	if id == "" {
 		return nil, ErrNotFound
 	}
-	rec, err := s.store.GetGroup(ctx, id)
-	if err != nil {
+	rec, err := s.groups.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) || rec == nil {
 		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	members := make([]v2.GroupMember, len(rec.MemberIDs))
@@ -250,21 +291,34 @@ func (s *service) UpdateGroup(ctx context.Context, res *v2.GroupResource) (*v2.G
 		return nil, ErrNotFound
 	}
 
-	rec, err := s.store.GetGroup(ctx, res.ID)
-	if err != nil {
+	rec, err := s.groups.FindOne(ctx, adapter.Eq("id", res.ID))
+	if errors.Is(err, adapter.ErrNotFound) || rec == nil {
 		return nil, ErrNotFound
 	}
+	if err != nil {
+		return nil, err
+	}
 
+	now := s.now()
 	rec.DisplayName = res.DisplayName
-	rec.UpdatedAt = s.ctx.Now()
+	rec.UpdatedAt = now
 	rec.MemberIDs = nil
 	for _, m := range res.Members {
 		rec.MemberIDs = append(rec.MemberIDs, m.Value)
 	}
 
-	if err := s.store.UpdateGroup(ctx, rec); err != nil {
+	affected, err := s.groups.Update(ctx, []adapter.Condition{adapter.Eq("id", res.ID)}, map[string]any{
+		"display_name": rec.DisplayName,
+		"member_ids":   rec.MemberIDs,
+		"updated_at":   now,
+	})
+	if err != nil {
 		return nil, err
 	}
+	if affected == 0 {
+		return nil, ErrNotFound
+	}
+
 	return s.GetGroup(ctx, res.ID)
 }
 
@@ -272,11 +326,20 @@ func (s *service) DeleteGroup(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrNotFound
 	}
-	return s.store.DeleteGroup(ctx, id)
+	affected, err := s.groups.Delete(ctx, adapter.Eq("id", id))
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *service) ListGroups(ctx context.Context, startIndex, count int) (*v2.ListResponse, error) {
-	groups, err := s.store.ListGroups(ctx)
+	groups, err := s.groups.FindMany(ctx, adapter.Query{
+		Model: ModelSCIMGroups,
+	})
 	if err != nil {
 		return nil, err
 	}

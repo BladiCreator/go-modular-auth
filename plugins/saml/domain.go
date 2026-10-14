@@ -4,15 +4,133 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-saml/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
-type IdPConfig = store.IdPConfig
-type RequestSession = store.RequestSession
-type AttributeMapping = store.AttributeMapping
+// Model constants for schema registration.
+const (
+	ModelSAMLIdPs       = "saml_idps"
+	ModelSAMLRequests   = "saml_requests"
+	ModelSAMLAssertions = "saml_assertions"
+)
+
+// AttributeMapping defines how SAML attribute names map to normalized user profile attributes.
+type AttributeMapping struct {
+	EmailAttr     string            `json:"email_attr"`
+	NameAttr      string            `json:"name_attr"`
+	FirstNameAttr string            `json:"first_name_attr,omitempty"`
+	LastNameAttr  string            `json:"last_name_attr,omitempty"`
+	GroupsAttr    string            `json:"groups_attr,omitempty"`
+	Custom        map[string]string `json:"custom,omitempty"`
+}
+
+// IdPConfig holds the configuration for a remote SAML 2.0 Identity Provider.
+type IdPConfig struct {
+	ID               string           `json:"id"`
+	OrganizationID   string           `json:"organization_id,omitempty"`
+	EntityID         string           `json:"entity_id"`
+	SSOURL           string           `json:"sso_url"`
+	SLOURL           string           `json:"slo_url,omitempty"`
+	Certificates     []string         `json:"certificates"`
+	SPEntityID       string           `json:"sp_entity_id,omitempty"`
+	ACSURL           string           `json:"acs_url,omitempty"`
+	NameIDFormat     string           `json:"name_id_format,omitempty"`
+	SignRequest      bool             `json:"sign_request,omitempty"`
+	AllowUnsolicited bool             `json:"allow_unsolicited,omitempty"`
+	ClockSkew        time.Duration    `json:"clock_skew,omitempty"`
+	AttributeMapping AttributeMapping `json:"attribute_mapping"`
+	Enabled          bool             `json:"enabled"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
+}
+
+// RequestSession stores ephemeral state for an in-flight SAML AuthnRequest.
+type RequestSession struct {
+	ID             string     `json:"id"`
+	RelayState     string     `json:"relay_state"`
+	ProviderID     string     `json:"provider_id"`
+	OrganizationID string     `json:"organization_id,omitempty"`
+	RedirectURI    string     `json:"redirect_uri,omitempty"`
+	ConsumedAt     *time.Time `json:"consumed_at,omitempty"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+// Expired reports whether the request session has expired relative to the given time.
+func (s *RequestSession) Expired(now time.Time) bool {
+	return s != nil && !s.ExpiresAt.IsZero() && !now.Before(s.ExpiresAt)
+}
+
+// IsConsumed reports whether the request session has already been redeemed.
+func (s *RequestSession) IsConsumed() bool {
+	return s != nil && s.ConsumedAt != nil
+}
+
+// AssertionRecord tracks processed SAML assertions to prevent replay attacks.
+type AssertionRecord struct {
+	ID         string    `json:"id"`
+	ProviderID string    `json:"provider_id"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// RegisterSchema registers all database models required by the SAML plugin.
+func RegisterSchema(s *schema.Schema) error {
+	mIdPs := schema.NewModel(ModelSAMLIdPs, ModelSAMLIdPs, "id")
+	_ = mIdPs.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mIdPs.AddField(schema.Field{Name: "organization_id", Type: schema.TypeString})
+	_ = mIdPs.AddField(schema.Field{Name: "entity_id", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mIdPs.AddField(schema.Field{Name: "sso_url", Type: schema.TypeString, Required: true})
+	_ = mIdPs.AddField(schema.Field{Name: "slo_url", Type: schema.TypeString})
+	_ = mIdPs.AddField(schema.Field{Name: "certificates", Type: schema.TypeJSON})
+	_ = mIdPs.AddField(schema.Field{Name: "sp_entity_id", Type: schema.TypeString})
+	_ = mIdPs.AddField(schema.Field{Name: "acs_url", Type: schema.TypeString})
+	_ = mIdPs.AddField(schema.Field{Name: "name_id_format", Type: schema.TypeString})
+	_ = mIdPs.AddField(schema.Field{Name: "sign_request", Type: schema.TypeBool})
+	_ = mIdPs.AddField(schema.Field{Name: "allow_unsolicited", Type: schema.TypeBool})
+	_ = mIdPs.AddField(schema.Field{Name: "clock_skew", Type: schema.TypeInt64})
+	_ = mIdPs.AddField(schema.Field{Name: "attribute_mapping", Type: schema.TypeJSON})
+	_ = mIdPs.AddField(schema.Field{Name: "enabled", Type: schema.TypeBool})
+	_ = mIdPs.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	_ = mIdPs.AddField(schema.Field{Name: "updated_at", Type: schema.TypeTime, Required: true})
+	mIdPs.Indexes = []schema.Index{
+		{Name: "idx_saml_idps_entity_id", Fields: []string{"entity_id"}, Unique: true},
+		{Name: "idx_saml_idps_org_id", Fields: []string{"organization_id"}},
+	}
+	if err := s.AddModel(mIdPs); err != nil {
+		return err
+	}
+
+	mReqs := schema.NewModel(ModelSAMLRequests, ModelSAMLRequests, "id")
+	_ = mReqs.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mReqs.AddField(schema.Field{Name: "relay_state", Type: schema.TypeString})
+	_ = mReqs.AddField(schema.Field{Name: "provider_id", Type: schema.TypeString, Required: true})
+	_ = mReqs.AddField(schema.Field{Name: "organization_id", Type: schema.TypeString})
+	_ = mReqs.AddField(schema.Field{Name: "redirect_uri", Type: schema.TypeString})
+	_ = mReqs.AddField(schema.Field{Name: "consumed_at", Type: schema.TypeTime})
+	_ = mReqs.AddField(schema.Field{Name: "expires_at", Type: schema.TypeTime, Required: true})
+	_ = mReqs.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	mReqs.Indexes = []schema.Index{
+		{Name: "idx_saml_requests_relay_state", Fields: []string{"relay_state"}},
+		{Name: "idx_saml_requests_expires", Fields: []string{"expires_at"}},
+	}
+	if err := s.AddModel(mReqs); err != nil {
+		return err
+	}
+
+	mAsserts := schema.NewModel(ModelSAMLAssertions, ModelSAMLAssertions, "id")
+	_ = mAsserts.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mAsserts.AddField(schema.Field{Name: "provider_id", Type: schema.TypeString, Required: true})
+	_ = mAsserts.AddField(schema.Field{Name: "expires_at", Type: schema.TypeTime, Required: true})
+	_ = mAsserts.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	mAsserts.Indexes = []schema.Index{
+		{Name: "idx_saml_assertions_expires", Fields: []string{"expires_at"}},
+	}
+	return s.AddModel(mAsserts)
+}
 
 // Binding denotes SAML 2.0 protocol binding profiles.
 type Binding string

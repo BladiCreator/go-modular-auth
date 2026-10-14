@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
-	otpstore "github.com/BladiCreator/go-modular-auth-email-otp/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/store"
@@ -17,7 +17,7 @@ import (
 type service struct {
 	ctx     *sdk.Context
 	cfg     Config
-	store   otpstore.Store
+	otps    *sdk.Repository[OTPRecord]
 	sender  email.Sender
 	limiter *cache.Limiter
 	hooks   *Hooks
@@ -29,7 +29,7 @@ func newService(ctx *sdk.Context, cfg Config, sender email.Sender) *service {
 	return &service{
 		ctx:     ctx,
 		cfg:     cfg,
-		store:   cfg.Store,
+		otps:    sdk.Model[OTPRecord](ctx, ModelEmailOTPs),
 		sender:  sender,
 		limiter: cache.NewLimiter(ctx.Cache(), cfg.RateLimit.FailurePolicy, ctx.Now),
 		hooks:   cfg.Hooks,
@@ -92,7 +92,7 @@ func (s *service) Request(ctx context.Context, in RequestInput) error {
 
 func (s *service) dispatchOTP(ctx context.Context, emailAddress, subject string) error {
 	if s.cfg.RevokePreviousOnRequest {
-		_ = s.store.RevokeByEmail(ctx, emailAddress)
+		_ = s.Revoke(ctx, emailAddress)
 	}
 
 	code, err := GenerateCode(s.cfg.OTPLength)
@@ -111,7 +111,7 @@ func (s *service) dispatchOTP(ctx context.Context, emailAddress, subject string)
 	}
 
 	now := s.ctx.Now()
-	rec := &otpstore.Record{
+	rec := &OTPRecord{
 		ID:          id,
 		Email:       emailAddress,
 		Subject:     subject,
@@ -124,7 +124,7 @@ func (s *service) dispatchOTP(ctx context.Context, emailAddress, subject string)
 		CreatedAt:   now,
 	}
 
-	if err := s.store.Create(ctx, rec); err != nil {
+	if err := s.otps.Create(ctx, rec); err != nil {
 		return err
 	}
 
@@ -167,14 +167,23 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 	}
 
 	now := s.ctx.Now()
-	rec, err := s.store.GetActiveByEmail(ctx, normEmail, now)
-	if errors.Is(err, otpstore.ErrNotFound) {
-		s.publishRejected(ctx, normEmail, "not_found", 0)
-		return nil, ErrInvalidCode
-	}
+	recs, err := s.otps.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{
+			adapter.Eq("email", normEmail),
+			adapter.IsNull("used_at"),
+		},
+		SortBy: "created_at",
+		Desc:   true,
+		Limit:  1,
+	})
 	if err != nil {
 		return nil, err
 	}
+	if len(recs) == 0 {
+		s.publishRejected(ctx, normEmail, "not_found", 0)
+		return nil, ErrInvalidCode
+	}
+	rec := &recs[0]
 
 	if rec.Expired(now) {
 		s.publishRejected(ctx, normEmail, "expired", rec.Attempts)
@@ -188,35 +197,40 @@ func (s *service) Verify(ctx context.Context, in VerifyInput) (*auth.AuthResult,
 
 	// Constant-time comparison
 	if !CompareOTP(in.Code, rec.OTPHash, rec.Salt) {
-		attempts, incErr := s.store.IncrementAttempts(ctx, rec.ID)
+		newAttempts := rec.Attempts + 1
+		_, incErr := s.otps.Update(ctx, []adapter.Condition{adapter.Eq("id", rec.ID)}, map[string]any{"attempts": newAttempts})
 		if incErr != nil {
 			return nil, incErr
 		}
 
-		if attempts >= rec.MaxAttempts {
-			s.publishRejected(ctx, normEmail, "max_attempts_exceeded", attempts)
+		if newAttempts >= rec.MaxAttempts {
+			s.publishRejected(ctx, normEmail, "max_attempts_exceeded", newAttempts)
 			return nil, &VerificationError{
 				Reason:   "max_attempts_exceeded",
-				Attempts: attempts,
+				Attempts: newAttempts,
 				Err:      ErrMaxAttemptsExceeded,
 			}
 		}
 
-		s.publishRejected(ctx, normEmail, "invalid_code", attempts)
+		s.publishRejected(ctx, normEmail, "invalid_code", newAttempts)
 		return nil, &VerificationError{
 			Reason:   "invalid_code",
-			Attempts: attempts,
+			Attempts: newAttempts,
 			Err:      ErrInvalidCode,
 		}
 	}
 
 	// Atomic consumption: single-use guarantee and race-condition prevention
-	if err := s.store.MarkUsed(ctx, rec.ID, now); err != nil {
-		if errors.Is(err, otpstore.ErrConflict) {
-			s.publishRejected(ctx, normEmail, "already_used", rec.Attempts)
-			return nil, ErrCodeAlreadyUsed
-		}
+	affected, err := s.otps.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", rec.ID),
+		adapter.IsNull("used_at"),
+	}, map[string]any{"used_at": now})
+	if err != nil {
 		return nil, err
+	}
+	if affected == 0 {
+		s.publishRejected(ctx, normEmail, "already_used", rec.Attempts)
+		return nil, ErrCodeAlreadyUsed
 	}
 
 	u, err := s.resolveUser(ctx, rec.Subject)
@@ -344,5 +358,10 @@ func (s *service) Revoke(ctx context.Context, email string) error {
 		return ErrInvalidEmail
 	}
 
-	return s.store.RevokeByEmail(ctx, normEmail)
+	now := s.ctx.Now()
+	_, err = s.otps.Update(ctx, []adapter.Condition{
+		adapter.Eq("email", normEmail),
+		adapter.IsNull("used_at"),
+	}, map[string]any{"used_at": now})
+	return err
 }

@@ -223,8 +223,8 @@ The plugin publishes domain events to GoModularAuth's event bus after successful
 PostgreSQL DDL migrations are located in `migrations/001_create_organizations_tables.sql`.
 
 Tables created:
-- `auth_organizations`: Tenant boundaries and metadata.
-- `auth_organization_memberships`: User-to-organization relationships, roles, and status.
-- `auth_organization_teams`: Department and sub-team boundaries.
-- `auth_organization_team_members`: User enrollment in teams.
-- `auth_organization_invitations`: Pending invitations with secure token hashes.
+- `organizations`: Tenant boundaries and metadata.
+- `organization_memberships`: User-to-organization relationships, roles, and status.
+- `organization_teams`: Department and sub-team boundaries.
+- `organization_team_members`: User enrollment in teams.
+- `organization_invitations`: Pending invitations with secure token hashes.

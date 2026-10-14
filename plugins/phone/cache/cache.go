@@ -1,4 +1,3 @@
-// Package cache provides rate limiting, cooldown, and ephemeral caching abstractions for phone authentication.
 package cache
 
 import (
@@ -9,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-phone/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 
@@ -138,72 +136,4 @@ func (l *Limiter) CheckAndSetCooldown(ctx context.Context, phone string, cooldow
 
 	l.memCounts[key] = memEntry{count: 1, expiresAt: now.Add(cooldown)}
 	return true, nil
-}
-
-// PhoneCache accelerates read queries for PhoneRecords with automatic invalidation.
-type PhoneCache struct {
-	cache corecache.Cache
-	ttl   time.Duration
-}
-
-// NewPhoneCache creates a PhoneCache adapter.
-func NewPhoneCache(c corecache.Cache, ttl time.Duration) *PhoneCache {
-	return &PhoneCache{cache: c, ttl: ttl}
-}
-
-// GetByUserID retrieves a cached phone record by user ID.
-func (c *PhoneCache) GetByUserID(ctx context.Context, userID string) (*store.PhoneRecord, error) {
-	if c.cache == nil || c.ttl <= 0 {
-		return nil, corecache.ErrMiss
-	}
-	key := corecache.Key("phone", "user", HashIdentifier(userID))
-	var p store.PhoneRecord
-	if err := c.cache.Get(ctx, key, &p); err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-// SetByUserID caches a phone record by user ID.
-func (c *PhoneCache) SetByUserID(ctx context.Context, userID string, p *store.PhoneRecord) error {
-	if c.cache == nil || c.ttl <= 0 || p == nil {
-		return nil
-	}
-	key := corecache.Key("phone", "user", HashIdentifier(userID))
-	return c.cache.Set(ctx, key, *p, c.ttl)
-}
-
-// GetByNumber retrieves a cached phone record by phone number.
-func (c *PhoneCache) GetByNumber(ctx context.Context, phone string) (*store.PhoneRecord, error) {
-	if c.cache == nil || c.ttl <= 0 {
-		return nil, corecache.ErrMiss
-	}
-	key := corecache.Key("phone", "num", HashIdentifier(phone))
-	var p store.PhoneRecord
-	if err := c.cache.Get(ctx, key, &p); err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-// SetByNumber caches a phone record by phone number.
-func (c *PhoneCache) SetByNumber(ctx context.Context, phone string, p *store.PhoneRecord) error {
-	if c.cache == nil || c.ttl <= 0 || p == nil {
-		return nil
-	}
-	key := corecache.Key("phone", "num", HashIdentifier(phone))
-	return c.cache.Set(ctx, key, *p, c.ttl)
-}
-
-// Invalidate invalidates cached phone records for both user ID and phone number.
-func (c *PhoneCache) Invalidate(ctx context.Context, userID, phone string) {
-	if c.cache == nil {
-		return
-	}
-	if userID != "" {
-		_ = c.cache.Delete(ctx, corecache.Key("phone", "user", HashIdentifier(userID)))
-	}
-	if phone != "" {
-		_ = c.cache.Delete(ctx, corecache.Key("phone", "num", HashIdentifier(phone)))
-	}
 }

@@ -2,88 +2,115 @@
 
 ## 1. Principles of the Cache Adapter
 
-The **Cache Adapter** provides optional, non-authoritative acceleration:
+The **Cache Adapter** is an optional acceleration layer designed to minimize read latency on high-throughput authentication paths.
 
-- **Store = Source of Truth**: The cache is purely a performance optimization. Data loss in the cache must not corrupt or compromise the system.
-- **Cache is Optional**: If `Config.Cache` is omitted (`nil`), GoModularAuth functions completely and queries the Store directly.
-- **Fail-Open Resilience**: If the cache backend (e.g. Redis/Valkey cluster) crashes or encounters network timeouts, the core logs a warning and degrades seamlessly to the Store without failing requests.
-- **Never Store Secrets Directly**: Plaintext tokens or raw passwords are never cached or used as cache keys. Only SHA-256 token hashes are used as keys.
+- **Non-Authoritative**: The cache is never the source of truth. If the cache is omitted, unpopulated, or offline, GoModularAuth continues to operate seamlessly by querying the Store directly.
+- **Cache-Aside Pattern**: Reads query the cache first; on a cache miss, the core reads from the Store and populates the cache.
+- **Post-Commit Invalidation**: Mutations and revocations update the Store first. Upon transaction commit, the cache entries are evicted or updated.
+- **Bounded TTL**: Cache TTLs are strictly bounded by the entity's remaining lifetime: `effectiveTTL = min(Config.CacheTTL, remaining entity lifetime)`.
+- **Hashed Keys**: Plaintext secrets or raw bearer tokens are **never** used as cache keys. Keys are derived from SHA-256 hashes.
 
 ---
 
-## 2. Infrastructure Contract: `cache.Cache`
+## 2. Contracts: `cache.Cache` & `cache.Counter`
 
 ```go
+package cache
+
 type Cache interface {
-    Get(ctx context.Context, key string, value any) error
+    Get(ctx context.Context, key string, dest any) error
     Set(ctx context.Context, key string, value any, ttl time.Duration) error
     Delete(ctx context.Context, key string) error
 }
+
+type Counter interface {
+    Increment(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, error)
+}
 ```
 
-### Key Rules for Implementations
-1. **Mandatory TTL**: `Set` must enforce `ttl > 0`. Entries without expiration are forbidden to prevent memory leaks and infinite stale data.
-2. **Serialization Boundary**: Implementations should serialize values (e.g. JSON or MessagePack) to emulate distributed cache semantics and prevent struct reference aliasing.
-3. **Miss Sentinel**: When a key does not exist or has expired, `Get` must return `cache.ErrMiss`.
+### 2.1 Namespacing Helper
+All keys written by the engine use the root prefix `gomodularauth:`:
+
+```go
+// Returns "gomodularauth:session:<hash>"
+key := cache.Key("session", tokenHash)
+
+// Plugins namespace their own entries
+key := cache.Key("organizations", "member", orgID, userID)
+```
 
 ---
 
 ## 3. Semantic Caches
 
-Rather than spreading raw string keys throughout the codebase, GoModularAuth wraps `cache.Cache` with semantic interfaces:
+GoModularAuth wraps the generic `cache.Cache` in type-safe semantic wrappers:
 
-### 3.1 `SessionCache`
-```go
-type SessionCache interface {
-    Get(ctx context.Context, tokenHash string) (*session.Session, error)
-    Set(ctx context.Context, s *session.Session, ttl time.Duration) error
-    Delete(ctx context.Context, tokenHash string) error
-}
-```
-Constructed via `cache.NewSessionCache(c)`. Keys follow `gomodularauth:session:<tokenHash>`.
-
-### 3.2 `UserCache`
-```go
-type UserCache interface {
-    Get(ctx context.Context, id string) (*user.User, error)
-    Set(ctx context.Context, u *user.User, ttl time.Duration) error
-    Delete(ctx context.Context, id string) error
-}
-```
-Constructed via `cache.NewUserCache(c)`. Keys follow `gomodularauth:user:<id>`.
+- **`SessionCache` (`cache.NewSessionCache`)**:
+  Caches active `session.Session` records indexed by token hash. When a session is revoked or signed out, `a.invalidateSessions()` evicts the session from cache immediately.
+- **`UserCache` (`cache.NewUserCache`)**:
+  Caches `user.User` domain records indexed by User ID.
 
 ---
 
-## 4. Cache-Aside and Invalidation Flow
+## 4. Official Cache Adapters
 
-### Read Path (`GetSession`, `GetUser`)
-1. Derive key from SHA-256 hash or user ID.
-2. Query `cache.Get`.
-3. If **HIT**: Return cached entity immediately.
-4. If **MISS** (or cache error):
-   - Query authoritative Store.
-   - If found and active: Calculate `min(Config.CacheTTL, remainingEntityLifetime)`.
-   - Call `cache.Set` with calculated TTL.
-   - Return entity.
-
-### Write / Invalidation Path
-1. Execute database mutation inside `Store.Transaction(...)`.
-2. Commit database transaction.
-3. **Post-Commit Invalidation**: Explicitly invoke `cache.Delete` for modified or revoked entities.
-
-> **Important**: Cache invalidation occurs **after** the database commit. It is never included as part of an ACID database transaction.
-
----
-
-## 5. Distributed Counters (`cache.Counter`)
-
-Plugins like **Rate Limiting** can optionally take advantage of `cache.Counter`:
+### 4.1 Redis Adapter (`adapters/redis`)
+Compatible with Redis clients such as `github.com/redis/go-redis/v9`:
 
 ```go
-type Counter interface {
-    Increment(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, error)
+package main
+
+import (
+    "context"
+    "time"
+
+    "github.com/BladiCreator/go-modular-auth/adapters/redis"
+    goredis "github.com/redis/go-redis/v9"
+)
+
+type redisClientWrapper struct {
+    rdb *goredis.Client
+}
+
+func (w *redisClientWrapper) Get(ctx context.Context, key string) ([]byte, error) {
+    return w.rdb.Get(ctx, key).Bytes()
+}
+
+func (w *redisClientWrapper) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+    return w.rdb.Set(ctx, key, value, ttl).Err()
+}
+
+func (w *redisClientWrapper) Del(ctx context.Context, keys ...string) error {
+    return w.rdb.Del(ctx, keys...).Err()
+}
+
+func (w *redisClientWrapper) IncrBy(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, error) {
+    val, err := w.rdb.IncrBy(ctx, key, delta).Result()
+    if err == nil {
+        w.rdb.Expire(ctx, key, ttl)
+    }
+    return val, err
+}
+
+func NewRedisCache(rdb *goredis.Client) *redis.Cache {
+    return redis.New(&redisClientWrapper{rdb: rdb})
 }
 ```
-- Implements fixed-window counters.
-- If the key does not exist, it is initialized with `delta` and bound to `ttl`.
-- Supported out-of-the-box by `cache/memory` and standard Redis/Valkey adapters via atomic `INCRBY` + `EXPIRE`.
+
+### 4.2 Valkey Adapter (`adapters/valkey`)
+Valkey is a high-performance open-source fork of Redis:
+
+```go
+import "github.com/BladiCreator/go-modular-auth/adapters/valkey"
+
+cacheAdapter := valkey.New(clientWrapper)
+```
+
+### 4.3 In-Memory Cache (`adapters/memory`)
+Thread-safe in-memory cache featuring automatic TTL expiration and atomic counter increments:
+
+```go
+import "github.com/BladiCreator/go-modular-auth/adapters/memory"
+
+cacheAdapter := memory.NewCache()
+```

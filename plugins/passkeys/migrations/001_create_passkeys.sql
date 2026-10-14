@@ -1,8 +1,8 @@
 -- Migration: 001_create_passkeys.sql
--- Description: Creates auth_passkeys and auth_passkey_challenges tables for the GoModularAuth Passkey plugin.
+-- Description: Creates passkeys and passkey_challenges tables for the GoModularAuth Passkey plugin.
 -- Compatible with PostgreSQL, SQLite, and MySQL.
 
-CREATE TABLE IF NOT EXISTS auth_passkeys (
+CREATE TABLE IF NOT EXISTS passkeys (
     id VARCHAR(255) NOT NULL PRIMARY KEY,
     credential_id BYTEA NOT NULL,
     user_id VARCHAR(64) NOT NULL,
@@ -22,13 +22,13 @@ CREATE TABLE IF NOT EXISTS auth_passkeys (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_used_at TIMESTAMP WITH TIME ZONE NULL,
     revoked_at TIMESTAMP WITH TIME ZONE NULL,
-    CONSTRAINT fk_auth_passkeys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_passkeys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_passkeys_user_id ON auth_passkeys(user_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_auth_passkeys_credential_id ON auth_passkeys(credential_id);
+CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_passkeys_credential_id ON passkeys(credential_id);
 
-CREATE TABLE IF NOT EXISTS auth_passkey_challenges (
+CREATE TABLE IF NOT EXISTS passkey_challenges (
     id VARCHAR(128) NOT NULL PRIMARY KEY,
     type VARCHAR(32) NOT NULL,
     user_id VARCHAR(64) NOT NULL DEFAULT '',
@@ -39,4 +39,4 @@ CREATE TABLE IF NOT EXISTS auth_passkey_challenges (
     consumed_at TIMESTAMP WITH TIME ZONE NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_passkey_challenges_expires ON auth_passkey_challenges(expires_at);
+CREATE INDEX IF NOT EXISTS idx_passkey_challenges_expires ON passkey_challenges(expires_at);

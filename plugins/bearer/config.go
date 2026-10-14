@@ -2,9 +2,6 @@ package bearer
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-bearer/store"
-	"github.com/BladiCreator/go-modular-auth-bearer/store/memory"
 )
 
 const (
@@ -17,10 +14,6 @@ const (
 
 // Config configures the bearer token authentication plugin.
 type Config struct {
-	// Store is the persistence store for bearer token records.
-	// If nil, defaults to an in-memory store (convenient for testing and development).
-	Store store.Store
-
 	// DefaultTTL specifies the default expiration duration for newly issued tokens.
 	DefaultTTL time.Duration
 
@@ -36,13 +29,6 @@ type Config struct {
 
 // Option configures a Config struct.
 type Option func(*Config)
-
-// WithStore sets the persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithDefaultTTL sets the default token expiration duration.
 func WithDefaultTTL(d time.Duration) Option {
@@ -73,9 +59,6 @@ func WithHooks(h *Hooks) Option {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.DefaultTTL <= 0 {
 		c.DefaultTTL = DefaultTokenTTL
 	}

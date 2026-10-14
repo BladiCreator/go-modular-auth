@@ -11,8 +11,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
-	"github.com/BladiCreator/go-modular-auth-oauth/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -21,7 +21,7 @@ import (
 type service struct {
 	ctx       *sdk.Context
 	cfg       Config
-	store     store.Store
+	states    *sdk.Repository[StateSession]
 	providers map[string]provider.Provider
 	hooks     *Hooks
 }
@@ -32,10 +32,37 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
 		ctx:       ctx,
 		cfg:       cfg,
-		store:     cfg.Store,
+		states:    sdk.Model[StateSession](ctx, ModelOAuthStates),
 		providers: cfg.Providers,
 		hooks:     cfg.Hooks,
 	}
+}
+
+func (s *service) consumeState(ctx context.Context, state string, now time.Time) (*StateSession, error) {
+	if state == "" {
+		return nil, ErrStateNotFound
+	}
+	sess, err := s.states.FindOne(ctx, adapter.Eq("state", state))
+	if errors.Is(err, adapter.ErrNotFound) || sess == nil {
+		return nil, ErrStateNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if sess.Consumed() {
+		return nil, ErrStateAlreadyConsumed
+	}
+	if sess.Expired(now) {
+		return nil, ErrStateExpired
+	}
+	sess.ConsumedAt = &now
+	_, err = s.states.Update(ctx, []adapter.Condition{adapter.Eq("state", state)}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return sess, nil
 }
 
 func (s *service) now() time.Time {
@@ -104,18 +131,18 @@ func (s *service) BeginAuth(ctx context.Context, in BeginAuthInput) (*BeginAuthR
 	now := s.now()
 	expiresAt := now.Add(s.cfg.StateTTL)
 
-	stateSess := &store.StateSession{
+	stateSess := &StateSession{
 		State:        state,
 		Provider:     in.Provider,
 		RedirectURI:  in.RedirectURI,
 		CodeVerifier: codeVerifier,
-		Action:       store.ActionSignIn,
+		Action:       ActionSignIn,
 		Metadata:     in.Metadata,
 		ExpiresAt:    expiresAt,
 		CreatedAt:    now,
 	}
 
-	if err := s.store.SaveState(ctx, stateSess); err != nil {
+	if err := s.states.Create(ctx, stateSess); err != nil {
 		return nil, fmt.Errorf("oauth: failed to save state session: %w", err)
 	}
 
@@ -140,7 +167,7 @@ func (s *service) BeginAuth(ctx context.Context, in BeginAuthInput) (*BeginAuthR
 	s.publish(ctx, EventOAuthStateCreated, state, StateCreatedPayload{
 		Provider:  in.Provider,
 		State:     state,
-		Action:    string(store.ActionSignIn),
+		Action:    string(ActionSignIn),
 		ExpiresAt: expiresAt,
 	})
 
@@ -214,19 +241,19 @@ func (s *service) BeginLink(ctx context.Context, in BeginLinkInput) (*BeginAuthR
 	now := s.now()
 	expiresAt := now.Add(s.cfg.StateTTL)
 
-	stateSess := &store.StateSession{
+	stateSess := &StateSession{
 		State:        state,
 		Provider:     in.Provider,
 		RedirectURI:  in.RedirectURI,
 		CodeVerifier: codeVerifier,
-		Action:       store.ActionLink,
+		Action:       ActionLink,
 		UserID:       in.UserID,
 		Metadata:     in.Metadata,
 		ExpiresAt:    expiresAt,
 		CreatedAt:    now,
 	}
 
-	if err := s.store.SaveState(ctx, stateSess); err != nil {
+	if err := s.states.Create(ctx, stateSess); err != nil {
 		return nil, fmt.Errorf("oauth: failed to save state session: %w", err)
 	}
 
@@ -251,7 +278,7 @@ func (s *service) BeginLink(ctx context.Context, in BeginLinkInput) (*BeginAuthR
 	s.publish(ctx, EventOAuthStateCreated, state, StateCreatedPayload{
 		Provider:  in.Provider,
 		State:     state,
-		Action:    string(store.ActionLink),
+		Action:    string(ActionLink),
 		UserID:    in.UserID,
 		ExpiresAt: expiresAt,
 	})
@@ -276,18 +303,9 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 	}
 
 	now := s.now()
-	stateSess, err := s.store.ConsumeState(ctx, in.State, now)
+	stateSess, err := s.consumeState(ctx, in.State, now)
 	if err != nil {
 		s.publish(ctx, EventOAuthFailed, in.Provider, FailedPayload{Provider: in.Provider, Reason: "state_consumption_failed"})
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrStateNotFound
-		}
-		if errors.Is(err, store.ErrExpired) {
-			return nil, ErrStateExpired
-		}
-		if errors.Is(err, store.ErrAlreadyConsumed) {
-			return nil, ErrStateAlreadyConsumed
-		}
 		return nil, err
 	}
 
@@ -296,7 +314,7 @@ func (s *service) CompleteAuth(ctx context.Context, in CompleteAuthInput) (*Auth
 		return nil, ErrInvalidState
 	}
 
-	if stateSess.Action != store.ActionSignIn {
+	if stateSess.Action != ActionSignIn {
 		s.publish(ctx, EventOAuthFailed, in.Provider, FailedPayload{Provider: in.Provider, Reason: "action_mismatch"})
 		return nil, fmt.Errorf("%w: expected sign_in, got %s", ErrInvalidAction, stateSess.Action)
 	}
@@ -553,21 +571,12 @@ func (s *service) CompleteLink(ctx context.Context, in CompleteLinkInput) (*Link
 	}
 
 	now := s.now()
-	stateSess, err := s.store.ConsumeState(ctx, in.State, now)
+	stateSess, err := s.consumeState(ctx, in.State, now)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, ErrStateNotFound
-		}
-		if errors.Is(err, store.ErrExpired) {
-			return nil, ErrStateExpired
-		}
-		if errors.Is(err, store.ErrAlreadyConsumed) {
-			return nil, ErrStateAlreadyConsumed
-		}
 		return nil, err
 	}
 
-	if stateSess.Action != store.ActionLink || stateSess.UserID == "" {
+	if stateSess.Action != ActionLink || stateSess.UserID == "" {
 		return nil, fmt.Errorf("%w: expected link action bound to user", ErrInvalidAction)
 	}
 
@@ -711,7 +720,8 @@ func (s *service) GetProvider(name string) (provider.Provider, error) {
 
 // PurgeExpired cleans up expired states from the store.
 func (s *service) PurgeExpired(ctx context.Context) (int, error) {
-	return s.store.DeleteExpiredStates(ctx, s.now())
+	affected, err := s.states.Delete(ctx, adapter.Lt("expires_at", s.now()))
+	return int(affected), err
 }
 
 func generateRandomToken(byteLength int) (string, error) {

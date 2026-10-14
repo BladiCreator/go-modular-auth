@@ -19,9 +19,20 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-sso/store"
 )
+
+// SAMLConfig contains SAML 2.0 specific parameters.
+type SAMLConfig struct {
+	EntityID     string   `json:"entity_id"`
+	SSOURL       string   `json:"sso_url"`
+	SLOURL       string   `json:"slo_url,omitempty"`
+	Certificates []string `json:"certificates"`
+	NameIDFormat string   `json:"name_id_format,omitempty"`
+	SPEntityID   string   `json:"sp_entity_id,omitempty"`
+	SPACSURL     string   `json:"sp_acs_url,omitempty"`
+	SignRequest  bool     `json:"sign_request,omitempty"`
+	ForceAuthn   bool     `json:"force_authn,omitempty"`
+}
 
 var (
 	ErrMalformedResponse      = errors.New("sso saml: malformed response XML")
@@ -187,7 +198,7 @@ type AssertionData struct {
 }
 
 // ParseAndValidateResponse parses, verifies and extracts attributes from a base64 SAMLResponse.
-func ParseAndValidateResponse(rawBase64 string, cfg *store.SAMLConfig, expectedAudience string, now time.Time) (*AssertionData, error) {
+func ParseAndValidateResponse(rawBase64 string, cfg *SAMLConfig, expectedAudience string, now time.Time) (*AssertionData, error) {
 	xmlData, err := base64.StdEncoding.DecodeString(rawBase64)
 	if err != nil {
 		return nil, fmt.Errorf("%w: base64 decode: %v", ErrMalformedResponse, err)

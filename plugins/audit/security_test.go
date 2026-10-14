@@ -112,7 +112,7 @@ func TestSecurity_Sanitizer_NeverStoresSecrets(t *testing.T) {
 
 func TestSecurity_Concurrency_ThreadSafeAudit(t *testing.T) {
 	ctx := context.Background()
-	_, audCap, _ := setupTestAuth(t)
+	_, audCap := setupTestAuth(t)
 
 	var wg sync.WaitGroup
 	workers := 20

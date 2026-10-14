@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-phone/cache"
-	"github.com/BladiCreator/go-modular-auth-phone/store"
-	"github.com/BladiCreator/go-modular-auth-phone/store/memory"
 )
 
 // RateLimitConfig configures throttling and abuse mitigation.
@@ -19,10 +17,6 @@ type RateLimitConfig struct {
 
 // Config defines the configuration for the Phone authentication plugin.
 type Config struct {
-	// Store is the authoritative storage adapter for phone and OTP records.
-	// Defaults to memory.New() if nil.
-	Store store.Store
-
 	// Provider delivers transactional SMS/voice messages.
 	Provider PhoneProvider
 
@@ -61,9 +55,6 @@ type Config struct {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.TTL <= 0 {
 		c.TTL = 5 * time.Minute
 	}
@@ -96,15 +87,6 @@ func (c Config) withDefaults() Config {
 
 // Option applies a functional configuration option.
 type Option func(*Config)
-
-// WithStore sets the authoritative Store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithProvider sets the message delivery provider.
 func WithProvider(p PhoneProvider) Option {

@@ -10,18 +10,18 @@ import (
 	ratelimit "github.com/BladiCreator/go-modular-auth-rate-limit"
 	"github.com/BladiCreator/go-modular-auth-rate-limit/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func setupTestAuth(t *testing.T, opts ...ratelimit.Option) (*auth.Auth, plugins.RateLimit) {
 	t.Helper()
-	cStore := corememory.New()
+	cStore := adaptermem.New()
 	cCache := corecache.New()
 
 	rlModule := ratelimit.New(opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cStore,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{rlModule},
 	})
@@ -204,7 +204,7 @@ func TestRateLimit_CoreHook_Interception(t *testing.T) {
 
 func TestRateLimit_NoCache_InMemoryFallback(t *testing.T) {
 	ctx := context.Background()
-	cStore := corememory.New()
+	cStore := adaptermem.New()
 
 	rlModule := ratelimit.New(
 		ratelimit.WithPolicy(ratelimit.Policy{
@@ -218,7 +218,7 @@ func TestRateLimit_NoCache_InMemoryFallback(t *testing.T) {
 
 	// Host initialized with nil Cache
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: cStore,
 		Cache:   nil,
 		Plugins: []auth.PluginModule{rlModule},
 	})

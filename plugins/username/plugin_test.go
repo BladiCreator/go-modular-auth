@@ -7,7 +7,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-username"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func TestPluginModuleRegistration(t *testing.T) {
@@ -17,7 +17,7 @@ func TestPluginModuleRegistration(t *testing.T) {
 	}
 
 	a, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{mod},
 	})
@@ -51,7 +51,7 @@ func TestCaseSensitiveConfiguration(t *testing.T) {
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{mod},
 	})

@@ -3,11 +3,12 @@ package phone
 import (
 	"context"
 	"errors"
+	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-phone/cache"
-	phonestore "github.com/BladiCreator/go-modular-auth-phone/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
@@ -16,10 +17,9 @@ import (
 type service struct {
 	ctx      *sdk.Context
 	cfg      Config
-	store    phonestore.Store
 	provider PhoneProvider
 	limiter  *cache.Limiter
-	cache    *cache.PhoneCache
+	cache    *PhoneCache
 	hooks    *Hooks
 }
 
@@ -29,10 +29,9 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
 		ctx:      ctx,
 		cfg:      cfg,
-		store:    cfg.Store,
 		provider: cfg.Provider,
 		limiter:  cache.NewLimiter(ctx.Cache(), cfg.RateLimit.FailurePolicy, ctx.Now),
-		cache:    cache.NewPhoneCache(ctx.Cache(), cfg.CacheTTL),
+		cache:    NewPhoneCache(ctx.Cache(), cfg.CacheTTL),
 		hooks:    cfg.Hooks,
 	}
 }
@@ -86,8 +85,8 @@ func (s *service) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 		}
 	}
 
-	existing, err := s.store.GetPhoneByNumber(ctx, normPhone)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	existing, err := s.getPhoneByNumber(ctx, normPhone)
+	if errors.Is(err, ErrPhoneNotFound) {
 		if !s.cfg.AllowSignUp {
 			// ENUMERATION PROTECTION:
 			// Unknown phone returns nil so callers cannot deduce whether the phone exists.
@@ -122,8 +121,8 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 	}
 
 	now := s.ctx.Now()
-	rec, err := s.store.GetActiveOTP(ctx, normPhone, PurposeAuthenticate, now)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	rec, err := s.getActiveOTP(ctx, normPhone, PurposeAuthenticate, now)
+	if errors.Is(err, adapter.ErrNotFound) {
 		s.publishRejected(ctx, normPhone, "not_found", 0)
 		return nil, ErrInvalidCode
 	}
@@ -148,7 +147,7 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 
 	// Constant-time hash verification
 	if !CompareOTP(in.Code, rec.OTPHash, rec.Salt) {
-		attempts, incErr := s.store.IncrementOTPAttempts(ctx, rec.ID)
+		attempts, incErr := s.incrementOTPAttempts(ctx, rec.ID)
 		if incErr != nil {
 			return nil, incErr
 		}
@@ -171,8 +170,8 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 	}
 
 	// Atomic consumption preventing replay and concurrency races
-	if err := s.store.MarkOTPUsed(ctx, rec.ID, now); err != nil {
-		if errors.Is(err, phonestore.ErrConflict) {
+	if err := s.markOTPUsed(ctx, rec.ID, now); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			s.publishRejected(ctx, normPhone, "already_used", rec.Attempts)
 			return nil, ErrCodeAlreadyUsed
 		}
@@ -198,7 +197,7 @@ func (s *service) VerifyOTP(ctx context.Context, in VerifyOTPInput) (*auth.AuthR
 	s.ctx.Events().Publish(ctx, auth.Event{
 		Name:    EventPhoneOTPVerified,
 		Time:    now,
-		Subject: u.ID,
+		Subject: normPhone,
 		Payload: OTPVerifiedPayload{
 			UserID:      u.ID,
 			PhoneNumber: normPhone,
@@ -232,22 +231,22 @@ func (s *service) RequestVerification(ctx context.Context, in RequestVerificatio
 		return ErrUserNotFound
 	}
 
-	existing, err := s.store.GetPhoneByNumber(ctx, normPhone)
+	existing, err := s.getPhoneByNumber(ctx, normPhone)
 	if err == nil && existing.UserID != in.UserID {
 		return ErrPhoneAlreadyExists
 	}
-	if err != nil && !errors.Is(err, phonestore.ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrPhoneNotFound) {
 		return err
 	}
 
 	now := s.ctx.Now()
-	userPhone, err := s.store.GetPhoneByUserID(ctx, in.UserID)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	userPhone, err := s.getPhoneByUserID(ctx, in.UserID)
+	if errors.Is(err, ErrPhoneNotFound) {
 		id, err := GenerateID()
 		if err != nil {
 			return err
 		}
-		p := &phonestore.PhoneRecord{
+		p := &PhoneRecord{
 			ID:          id,
 			UserID:      in.UserID,
 			PhoneNumber: normPhone,
@@ -255,7 +254,7 @@ func (s *service) RequestVerification(ctx context.Context, in RequestVerificatio
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
-		if err := s.store.CreatePhone(ctx, p); err != nil {
+		if err := s.createPhone(ctx, p); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -265,7 +264,7 @@ func (s *service) RequestVerification(ctx context.Context, in RequestVerificatio
 		userPhone.Verified = false
 		userPhone.VerifiedAt = nil
 		userPhone.UpdatedAt = now
-		if err := s.store.UpdatePhone(ctx, userPhone); err != nil {
+		if err := s.updatePhone(ctx, userPhone); err != nil {
 			return err
 		}
 		s.cache.Invalidate(ctx, in.UserID, normPhone)
@@ -292,8 +291,8 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 	}
 
 	now := s.ctx.Now()
-	rec, err := s.store.GetActiveOTP(ctx, normPhone, PurposeVerify, now)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	rec, err := s.getActiveOTP(ctx, normPhone, PurposeVerify, now)
+	if errors.Is(err, adapter.ErrNotFound) {
 		s.publishRejected(ctx, normPhone, "not_found", 0)
 		return nil, ErrInvalidCode
 	}
@@ -317,7 +316,7 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 	}
 
 	if !CompareOTP(in.Code, rec.OTPHash, rec.Salt) {
-		attempts, incErr := s.store.IncrementOTPAttempts(ctx, rec.ID)
+		attempts, incErr := s.incrementOTPAttempts(ctx, rec.ID)
 		if incErr != nil {
 			return nil, incErr
 		}
@@ -329,17 +328,17 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 		return nil, &VerificationError{Reason: "invalid_code", Attempts: attempts, Err: ErrInvalidCode}
 	}
 
-	if err := s.store.MarkOTPUsed(ctx, rec.ID, now); err != nil {
-		if errors.Is(err, phonestore.ErrConflict) {
+	if err := s.markOTPUsed(ctx, rec.ID, now); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			s.publishRejected(ctx, normPhone, "already_used", rec.Attempts)
 			return nil, ErrCodeAlreadyUsed
 		}
 		return nil, err
 	}
 
-	userPhone, err := s.store.GetPhoneByUserID(ctx, in.UserID)
+	userPhone, err := s.getPhoneByUserID(ctx, in.UserID)
 	if err != nil {
-		if errors.Is(err, phonestore.ErrNotFound) {
+		if errors.Is(err, ErrPhoneNotFound) {
 			return nil, ErrPhoneNotFound
 		}
 		return nil, err
@@ -349,7 +348,7 @@ func (s *service) ConfirmVerification(ctx context.Context, in ConfirmVerificatio
 	userPhone.VerifiedAt = &now
 	userPhone.UpdatedAt = now
 
-	if err := s.store.UpdatePhone(ctx, userPhone); err != nil {
+	if err := s.updatePhone(ctx, userPhone); err != nil {
 		return nil, err
 	}
 
@@ -409,9 +408,9 @@ func (s *service) RequestChange(ctx context.Context, in RequestChangeInput) erro
 		return ErrUserNotFound
 	}
 
-	current, err := s.store.GetPhoneByUserID(ctx, in.UserID)
+	current, err := s.getPhoneByUserID(ctx, in.UserID)
 	if err != nil {
-		if errors.Is(err, phonestore.ErrNotFound) {
+		if errors.Is(err, ErrPhoneNotFound) {
 			return ErrPhoneNotFound
 		}
 		return err
@@ -422,11 +421,11 @@ func (s *service) RequestChange(ctx context.Context, in RequestChangeInput) erro
 		return nil
 	}
 
-	other, err := s.store.GetPhoneByNumber(ctx, normNew)
+	other, err := s.getPhoneByNumber(ctx, normNew)
 	if err == nil && other.UserID != in.UserID {
 		return ErrPhoneAlreadyExists
 	}
-	if err != nil && !errors.Is(err, phonestore.ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrPhoneNotFound) {
 		return err
 	}
 
@@ -452,8 +451,8 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 	}
 
 	now := s.ctx.Now()
-	rec, err := s.store.GetActiveOTP(ctx, normNew, PurposeChange, now)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	rec, err := s.getActiveOTP(ctx, normNew, PurposeChange, now)
+	if errors.Is(err, adapter.ErrNotFound) {
 		s.publishRejected(ctx, normNew, "not_found", 0)
 		return nil, ErrInvalidCode
 	}
@@ -477,7 +476,7 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 	}
 
 	if !CompareOTP(in.Code, rec.OTPHash, rec.Salt) {
-		attempts, incErr := s.store.IncrementOTPAttempts(ctx, rec.ID)
+		attempts, incErr := s.incrementOTPAttempts(ctx, rec.ID)
 		if incErr != nil {
 			return nil, incErr
 		}
@@ -489,17 +488,17 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 		return nil, &VerificationError{Reason: "invalid_code", Attempts: attempts, Err: ErrInvalidCode}
 	}
 
-	if err := s.store.MarkOTPUsed(ctx, rec.ID, now); err != nil {
-		if errors.Is(err, phonestore.ErrConflict) {
+	if err := s.markOTPUsed(ctx, rec.ID, now); err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
 			s.publishRejected(ctx, normNew, "already_used", rec.Attempts)
 			return nil, ErrCodeAlreadyUsed
 		}
 		return nil, err
 	}
 
-	current, err := s.store.GetPhoneByUserID(ctx, in.UserID)
+	current, err := s.getPhoneByUserID(ctx, in.UserID)
 	if err != nil {
-		if errors.Is(err, phonestore.ErrNotFound) {
+		if errors.Is(err, ErrPhoneNotFound) {
 			return nil, ErrPhoneNotFound
 		}
 		return nil, err
@@ -511,7 +510,7 @@ func (s *service) ConfirmChange(ctx context.Context, in ConfirmChangeInput) (*Re
 	current.VerifiedAt = &now
 	current.UpdatedAt = now
 
-	if err := s.store.UpdatePhone(ctx, current); err != nil {
+	if err := s.updatePhone(ctx, current); err != nil {
 		return nil, err
 	}
 
@@ -558,16 +557,16 @@ func (s *service) Remove(ctx context.Context, in RemoveInput) error {
 		return err
 	}
 
-	current, err := s.store.GetPhoneByUserID(ctx, in.UserID)
+	current, err := s.getPhoneByUserID(ctx, in.UserID)
 	if err != nil {
-		if errors.Is(err, phonestore.ErrNotFound) {
+		if errors.Is(err, ErrPhoneNotFound) {
 			return ErrPhoneNotFound
 		}
 		return err
 	}
 
 	phoneNum := current.PhoneNumber
-	if err := s.store.DeletePhone(ctx, in.UserID); err != nil {
+	if err := s.deletePhone(ctx, in.UserID); err != nil {
 		return err
 	}
 
@@ -603,8 +602,8 @@ func (s *service) GetByUserID(ctx context.Context, userID string) (*Record, erro
 		return cached, nil
 	}
 
-	rec, err := s.store.GetPhoneByUserID(ctx, userID)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	rec, err := s.getPhoneByUserID(ctx, userID)
+	if errors.Is(err, ErrPhoneNotFound) {
 		return nil, ErrPhoneNotFound
 	}
 	if err != nil {
@@ -626,8 +625,8 @@ func (s *service) GetByPhone(ctx context.Context, phoneNumber string) (*Record, 
 		return cached, nil
 	}
 
-	rec, err := s.store.GetPhoneByNumber(ctx, norm)
-	if errors.Is(err, phonestore.ErrNotFound) {
+	rec, err := s.getPhoneByNumber(ctx, norm)
+	if errors.Is(err, ErrPhoneNotFound) {
 		return nil, ErrPhoneNotFound
 	}
 	if err != nil {
@@ -640,7 +639,7 @@ func (s *service) GetByPhone(ctx context.Context, phoneNumber string) (*Record, 
 
 func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose string, metadata map[string]string) error {
 	if s.cfg.RevokePreviousOnRequest {
-		_ = s.store.RevokeOTPsByPhone(ctx, phone, purpose)
+		_ = s.revokeOTPsByPhone(ctx, phone, purpose)
 	}
 
 	code, err := GenerateCode(s.cfg.OTPLength)
@@ -659,7 +658,7 @@ func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose strin
 	}
 
 	now := s.ctx.Now()
-	rec := &phonestore.OTPRecord{
+	rec := &OTPRecord{
 		ID:          id,
 		PhoneNumber: phone,
 		Subject:     subject,
@@ -672,7 +671,7 @@ func (s *service) dispatchOTP(ctx context.Context, phone, subject, purpose strin
 		CreatedAt:   now,
 	}
 
-	if err := s.store.CreateOTP(ctx, rec); err != nil {
+	if err := s.createOTP(ctx, rec); err != nil {
 		return err
 	}
 
@@ -718,7 +717,7 @@ func (s *service) publishRejected(ctx context.Context, phone, reason string, att
 func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalEmail string) (*user.User, error) {
 	now := s.ctx.Now()
 
-	phoneRec, err := s.store.GetPhoneByNumber(ctx, normPhone)
+	phoneRec, err := s.getPhoneByNumber(ctx, normPhone)
 	if err == nil {
 		u, err := s.ctx.Store().Users().GetByID(ctx, phoneRec.UserID)
 		if err != nil {
@@ -728,7 +727,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 			phoneRec.Verified = true
 			phoneRec.VerifiedAt = &now
 			phoneRec.UpdatedAt = now
-			_ = s.store.UpdatePhone(ctx, phoneRec)
+			_ = s.updatePhone(ctx, phoneRec)
 			s.cache.Invalidate(ctx, u.ID, normPhone)
 			s.ctx.Events().Publish(ctx, auth.Event{
 				Name:    EventPhoneVerified,
@@ -743,7 +742,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 		}
 		return u, nil
 	}
-	if !errors.Is(err, phonestore.ErrNotFound) {
+	if !errors.Is(err, ErrPhoneNotFound) {
 		return nil, err
 	}
 
@@ -752,8 +751,13 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 		return nil, ErrSignUpDisabled
 	}
 
+	return s.findOrCreateUserByPhone(ctx, normPhone, optionalEmail, now)
+}
+
+func (s *service) findOrCreateUserByPhone(ctx context.Context, normPhone, optionalEmail string, now time.Time) (*user.User, error) {
 	var newUser *user.User
-	err = s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
+
+	createFn := func(txCtx context.Context) error {
 		uID, err := GenerateID()
 		if err != nil {
 			return err
@@ -800,7 +804,7 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 		if err != nil {
 			return err
 		}
-		newPhoneRec := &phonestore.PhoneRecord{
+		newPhoneRec := &PhoneRecord{
 			ID:          pID,
 			UserID:      newUser.ID,
 			PhoneNumber: normPhone,
@@ -809,8 +813,18 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
-		return s.store.CreatePhone(txCtx, newPhoneRec)
-	})
+		return s.createPhone(txCtx, newPhoneRec)
+	}
+
+	var err error
+	if s.ctx.Adapter() != nil {
+		err = s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, _ adapter.Adapter) error {
+			return createFn(txCtx)
+		})
+	} else {
+		err = s.ctx.Store().Transaction(ctx, createFn)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -834,4 +848,137 @@ func (s *service) resolveUser(ctx context.Context, normPhone, subject, optionalE
 	})
 
 	return newUser, nil
+}
+
+func (s *service) getPhoneByNumber(ctx context.Context, phone string) (*PhoneRecord, error) {
+	repo := sdk.Model[PhoneRecord](s.ctx, ModelPhones)
+	p, err := repo.FindOne(ctx, adapter.Eq("phone_number", phone))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrPhoneNotFound
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+func (s *service) getPhoneByUserID(ctx context.Context, userID string) (*PhoneRecord, error) {
+	repo := sdk.Model[PhoneRecord](s.ctx, ModelPhones)
+	p, err := repo.FindOne(ctx, adapter.Eq("user_id", userID))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrPhoneNotFound
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+func (s *service) createPhone(ctx context.Context, p *PhoneRecord) error {
+	repo := sdk.Model[PhoneRecord](s.ctx, ModelPhones)
+	err := repo.Create(ctx, p)
+	if err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
+			return ErrPhoneAlreadyExists
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *service) updatePhone(ctx context.Context, p *PhoneRecord) error {
+	repo := sdk.Model[PhoneRecord](s.ctx, ModelPhones)
+	count, err := repo.Update(ctx, []adapter.Condition{adapter.Eq("id", p.ID)}, map[string]any{
+		"phone_number": p.PhoneNumber,
+		"verified":     p.Verified,
+		"verified_at":  p.VerifiedAt,
+		"updated_at":   p.UpdatedAt,
+	})
+	if err != nil {
+		if errors.Is(err, adapter.ErrConflict) {
+			return ErrPhoneAlreadyExists
+		}
+		return err
+	}
+	if count == 0 {
+		return ErrPhoneNotFound
+	}
+	return nil
+}
+
+func (s *service) deletePhone(ctx context.Context, userID string) error {
+	repo := sdk.Model[PhoneRecord](s.ctx, ModelPhones)
+	_, err := repo.Delete(ctx, adapter.Eq("user_id", userID))
+	return err
+}
+
+func (s *service) createOTP(ctx context.Context, rec *OTPRecord) error {
+	repo := sdk.Model[OTPRecord](s.ctx, ModelPhoneOTPs)
+	return repo.Create(ctx, rec)
+}
+
+func (s *service) getActiveOTP(ctx context.Context, phone, purpose string, now time.Time) (*OTPRecord, error) {
+	repo := sdk.Model[OTPRecord](s.ctx, ModelPhoneOTPs)
+	otps, err := repo.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{
+			adapter.Eq("phone_number", phone),
+			adapter.Eq("purpose", purpose),
+		},
+		SortBy: "created_at",
+		Desc:   true,
+		Limit:  1,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(otps) == 0 {
+		return nil, adapter.ErrNotFound
+	}
+	return &otps[0], nil
+}
+
+func (s *service) incrementOTPAttempts(ctx context.Context, id string) (int, error) {
+	repo := sdk.Model[OTPRecord](s.ctx, ModelPhoneOTPs)
+	rec, err := repo.FindOne(ctx, adapter.Eq("id", id))
+	if err != nil {
+		return 0, err
+	}
+	newAttempts := rec.Attempts + 1
+	_, err = repo.Update(ctx, []adapter.Condition{adapter.Eq("id", id)}, map[string]any{
+		"attempts": newAttempts,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return newAttempts, nil
+}
+
+func (s *service) markOTPUsed(ctx context.Context, id string, at time.Time) error {
+	repo := sdk.Model[OTPRecord](s.ctx, ModelPhoneOTPs)
+	count, err := repo.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", id),
+		adapter.IsNull("used_at"),
+	}, map[string]any{
+		"used_at": at,
+	})
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return adapter.ErrConflict
+	}
+	return nil
+}
+
+func (s *service) revokeOTPsByPhone(ctx context.Context, phone, purpose string) error {
+	repo := sdk.Model[OTPRecord](s.ctx, ModelPhoneOTPs)
+	now := s.ctx.Now()
+	_, err := repo.Update(ctx, []adapter.Condition{
+		adapter.Eq("phone_number", phone),
+		adapter.Eq("purpose", purpose),
+		adapter.IsNull("used_at"),
+	}, map[string]any{
+		"used_at": now,
+	})
+	return err
 }

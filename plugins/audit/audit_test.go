@@ -6,28 +6,21 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	audit "github.com/BladiCreator/go-modular-auth-audit"
 	"github.com/BladiCreator/go-modular-auth-audit/plugins"
-	auditmemory "github.com/BladiCreator/go-modular-auth-audit/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-func setupTestAuth(t *testing.T, opts ...audit.Option) (*auth.Auth, plugins.Audit, *auditmemory.Store) {
+func setupTestAuth(t *testing.T, opts ...audit.Option) (*auth.Auth, plugins.Audit) {
 	t.Helper()
-	cStore := corememory.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	audStore := auditmemory.New()
 
-	defaultOpts := []audit.Option{
-		audit.WithStore(audStore),
-	}
-	defaultOpts = append(defaultOpts, opts...)
-
-	audModule := audit.New(defaultOpts...)
+	audModule := audit.New(opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{audModule},
 	})
@@ -40,12 +33,12 @@ func setupTestAuth(t *testing.T, opts ...audit.Option) (*auth.Auth, plugins.Audi
 		t.Fatalf("auth.Get[plugins.Audit] failed: %v", err)
 	}
 
-	return a, audCap, audStore
+	return a, audCap
 }
 
 func TestAudit_CoreEvents_Consumed(t *testing.T) {
 	ctx := context.Background()
-	a, audCap, _ := setupTestAuth(t)
+	a, audCap := setupTestAuth(t)
 
 	// 1. SignUp triggers user.created
 	signupRes, err := a.SignUp(ctx, auth.SignUpInput{
@@ -116,7 +109,7 @@ func TestAudit_CoreEvents_Consumed(t *testing.T) {
 
 func TestAudit_ManualRecord_AndQueries(t *testing.T) {
 	ctx := context.Background()
-	_, audCap, _ := setupTestAuth(t)
+	_, audCap := setupTestAuth(t)
 
 	// Record custom administrative event
 	customRecord := &audit.AuditRecord{
@@ -179,7 +172,7 @@ func TestAudit_ManualRecord_AndQueries(t *testing.T) {
 
 func TestAudit_AsyncBufferProcessing(t *testing.T) {
 	ctx := context.Background()
-	_, audCap, _ := setupTestAuth(t,
+	_, audCap := setupTestAuth(t,
 		audit.WithAsync(2, 50, 5, 20*time.Millisecond),
 	)
 

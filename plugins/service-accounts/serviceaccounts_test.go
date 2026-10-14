@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	serviceaccounts "github.com/BladiCreator/go-modular-auth-service-accounts"
 )
 
@@ -14,7 +14,7 @@ func TestServiceAccounts_Lifecycle(t *testing.T) {
 	mod := serviceaccounts.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   storememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

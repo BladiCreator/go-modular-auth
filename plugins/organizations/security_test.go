@@ -9,15 +9,14 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-organizations"
-	"github.com/BladiCreator/go-modular-auth-organizations/store/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func TestSecurityCrossTenantIsolation(t *testing.T) {
 	ctx := context.Background()
-	orgModule := organizations.New(organizations.WithStore(memory.New()))
+	orgModule := organizations.New()
 	a, _ := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	orgs, _ := auth.Get[organizations.Organization](a)
@@ -63,9 +62,9 @@ func TestSecurityCrossTenantIsolation(t *testing.T) {
 
 func TestSecurityInvitationSingleUseAndConcurrency(t *testing.T) {
 	ctx := context.Background()
-	orgModule := organizations.New(organizations.WithStore(memory.New()))
+	orgModule := organizations.New()
 	a, _ := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	orgs, _ := auth.Get[organizations.Organization](a)
@@ -112,9 +111,9 @@ func TestSecurityInvitationSingleUseAndConcurrency(t *testing.T) {
 
 func TestSecurityInvitationExpiration(t *testing.T) {
 	ctx := context.Background()
-	orgModule := organizations.New(organizations.WithStore(memory.New()))
+	orgModule := organizations.New()
 	a, _ := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	orgs, _ := auth.Get[organizations.Organization](a)
@@ -155,9 +154,9 @@ func TestSecurityConstantTimeComparison(t *testing.T) {
 
 func TestOrganizationService_UnauthorizedMutationRejection(t *testing.T) {
 	ctx := context.Background()
-	orgModule := organizations.New(organizations.WithStore(memory.New()))
+	orgModule := organizations.New()
 	a, _ := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	orgs, _ := auth.Get[organizations.Organization](a)

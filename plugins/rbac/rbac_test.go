@@ -7,25 +7,18 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	rbac "github.com/BladiCreator/go-modular-auth-rbac"
 	"github.com/BladiCreator/go-modular-auth-rbac/cache"
-	"github.com/BladiCreator/go-modular-auth-rbac/store/memory"
 )
 
-func TestRBAC_RegistrationAndGlobalRoles(t *testing.T) {
-	ctx := context.Background()
-	coreStore := adaptermem.NewStore()
-	rbacStore := memory.NewStore()
-	memCache := cache.NewMemoryCache(10 * time.Minute)
-
-	plugin := rbac.New(
-		rbac.WithStore(rbacStore),
-		rbac.WithCache(memCache),
-	)
+func setupTestRBAC(t *testing.T, opts ...rbac.Option) (*auth.Auth, rbac.RBAC) {
+	t.Helper()
+	ad := adaptermem.New()
+	plugin := rbac.New(opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   coreStore,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{plugin},
 	})
 	if err != nil {
@@ -36,6 +29,15 @@ func TestRBAC_RegistrationAndGlobalRoles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auth.Get failed: %v", err)
 	}
+
+	return a, rbacSvc
+}
+
+func TestRBAC_RegistrationAndGlobalRoles(t *testing.T) {
+	ctx := context.Background()
+	memCache := cache.NewMemoryCache(10 * time.Minute)
+
+	_, rbacSvc := setupTestRBAC(t, rbac.WithCache(memCache))
 
 	// 1. Create a global superadmin role
 	superAdminRole := &rbac.Role{
@@ -53,7 +55,7 @@ func TestRBAC_RegistrationAndGlobalRoles(t *testing.T) {
 		Subject: "user-super-1",
 		Type:    auth.PrincipalUser,
 	}
-	err = rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
+	err := rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
 		RoleID:           superAdminRole.ID,
 		PrincipalSubject: adminPrincipal.Subject,
 		PrincipalType:    adminPrincipal.Type,
@@ -88,23 +90,7 @@ func TestRBAC_RegistrationAndGlobalRoles(t *testing.T) {
 
 func TestRBAC_OrganizationAndServiceRoles(t *testing.T) {
 	ctx := context.Background()
-	coreStore := adaptermem.NewStore()
-	rbacStore := memory.NewStore()
-
-	plugin := rbac.New(rbac.WithStore(rbacStore))
-
-	a, err := auth.New(auth.Config{
-		Store:   coreStore,
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t)
 
 	// 1. Create Organization Role
 	orgBillingRole := &rbac.Role{
@@ -114,62 +100,61 @@ func TestRBAC_OrganizationAndServiceRoles(t *testing.T) {
 		Permissions: []string{"invoices:view", "invoices:pay"},
 	}
 	if err := rbacSvc.CreateRole(ctx, orgBillingRole); err != nil {
-		t.Fatalf("CreateRole org failed: %v", err)
+		t.Fatalf("CreateRole failed: %v", err)
 	}
 
-	// 2. Create Service Role
-	svcJobRole := &rbac.Role{
-		ID:          "role-svc-worker",
-		Name:        "service_worker",
-		Scope:       rbac.ScopeService,
-		Permissions: []string{"jobs:consume", "jobs:complete"},
-	}
-	if err := rbacSvc.CreateRole(ctx, svcJobRole); err != nil {
-		t.Fatalf("CreateRole svc failed: %v", err)
-	}
-
-	// 3. Assign to user in Org Alpha
-	userAlpha := auth.Principal{Subject: "user-alpha", Type: auth.PrincipalUser}
-	err = rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
+	// 2. Assign to user scoped strictly to org-alpha
+	userPrincipal := auth.Principal{Subject: "user-billing-1", Type: auth.PrincipalUser}
+	err := rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
 		RoleID:           orgBillingRole.ID,
-		PrincipalSubject: userAlpha.Subject,
-		PrincipalType:    userAlpha.Type,
+		PrincipalSubject: userPrincipal.Subject,
+		PrincipalType:    userPrincipal.Type,
 		Scope:            rbac.ScopeOrganization,
 		ScopeID:          "org-alpha",
 	})
 	if err != nil {
-		t.Fatalf("AssignRole org failed: %v", err)
+		t.Fatalf("AssignRole failed: %v", err)
 	}
 
-	// 4. Assign Service role to service account
-	svcPrincipal := auth.Principal{Subject: "svc-crawler", Type: auth.PrincipalServiceAccount}
+	// Evaluation 1: Resource belonging to org-alpha -> Authorized
+	resOrgAlpha := rbac.NewOrganizationResource("invoice", "inv-100", "org-alpha")
+	if err := rbacSvc.Authorize(ctx, userPrincipal, "invoices:pay", resOrgAlpha); err != nil {
+		t.Fatalf("expected Authorize to succeed for org-alpha, got: %v", err)
+	}
+
+	// Evaluation 2: Resource belonging to org-beta -> Denied
+	resOrgBeta := rbac.NewOrganizationResource("invoice", "inv-200", "org-beta")
+	if err := rbacSvc.Authorize(ctx, userPrincipal, "invoices:pay", resOrgBeta); !errors.Is(err, rbac.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for org-beta, got: %v", err)
+	}
+
+	// 3. Create Service-scoped Role for Microservice Auth
+	svcWorkerRole := &rbac.Role{
+		ID:          "role-svc-worker",
+		Name:        "queue_worker",
+		Scope:       rbac.ScopeService,
+		Permissions: []string{"jobs:consume", "jobs:ack"},
+	}
+	if err := rbacSvc.CreateRole(ctx, svcWorkerRole); err != nil {
+		t.Fatalf("CreateRole failed: %v", err)
+	}
+
+	svcPrincipal := auth.Principal{Subject: "worker-agent-1", Type: auth.PrincipalServiceAccount}
 	err = rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
-		RoleID:           svcJobRole.ID,
+		RoleID:           svcWorkerRole.ID,
 		PrincipalSubject: svcPrincipal.Subject,
 		PrincipalType:    svcPrincipal.Type,
 		Scope:            rbac.ScopeService,
-		ScopeID:          "queue-service",
+		ScopeID:          "billing-service",
 	})
 	if err != nil {
-		t.Fatalf("AssignRole svc failed: %v", err)
+		t.Fatalf("AssignRole failed: %v", err)
 	}
 
-	// Evaluation 1: User Alpha in Org Alpha accessing Invoice in Org Alpha -> Allowed
-	resAlpha := rbac.NewOrganizationResource("invoice", "inv-001", "org-alpha")
-	if err := rbacSvc.Authorize(ctx, userAlpha, "invoices:pay", resAlpha); err != nil {
-		t.Fatalf("expected userAlpha to be authorized in org-alpha, got: %v", err)
-	}
-
-	// Evaluation 2: User Alpha attempting to access Org Beta -> Denied
-	resBeta := rbac.NewOrganizationResource("invoice", "inv-002", "org-beta")
-	if err := rbacSvc.Authorize(ctx, userAlpha, "invoices:pay", resBeta); !errors.Is(err, rbac.ErrForbidden) {
-		t.Fatalf("expected ErrForbidden for cross-org access, got: %v", err)
-	}
-
-	// Evaluation 3: Service Principal in queue-service -> Allowed
-	resQueue := rbac.NewServiceResource("job", "job-99", "queue-service")
-	if err := rbacSvc.Authorize(ctx, svcPrincipal, "jobs:consume", resQueue); err != nil {
-		t.Fatalf("expected svcPrincipal to be authorized in queue-service, got: %v", err)
+	// Evaluation 3: Service Principal attempting billing-service action -> Authorized
+	resService := rbac.NewServiceResource("job", "job-42", "billing-service")
+	if err := rbacSvc.Authorize(ctx, svcPrincipal, "jobs:consume", resService); err != nil {
+		t.Fatalf("expected Authorize to succeed for service, got: %v", err)
 	}
 
 	// Evaluation 4: Service Principal attempting another service -> Denied
@@ -181,21 +166,7 @@ func TestRBAC_OrganizationAndServiceRoles(t *testing.T) {
 
 func TestRBAC_WildcardPermissions(t *testing.T) {
 	ctx := context.Background()
-	rbacStore := memory.NewStore()
-	plugin := rbac.New(rbac.WithStore(rbacStore))
-
-	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t)
 
 	editorRole := &rbac.Role{
 		ID:          "role-editor",
@@ -240,26 +211,9 @@ func TestRBAC_WildcardPermissions(t *testing.T) {
 
 func TestRBAC_CacheInvalidationOnMutation(t *testing.T) {
 	ctx := context.Background()
-	rbacStore := memory.NewStore()
 	memCache := cache.NewMemoryCache(1 * time.Hour)
 
-	plugin := rbac.New(
-		rbac.WithStore(rbacStore),
-		rbac.WithCache(memCache),
-	)
-
-	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t, rbac.WithCache(memCache))
 
 	role := &rbac.Role{
 		ID:          "role-temp",
@@ -299,22 +253,7 @@ func TestRBAC_CacheInvalidationOnMutation(t *testing.T) {
 
 func TestRBAC_ContextualOrganizationEvaluation(t *testing.T) {
 	ctx := context.Background()
-	coreStore := adaptermem.NewStore()
-	rbacStore := memory.NewStore()
-	plugin := rbac.New(rbac.WithStore(rbacStore))
-
-	a, err := auth.New(auth.Config{
-		Store:   coreStore,
-		Plugins: []auth.PluginModule{plugin},
-	})
-	if err != nil {
-		t.Fatalf("auth.New failed: %v", err)
-	}
-
-	rbacSvc, err := auth.Get[rbac.RBAC](a)
-	if err != nil {
-		t.Fatalf("auth.Get failed: %v", err)
-	}
+	_, rbacSvc := setupTestRBAC(t)
 
 	// 1. Create organization-scoped role
 	role := &rbac.Role{
@@ -330,7 +269,7 @@ func TestRBAC_ContextualOrganizationEvaluation(t *testing.T) {
 	principal := auth.Principal{Subject: "finance-carol", Type: auth.PrincipalUser}
 
 	// 2. Assign role to principal specifically in "org-acme"
-	err = rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
+	err := rbacSvc.AssignRole(ctx, &rbac.RoleAssignment{
 		RoleID:           role.ID,
 		PrincipalSubject: principal.Subject,
 		PrincipalType:    principal.Type,
@@ -359,4 +298,3 @@ func TestRBAC_ContextualOrganizationEvaluation(t *testing.T) {
 		t.Fatalf("expected ErrForbidden with wrong org context, got %v", err)
 	}
 }
-

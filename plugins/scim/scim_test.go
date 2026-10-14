@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	scim "github.com/BladiCreator/go-modular-auth-scim"
 	v2 "github.com/BladiCreator/go-modular-auth-scim/v2"
 )
@@ -15,7 +15,7 @@ func TestSCIMProvider_UserAndGroupProvisioning(t *testing.T) {
 	mod := scim.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   storememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{mod},
 	})
 	if err != nil {

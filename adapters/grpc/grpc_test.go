@@ -3,12 +3,10 @@ package grpc_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	grpcadapter "github.com/BladiCreator/go-modular-auth/adapters/grpc"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
-	"github.com/BladiCreator/go-modular-auth/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -17,29 +15,26 @@ import (
 
 func setupAuth(t *testing.T) (*auth.Auth, string, string) {
 	t.Helper()
-	s := storememory.New()
-	a, err := auth.New(auth.Config{Store: s})
+	a, err := auth.New(auth.Config{Adapter: adaptermem.New()})
 	if err != nil {
 		t.Fatalf("failed to init auth: %v", err)
 	}
 
 	ctx := context.Background()
-	u := &user.User{
-		ID:        "user-grpc-1",
-		Email:     "grpc@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	if err := s.Users().Create(ctx, u); err != nil {
+	res, err := a.SignUp(ctx, auth.SignUpInput{
+		Email:    "grpc@example.com",
+		Password: "Password123!",
+	})
+	if err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
-	issued, err := a.CreateSession(ctx, u.ID, auth.SessionOptions{})
+	issued, err := a.CreateSession(ctx, res.User.ID, auth.SessionOptions{})
 	if err != nil {
 		t.Fatalf("failed to create session: %v", err)
 	}
 
-	return a, u.ID, issued.Token
+	return a, res.User.ID, issued.Token
 }
 
 func TestGRPCAdapter_UnaryInterceptor(t *testing.T) {

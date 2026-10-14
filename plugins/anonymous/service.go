@@ -12,8 +12,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-anonymous/cache"
-	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/credential"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
@@ -21,22 +21,54 @@ import (
 )
 
 type service struct {
-	ctx   *sdk.Context
-	cfg   Config
-	store store.Store
-	cache *cache.Cache
-	hooks *Hooks
+	ctx        *sdk.Context
+	cfg        Config
+	identities *sdk.Repository[Identity]
+	cache      *cache.Cache
+	hooks      *Hooks
 }
 
 var _ Anonymous = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
-		ctx:   ctx,
-		cfg:   cfg,
-		store: cfg.Store,
-		cache: cache.New(ctx.Cache()),
-		hooks: cfg.Hooks,
+		ctx:        ctx,
+		cfg:        cfg,
+		identities: sdk.Model[Identity](ctx, ModelAnonymousIdentities),
+		cache:      cache.New(ctx.Cache()),
+		hooks:      cfg.Hooks,
+	}
+}
+
+func identityToCached(i *Identity) *cache.CachedIdentity {
+	if i == nil {
+		return nil
+	}
+	return &cache.CachedIdentity{
+		ID:           i.ID,
+		UserID:       i.UserID,
+		ExpiresAt:    i.ExpiresAt,
+		ConvertedAt:  i.ConvertedAt,
+		LinkedUserID: i.LinkedUserID,
+		Metadata:     i.Metadata,
+		CreatedAt:    i.CreatedAt,
+		UpdatedAt:    i.UpdatedAt,
+	}
+}
+
+func cachedToIdentity(c *cache.CachedIdentity) *Identity {
+	if c == nil {
+		return nil
+	}
+	return &Identity{
+		ID:           c.ID,
+		UserID:       c.UserID,
+		ExpiresAt:    c.ExpiresAt,
+		ConvertedAt:  c.ConvertedAt,
+		LinkedUserID: c.LinkedUserID,
+		Metadata:     c.Metadata,
+		CreatedAt:    c.CreatedAt,
+		UpdatedAt:    c.UpdatedAt,
 	}
 }
 
@@ -81,7 +113,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		UpdatedAt:  now,
 	}
 
-	ident := &store.Identity{
+	ident := &Identity{
 		ID:        anonID,
 		UserID:    userID,
 		ExpiresAt: expiresAt,
@@ -99,7 +131,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		if err := s.ctx.Store().Accounts().Create(txCtx, acc); err != nil {
 			return fmt.Errorf("anonymous: create core account: %w", err)
 		}
-		if err := s.store.Create(txCtx, ident); err != nil {
+		if err := s.identities.Create(txCtx, ident); err != nil {
 			return fmt.Errorf("anonymous: create identity: %w", err)
 		}
 
@@ -114,7 +146,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 		return nil, err
 	}
 
-	_ = s.cache.SetIdentity(ctx, ident, s.cfg.CacheTTL)
+	_ = s.cache.SetIdentity(ctx, identityToCached(ident), s.cfg.CacheTTL)
 
 	res := &AuthResult{
 		User:     u,
@@ -146,18 +178,18 @@ func (s *service) GetIdentity(ctx context.Context, userID string) (*Identity, er
 	}
 
 	if cached, err := s.cache.GetIdentity(ctx, userID); err == nil && cached != nil {
-		return cached, nil
+		return cachedToIdentity(cached), nil
 	}
 
-	ident, err := s.store.GetByUserID(ctx, userID)
-	if errors.Is(err, store.ErrNotFound) {
+	ident, err := s.identities.FindOne(ctx, adapter.Eq("user_id", userID))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrAnonymousNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	_ = s.cache.SetIdentity(ctx, ident, s.cfg.CacheTTL)
+	_ = s.cache.SetIdentity(ctx, identityToCached(ident), s.cfg.CacheTTL)
 	return ident, nil
 }
 
@@ -306,7 +338,10 @@ func (s *service) Convert(ctx context.Context, in ConvertInput) (*ConvertResult,
 		// Update identity record
 		ident.ConvertedAt = &now
 		ident.UpdatedAt = now
-		if err := s.store.Update(txCtx, ident); err != nil {
+		if _, err := s.identities.Update(txCtx, []adapter.Condition{adapter.Eq("id", ident.ID)}, map[string]any{
+			"converted_at": ident.ConvertedAt,
+			"updated_at":   ident.UpdatedAt,
+		}); err != nil {
 			return err
 		}
 		return nil
@@ -421,7 +456,10 @@ func (s *service) ConvertWithAccount(ctx context.Context, in ConvertAccountInput
 
 		ident.ConvertedAt = &now
 		ident.UpdatedAt = now
-		if err := s.store.Update(txCtx, ident); err != nil {
+		if _, err := s.identities.Update(txCtx, []adapter.Condition{adapter.Eq("id", ident.ID)}, map[string]any{
+			"converted_at": ident.ConvertedAt,
+			"updated_at":   ident.UpdatedAt,
+		}); err != nil {
 			return err
 		}
 		return nil
@@ -548,7 +586,11 @@ func (s *service) Link(ctx context.Context, in LinkInput) (*LinkResult, error) {
 		ident.ConvertedAt = &now
 		ident.LinkedUserID = permUser.ID
 		ident.UpdatedAt = now
-		if err := s.store.Update(txCtx, ident); err != nil {
+		if _, err := s.identities.Update(txCtx, []adapter.Condition{adapter.Eq("id", ident.ID)}, map[string]any{
+			"converted_at":   ident.ConvertedAt,
+			"linked_user_id": ident.LinkedUserID,
+			"updated_at":     ident.UpdatedAt,
+		}); err != nil {
 			return err
 		}
 
@@ -597,14 +639,21 @@ func (s *service) Cleanup(ctx context.Context, before time.Time) (CleanupResult,
 	}
 
 	// Batch list expired unconverted identities
-	expiredList, err := s.store.ListExpired(ctx, before, 500)
+	expiredList, err := s.identities.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{
+			adapter.Lte("expires_at", before),
+			adapter.IsNull("converted_at"),
+		},
+		Limit: 500,
+	})
 	if err != nil {
 		return CleanupResult{}, fmt.Errorf("anonymous: list expired: %w", err)
 	}
 
 	var result CleanupResult
 
-	for _, ident := range expiredList {
+	for i := range expiredList {
+		ident := &expiredList[i]
 		err := s.ctx.Store().Transaction(ctx, func(txCtx context.Context) error {
 			// Revoke sessions
 			if err := s.ctx.Core().RevokeUserSessions(txCtx, ident.UserID, ""); err == nil {
@@ -623,7 +672,7 @@ func (s *service) Cleanup(ctx context.Context, before time.Time) (CleanupResult,
 			}
 
 			// Delete anonymous identity
-			if err := s.store.Delete(txCtx, ident.ID); err != nil {
+			if _, err := s.identities.Delete(txCtx, adapter.Eq("id", ident.ID)); err != nil {
 				return err
 			}
 			result.IdentitiesDeleted++

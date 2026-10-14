@@ -1,50 +1,36 @@
 package sqlite_test
 
 import (
-	"strings"
 	"testing"
 
+	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/adapters/sqlite"
-	"github.com/BladiCreator/go-modular-auth/store"
 )
 
 func TestInterfaceCompliance(t *testing.T) {
-	var _ store.Store = (*sqlite.Store)(nil)
+	var _ adapter.Adapter = (*sqlite.Adapter)(nil)
 }
 
-func TestSchemaDDL(t *testing.T) {
-	ddl := sqlite.SchemaDDL
-
-	requiredTables := []string{
-		"auth_users",
-		"auth_accounts",
-		"auth_credentials",
-		"auth_sessions",
-		"auth_verification_tokens",
+func TestAdapterInstantiation(t *testing.T) {
+	ad := sqlite.New(nil)
+	if ad == nil {
+		t.Fatal("expected non-nil adapter")
 	}
-
-	for _, table := range requiredTables {
-		if !strings.Contains(ddl, table) {
-			t.Errorf("SchemaDDL missing required table %s", table)
-		}
+	if ad.Dialect().Name() != "sqlite" {
+		t.Errorf("expected dialect sqlite, got %s", ad.Dialect().Name())
 	}
 }
 
-func TestStoreInstantiation(t *testing.T) {
-	s := sqlite.New(nil)
-	if s.Users() == nil {
-		t.Error("expected non-nil Users store")
+func TestAuthEngineIntegrationWithSQLiteAdapter(t *testing.T) {
+	ad := sqlite.New(nil)
+	engine, err := auth.New(auth.Config{
+		Adapter: ad,
+	})
+	if err != nil {
+		t.Fatalf("auth.New with sqlite adapter failed: %v", err)
 	}
-	if s.Accounts() == nil {
-		t.Error("expected non-nil Accounts store")
-	}
-	if s.Credentials() == nil {
-		t.Error("expected non-nil Credentials store")
-	}
-	if s.Sessions() == nil {
-		t.Error("expected non-nil Sessions store")
-	}
-	if s.Tokens() == nil {
-		t.Error("expected non-nil Tokens store")
+	if engine == nil {
+		t.Fatal("expected non-nil engine")
 	}
 }

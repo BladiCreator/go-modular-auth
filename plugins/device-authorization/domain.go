@@ -4,22 +4,83 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-device-authorization/store"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/session"
 )
 
-// DeviceStatus is an alias for the persistent store's DeviceStatus.
-type DeviceStatus = store.DeviceStatus
+// DeviceStatus represents the lifecycle state of a device authorization grant.
+type DeviceStatus string
 
 const (
-	StatusPending    = store.StatusPending
-	StatusAuthorized = store.StatusAuthorized
-	StatusDenied     = store.StatusDenied
-	StatusConsumed   = store.StatusConsumed
+	// StatusPending indicates the authorization request is awaiting user interaction.
+	StatusPending DeviceStatus = "pending"
+
+	// StatusAuthorized indicates the user approved the request, ready for device token exchange.
+	StatusAuthorized DeviceStatus = "authorized"
+
+	// StatusDenied indicates the user rejected the authorization request.
+	StatusDenied DeviceStatus = "denied"
+
+	// StatusConsumed indicates the device code has been exchanged for credentials (single-use fulfilled).
+	StatusConsumed DeviceStatus = "consumed"
 )
 
-// DeviceGrant is an alias for store.DeviceGrant.
-type DeviceGrant = store.DeviceGrant
+// DeviceGrant represents the authoritative state of an RFC 8628 device authorization session.
+type DeviceGrant struct {
+	ID              string            `json:"id"`
+	ClientID        string            `json:"client_id"`
+	DeviceCodeHash  string            `json:"device_code_hash"`
+	UserCode        string            `json:"user_code"`
+	Status          DeviceStatus      `json:"status"`
+	UserID          string            `json:"user_id,omitempty"`
+	Scope           string            `json:"scope,omitempty"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
+	ExpiresAt       time.Time         `json:"expires_at"`
+	LastPolledAt    *time.Time        `json:"last_polled_at,omitempty"`
+	PollingInterval int               `json:"polling_interval"`
+	FailedAttempts  int               `json:"failed_attempts"`
+	AuthorizedAt    *time.Time        `json:"authorized_at,omitempty"`
+	ConsumedAt      *time.Time        `json:"consumed_at,omitempty"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+}
+
+// Expired reports whether the device grant has passed its validity window.
+func (g *DeviceGrant) Expired(now time.Time) bool {
+	return g != nil && !now.Before(g.ExpiresAt)
+}
+
+const (
+	ModelDeviceGrants = "device_grants"
+)
+
+// RegisterSchema registers the device_grants model into the compiled schema.
+func RegisterSchema(s *schema.Schema) error {
+	m := schema.NewModel(ModelDeviceGrants, ModelDeviceGrants, "id")
+	_ = m.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "client_id", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "device_code_hash", Type: schema.TypeString, Required: true, Unique: true})
+	_ = m.AddField(schema.Field{Name: "user_code", Type: schema.TypeString, Required: true, Unique: true})
+	_ = m.AddField(schema.Field{Name: "status", Type: schema.TypeString, Required: true})
+	_ = m.AddField(schema.Field{Name: "user_id", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "scope", Type: schema.TypeString})
+	_ = m.AddField(schema.Field{Name: "metadata", Type: schema.TypeJSON})
+	_ = m.AddField(schema.Field{Name: "expires_at", Type: schema.TypeTime, Required: true})
+	_ = m.AddField(schema.Field{Name: "last_polled_at", Type: schema.TypeTime})
+	_ = m.AddField(schema.Field{Name: "polling_interval", Type: schema.TypeInt64, Required: true})
+	_ = m.AddField(schema.Field{Name: "failed_attempts", Type: schema.TypeInt64, Required: true})
+	_ = m.AddField(schema.Field{Name: "authorized_at", Type: schema.TypeTime})
+	_ = m.AddField(schema.Field{Name: "consumed_at", Type: schema.TypeTime})
+	_ = m.AddField(schema.Field{Name: "created_at", Type: schema.TypeTime, Required: true})
+	_ = m.AddField(schema.Field{Name: "updated_at", Type: schema.TypeTime, Required: true})
+
+	m.Indexes = []schema.Index{
+		{Name: "idx_device_code_hash", Fields: []string{"device_code_hash"}, Unique: true},
+		{Name: "idx_device_user_code", Fields: []string{"user_code"}, Unique: true},
+	}
+
+	return s.AddModel(m)
+}
 
 // DeviceAuthorizationRequestInput contains parameters to initiate a device authorization flow.
 type DeviceAuthorizationRequestInput struct {

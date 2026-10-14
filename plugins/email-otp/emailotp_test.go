@@ -12,11 +12,11 @@ import (
 	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
 	"github.com/BladiCreator/go-modular-auth-email-otp/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/email"
 	emailmemory "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/store"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
@@ -32,7 +32,7 @@ type testHarness struct {
 func setupTest(t *testing.T, opts ...emailotp.Option) *testHarness {
 	t.Helper()
 
-	s := storememory.New()
+	ad := adaptermem.New()
 	c := cachememory.New()
 	sender := emailmemory.New()
 
@@ -48,7 +48,7 @@ func setupTest(t *testing.T, opts ...emailotp.Option) *testHarness {
 	mod := emailotp.New(baseOpts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Cache:   c,
 		Email:   sender,
 		Plugins: []auth.PluginModule{mod},
@@ -64,7 +64,7 @@ func setupTest(t *testing.T, opts ...emailotp.Option) *testHarness {
 
 	return &testHarness{
 		auth:        a,
-		store:       s,
+		store:       a.Store(),
 		cache:       c,
 		emailSender: sender,
 		plugin:      mod,
@@ -100,11 +100,11 @@ func TestEmailOTP_PluginRegistration(t *testing.T) {
 }
 
 func TestEmailOTP_MissingEmailSender(t *testing.T) {
-	s := storememory.New()
+	ad := adaptermem.New()
 	mod := emailotp.New() // no email sender supplied
 
 	_, err := auth.New(auth.Config{
-		Store:   s,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{mod},
 	})
 	if !errors.Is(err, emailotp.ErrEmailSenderRequired) {

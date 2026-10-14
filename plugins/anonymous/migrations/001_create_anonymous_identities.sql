@@ -1,7 +1,7 @@
 -- Migration: 001_create_anonymous_identities.sql
--- Description: Creates the auth_anonymous_identities table and relevant indexes
+-- Description: Creates the anonymous_identities table and relevant indexes
 
-CREATE TABLE IF NOT EXISTS auth_anonymous_identities (
+CREATE TABLE IF NOT EXISTS anonymous_identities (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS auth_anonymous_identities (
 );
 
 -- Index for efficient cleanup queries filtering unconverted expired records
-CREATE INDEX IF NOT EXISTS idx_auth_anonymous_expires_at 
-    ON auth_anonymous_identities (expires_at) 
+CREATE INDEX IF NOT EXISTS idx_anonymous_expires_at 
+    ON anonymous_identities (expires_at) 
     WHERE converted_at IS NULL;
 
 -- Index for lookup by Core user ID
-CREATE INDEX IF NOT EXISTS idx_auth_anonymous_user_id 
-    ON auth_anonymous_identities (user_id);
+CREATE INDEX IF NOT EXISTS idx_anonymous_user_id 
+    ON anonymous_identities (user_id);

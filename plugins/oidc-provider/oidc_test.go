@@ -7,7 +7,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
 	oidcprovider "github.com/BladiCreator/go-modular-auth-oidc-provider"
 )
@@ -16,22 +16,22 @@ func TestOIDCProvider_DiscoveryAndTokens(t *testing.T) {
 	ctx := context.Background()
 	mod := oidcprovider.New(oidcprovider.WithIssuer("https://auth.example.com"))
 
-	s := storememory.New()
+	ad := adaptermem.New()
+	a, err := auth.New(auth.Config{
+		Adapter: ad,
+		Plugins: []auth.PluginModule{mod},
+	})
+	if err != nil {
+		t.Fatalf("failed to create auth engine: %v", err)
+	}
+
 	testUser := &user.User{
 		ID:            "u-123",
 		Email:         "test@example.com",
 		EmailVerified: true,
 	}
-	if err := s.Users().Create(ctx, testUser); err != nil {
+	if err := a.Store().Users().Create(ctx, testUser); err != nil {
 		t.Fatalf("failed to create user: %v", err)
-	}
-
-	a, err := auth.New(auth.Config{
-		Store:   s,
-		Plugins: []auth.PluginModule{mod},
-	})
-	if err != nil {
-		t.Fatalf("failed to create auth engine: %v", err)
 	}
 
 	provider, err := auth.Get[oidcprovider.OIDCProvider](a)

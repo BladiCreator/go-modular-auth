@@ -3,6 +3,7 @@ package accountlinking
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -14,7 +15,15 @@ type Module struct {
 	svc *service
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
+
+// RegisterSchema registers the linking tickets model in the compiled schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
 
 // New creates an installable Account Linking PluginModule with optional configurations.
 func New(opts ...Option) *Module {

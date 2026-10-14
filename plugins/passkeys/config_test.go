@@ -5,8 +5,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
-	"github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 
@@ -75,7 +75,7 @@ func TestConfigValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mod := passkey.New(tt.opts...)
 			a, err := auth.New(auth.Config{
-				Store:   memory.New(),
+				Adapter: adaptermem.New(),
 				Plugins: []auth.PluginModule{mod},
 			})
 

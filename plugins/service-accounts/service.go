@@ -7,9 +7,10 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
+	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-service-accounts/store"
 )
 
 type ServiceAccountManager interface {
@@ -22,17 +23,24 @@ type ServiceAccountManager interface {
 }
 
 type service struct {
-	ctx   *sdk.Context
-	store store.Store
+	ctx  *sdk.Context
+	repo *sdk.Repository[ServiceAccount]
 }
 
 var _ ServiceAccountManager = (*service)(nil)
 
-func newService(ctx *sdk.Context, st store.Store) *service {
+func newService(ctx *sdk.Context) *service {
 	return &service{
-		ctx:   ctx,
-		store: st,
+		ctx:  ctx,
+		repo: sdk.Model[ServiceAccount](ctx, ModelServiceAccounts),
 	}
+}
+
+func (s *service) now() time.Time {
+	if s.ctx != nil {
+		return s.ctx.Now()
+	}
+	return time.Now()
 }
 
 func generateID(prefix string) string {
@@ -61,10 +69,10 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*ServiceAccount, 
 	}
 
 	secret := generateSecret()
-	now := s.ctx.Now()
+	now := s.now()
 	id := generateID("sa")
 
-	rec := &store.Record{
+	sa := &ServiceAccount{
 		ID:          id,
 		Name:        in.Name,
 		Description: in.Description,
@@ -76,19 +84,8 @@ func (s *service) Create(ctx context.Context, in CreateInput) (*ServiceAccount, 
 		UpdatedAt:   now,
 	}
 
-	if err := s.store.Create(ctx, rec); err != nil {
+	if err := s.repo.Create(ctx, sa); err != nil {
 		return nil, "", err
-	}
-
-	sa := &ServiceAccount{
-		ID:          rec.ID,
-		Name:        rec.Name,
-		Description: rec.Description,
-		OwnerID:     rec.OwnerID,
-		Scopes:      rec.Scopes,
-		Active:      rec.Active,
-		CreatedAt:   rec.CreatedAt,
-		UpdatedAt:   rec.UpdatedAt,
 	}
 
 	return sa, secret, nil
@@ -99,33 +96,24 @@ func (s *service) Authenticate(ctx context.Context, id, secret string) (*Service
 		return nil, ErrInvalidSecret
 	}
 
-	rec, err := s.store.GetByID(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	sa, err := s.repo.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrInvalidSecret
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	if !rec.Active {
+	if !sa.Active {
 		return nil, ErrInactive
 	}
 
 	expectedHash := hashSecret(secret)
-	if subtle.ConstantTimeCompare([]byte(rec.SecretHash), []byte(expectedHash)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(sa.SecretHash), []byte(expectedHash)) != 1 {
 		return nil, ErrInvalidSecret
 	}
 
-	return &ServiceAccount{
-		ID:          rec.ID,
-		Name:        rec.Name,
-		Description: rec.Description,
-		OwnerID:     rec.OwnerID,
-		Scopes:      rec.Scopes,
-		Active:      rec.Active,
-		CreatedAt:   rec.CreatedAt,
-		UpdatedAt:   rec.UpdatedAt,
-	}, nil
+	return sa, nil
 }
 
 func (s *service) RotateSecret(ctx context.Context, id string) (string, error) {
@@ -133,8 +121,8 @@ func (s *service) RotateSecret(ctx context.Context, id string) (string, error) {
 		return "", ErrNotFound
 	}
 
-	rec, err := s.store.GetByID(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	sa, err := s.repo.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return "", ErrNotFound
 	}
 	if err != nil {
@@ -142,12 +130,22 @@ func (s *service) RotateSecret(ctx context.Context, id string) (string, error) {
 	}
 
 	newSecret := generateSecret()
-	rec.SecretHash = hashSecret(newSecret)
-	rec.UpdatedAt = s.ctx.Now()
+	newHash := hashSecret(newSecret)
+	now := s.now()
 
-	if err := s.store.Update(ctx, rec); err != nil {
+	affected, err := s.repo.Update(ctx, []adapter.Condition{adapter.Eq("id", id)}, map[string]any{
+		"secret_hash": newHash,
+		"updated_at":  now,
+	})
+	if err != nil {
 		return "", err
 	}
+	if affected == 0 {
+		return "", ErrNotFound
+	}
+
+	sa.SecretHash = newHash
+	sa.UpdatedAt = now
 
 	return newSecret, nil
 }
@@ -157,44 +155,34 @@ func (s *service) Get(ctx context.Context, id string) (*ServiceAccount, error) {
 		return nil, ErrNotFound
 	}
 
-	rec, err := s.store.GetByID(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	sa, err := s.repo.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return &ServiceAccount{
-		ID:          rec.ID,
-		Name:        rec.Name,
-		Description: rec.Description,
-		OwnerID:     rec.OwnerID,
-		Scopes:      rec.Scopes,
-		Active:      rec.Active,
-		CreatedAt:   rec.CreatedAt,
-		UpdatedAt:   rec.UpdatedAt,
-	}, nil
+	return sa, nil
 }
 
 func (s *service) List(ctx context.Context, ownerID string) ([]*ServiceAccount, error) {
-	records, err := s.store.List(ctx, ownerID)
+	var where []adapter.Condition
+	if ownerID != "" {
+		where = append(where, adapter.Eq("owner_id", ownerID))
+	}
+
+	records, err := s.repo.FindMany(ctx, adapter.Query{
+		Model: ModelServiceAccounts,
+		Where: where,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	var res []*ServiceAccount
-	for _, r := range records {
-		res = append(res, &ServiceAccount{
-			ID:          r.ID,
-			Name:        r.Name,
-			Description: r.Description,
-			OwnerID:     r.OwnerID,
-			Scopes:      r.Scopes,
-			Active:      r.Active,
-			CreatedAt:   r.CreatedAt,
-			UpdatedAt:   r.UpdatedAt,
-		})
+	res := make([]*ServiceAccount, len(records))
+	for i := range records {
+		res[i] = &records[i]
 	}
 	return res, nil
 }
@@ -204,15 +192,16 @@ func (s *service) Revoke(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 
-	rec, err := s.store.GetByID(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
-		return ErrNotFound
-	}
+	now := s.now()
+	affected, err := s.repo.Update(ctx, []adapter.Condition{adapter.Eq("id", id)}, map[string]any{
+		"active":     false,
+		"updated_at": now,
+	})
 	if err != nil {
 		return err
 	}
-
-	rec.Active = false
-	rec.UpdatedAt = s.ctx.Now()
-	return s.store.Update(ctx, rec)
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

@@ -11,25 +11,23 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
 	"github.com/BladiCreator/go-modular-auth-apikeys/plugins"
-	"github.com/BladiCreator/go-modular-auth-apikeys/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-func setupTestAuth(t *testing.T, opts ...apikeys.Option) (*auth.Auth, plugins.APIKeys, *memory.Store) {
+func setupTestAuth(t *testing.T, opts ...apikeys.Option) (*auth.Auth, plugins.APIKeys, any) {
 	t.Helper()
-	memStore := memory.New()
+	ad := adaptermem.New()
 	memCache := corecache.New()
 
 	defaultOpts := []apikeys.Option{
-		apikeys.WithStore(memStore),
 		apikeys.WithTouchLastUsedThreshold(10 * time.Millisecond),
 	}
 	allOpts := append(defaultOpts, opts...)
 
 	engine, err := auth.New(auth.Config{
-		Store: corestore.New(),
-		Cache: memCache,
+		Adapter: ad,
+		Cache:   memCache,
 		Plugins: []auth.PluginModule{
 			apikeys.New(allOpts...),
 		},
@@ -43,7 +41,7 @@ func setupTestAuth(t *testing.T, opts ...apikeys.Option) (*auth.Auth, plugins.AP
 		t.Fatalf("failed to retrieve APIKeys capability: %v", err)
 	}
 
-	return engine, cap, memStore
+	return engine, cap, nil
 }
 
 func TestAPIKeys_CreateAndAuthenticate(t *testing.T) {

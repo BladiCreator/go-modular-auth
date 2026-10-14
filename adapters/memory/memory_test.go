@@ -11,14 +11,14 @@ import (
 )
 
 func TestMemoryAdaptersIntegration(t *testing.T) {
-	s := memory.NewStore()
+	ad := memory.NewAdapter()
 	c := memory.NewCache()
 	e := memory.NewEmail()
 
 	engine, err := auth.New(auth.Config{
-		Store: s,
-		Cache: c,
-		Email: e,
+		Adapter: ad,
+		Cache:   c,
+		Email:   e,
 	})
 	if err != nil {
 		t.Fatalf("auth.New failed: %v", err)

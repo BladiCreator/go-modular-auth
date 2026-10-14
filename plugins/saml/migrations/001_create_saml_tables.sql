@@ -1,7 +1,7 @@
 -- Migration: 001_create_saml_tables.sql
 -- Description: Creates persistent storage tables for SAML IdP configurations, request sessions, and assertion replay tracking.
 
-CREATE TABLE IF NOT EXISTS auth_saml_idps (
+CREATE TABLE IF NOT EXISTS saml_idps (
     id VARCHAR(64) PRIMARY KEY,
     organization_id VARCHAR(64) NULL,
     entity_id VARCHAR(255) NOT NULL UNIQUE,
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS auth_saml_idps (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_saml_idps_org ON auth_saml_idps(organization_id);
+CREATE INDEX IF NOT EXISTS idx_saml_idps_org ON saml_idps(organization_id);
 
-CREATE TABLE IF NOT EXISTS auth_saml_requests (
+CREATE TABLE IF NOT EXISTS saml_requests (
     id VARCHAR(255) PRIMARY KEY,
     relay_state VARCHAR(255) NOT NULL,
-    provider_id VARCHAR(64) NOT NULL REFERENCES auth_saml_idps(id) ON DELETE CASCADE,
+    provider_id VARCHAR(64) NOT NULL REFERENCES saml_idps(id) ON DELETE CASCADE,
     organization_id VARCHAR(64) NULL,
     redirect_uri TEXT NULL,
     consumed_at TIMESTAMPTZ NULL,
@@ -33,14 +33,14 @@ CREATE TABLE IF NOT EXISTS auth_saml_requests (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_saml_requests_expires ON auth_saml_requests(expires_at);
-CREATE INDEX IF NOT EXISTS idx_auth_saml_requests_relay ON auth_saml_requests(relay_state);
+CREATE INDEX IF NOT EXISTS idx_saml_requests_expires ON saml_requests(expires_at);
+CREATE INDEX IF NOT EXISTS idx_saml_requests_relay ON saml_requests(relay_state);
 
-CREATE TABLE IF NOT EXISTS auth_saml_assertions (
+CREATE TABLE IF NOT EXISTS saml_assertions (
     assertion_id VARCHAR(255) PRIMARY KEY,
     provider_id VARCHAR(64) NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     consumed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_saml_assertions_expires ON auth_saml_assertions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_saml_assertions_expires ON saml_assertions(expires_at);

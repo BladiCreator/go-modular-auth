@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
@@ -14,7 +13,7 @@ func TestCacheLimiter_KeyCachingAndInvalidation(t *testing.T) {
 	coreMem := corecache.New()
 	limiter := NewLimiter(coreMem, 5, 1*time.Minute, 5*time.Minute)
 
-	key := &store.APIKey{
+	key := &KeyRecord{
 		ID:      "ak_test",
 		Name:    "Cached Key",
 		KeyHash: "sha256_mock_hash",

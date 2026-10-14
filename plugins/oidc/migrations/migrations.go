@@ -15,7 +15,7 @@ func Migrations() []sdk.Migration {
 	return []sdk.Migration{
 		{
 			Version:     1,
-			Description: "create auth_oidc_states table",
+			Description: "create oidc_states table",
 		},
 	}
 }

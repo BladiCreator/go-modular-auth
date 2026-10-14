@@ -3,41 +3,54 @@ package twofactor
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"strings"
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-twofactor/cache"
-	"github.com/BladiCreator/go-modular-auth-twofactor/store"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 type service struct {
-	ctx       *sdk.Context
-	cfg       Config
-	store     store.Store
-	cache     *cache.Cache
-	protector SecretProtector
+	ctx        *sdk.Context
+	cfg        Config
+	cache      *cache.Cache
+	protector  SecretProtector
+	factors    *sdk.Repository[FactorRecord]
+	recovery   *sdk.Repository[RecoveryCodeRecord]
+	challenges *sdk.Repository[ChallengeRecord]
 }
 
 var _ TwoFactor = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
-	if ctx != nil && ctx.Cache() != nil {
-		return &service{
-			ctx:       ctx,
-			cfg:       cfg,
-			store:     cfg.Store,
-			cache:     cache.New(ctx.Cache()),
-			protector: cfg.Protector,
-		}
+	if ctx == nil {
+		memAdapter := adaptermem.New()
+		s := schema.New()
+		_ = RegisterSchema(s)
+		_ = memAdapter.RegisterSchema(context.Background(), s)
+		ctx = sdk.NewTestContext(memAdapter, nil, nil)
 	}
+
+	var c *cache.Cache
+	if ctx.Cache() != nil {
+		c = cache.New(ctx.Cache())
+	} else {
+		c = cache.New(nil)
+	}
+
 	return &service{
-		ctx:       ctx,
-		cfg:       cfg,
-		store:     cfg.Store,
-		cache:     cache.New(nil),
-		protector: cfg.Protector,
+		ctx:        ctx,
+		cfg:        cfg,
+		cache:      c,
+		protector:  cfg.Protector,
+		factors:    sdk.Model[FactorRecord](ctx, ModelTwoFactors),
+		recovery:   sdk.Model[RecoveryCodeRecord](ctx, ModelRecoveryCodes),
+		challenges: sdk.Model[ChallengeRecord](ctx, ModelMFAChallenges),
 	}
 }
 
@@ -53,12 +66,16 @@ func (s *service) GetStatus(ctx context.Context, userID string) (*Status, error)
 		return nil, ErrInvalidInput
 	}
 
-	records, err := s.store.ListFactorsByUser(ctx, userID)
+	records, err := s.factors.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("user_id", userID)},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	activeCodes, err := s.store.ListActiveRecoveryCodesByUser(ctx, userID)
+	activeCodes, err := s.recovery.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("user_id", userID), adapter.IsNull("used_at")},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +158,7 @@ func (s *service) EnrollTOTP(ctx context.Context, userID string, opts ...EnrollO
 	}
 
 	now := s.now()
-	rec := &store.FactorRecord{
+	rec := &FactorRecord{
 		ID:               factorID,
 		UserID:           userID,
 		Type:             string(FactorTypeTOTP),
@@ -153,7 +170,7 @@ func (s *service) EnrollTOTP(ctx context.Context, userID string, opts ...EnrollO
 		UpdatedAt:        now,
 	}
 
-	if err := s.store.SaveFactor(ctx, rec); err != nil {
+	if err := s.factors.Create(ctx, rec); err != nil {
 		return nil, err
 	}
 
@@ -173,9 +190,9 @@ func (s *service) ConfirmTOTP(ctx context.Context, userID, factorID, code string
 		return ErrInvalidInput
 	}
 
-	rec, err := s.store.GetFactor(ctx, factorID)
+	rec, err := s.factors.FindOne(ctx, adapter.Eq("id", factorID))
 	if err != nil {
-		if err == store.ErrNotFound {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrFactorNotFound
 		}
 		return err
@@ -210,7 +227,14 @@ func (s *service) ConfirmTOTP(ctx context.Context, userID, factorID, code string
 	rec.LastUsedTimeStep = matchedStep
 	rec.UpdatedAt = now
 
-	if err := s.store.UpdateFactor(ctx, rec); err != nil {
+	_, err = s.factors.Update(ctx, []adapter.Condition{adapter.Eq("id", rec.ID)}, map[string]any{
+		"confirmed":           rec.Confirmed,
+		"confirmed_at":        rec.ConfirmedAt,
+		"last_used_at":        rec.LastUsedAt,
+		"last_used_time_step": rec.LastUsedTimeStep,
+		"updated_at":          rec.UpdatedAt,
+	})
+	if err != nil {
 		return err
 	}
 
@@ -237,13 +261,16 @@ func (s *service) VerifyTOTP(ctx context.Context, userID, code string) (*VerifyR
 		return nil, ErrInvalidInput
 	}
 
-	records, err := s.store.ListFactorsByUser(ctx, userID)
+	records, err := s.factors.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("user_id", userID)},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	var confirmed []*store.FactorRecord
-	for _, r := range records {
+	var confirmed []*FactorRecord
+	for i := range records {
+		r := &records[i]
 		if r.Confirmed && r.Type == string(FactorTypeTOTP) {
 			confirmed = append(confirmed, r)
 		}
@@ -284,7 +311,12 @@ func (s *service) VerifyTOTP(ctx context.Context, userID, code string) (*VerifyR
 		factor.LastUsedTimeStep = matchedStep
 		factor.UpdatedAt = now
 
-		if err := s.store.UpdateFactor(ctx, factor); err != nil {
+		_, err = s.factors.Update(ctx, []adapter.Condition{adapter.Eq("id", factor.ID)}, map[string]any{
+			"last_used_at":        factor.LastUsedAt,
+			"last_used_time_step": factor.LastUsedTimeStep,
+			"updated_at":          factor.UpdatedAt,
+		})
+		if err != nil {
 			return nil, err
 		}
 
@@ -329,7 +361,9 @@ func (s *service) VerifyRecoveryCode(ctx context.Context, userID, code string) (
 		return nil, ErrInvalidInput
 	}
 
-	activeCodes, err := s.store.ListActiveRecoveryCodesByUser(ctx, userID)
+	activeCodes, err := s.recovery.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("user_id", userID), adapter.IsNull("used_at")},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -339,9 +373,10 @@ func (s *service) VerifyRecoveryCode(ctx context.Context, userID, code string) (
 	}
 
 	inputHash := HashRecoveryCode(code)
-	var matched *store.RecoveryCodeRecord
+	var matched *RecoveryCodeRecord
 
-	for _, c := range activeCodes {
+	for i := range activeCodes {
+		c := &activeCodes[i]
 		if subtle.ConstantTimeCompare([]byte(c.CodeHash), []byte(inputHash)) == 1 {
 			matched = c
 			break
@@ -353,8 +388,17 @@ func (s *service) VerifyRecoveryCode(ctx context.Context, userID, code string) (
 	}
 
 	now := s.now()
-	if err := s.store.MarkRecoveryCodeUsed(ctx, matched.ID, now); err != nil {
+	affected, err := s.recovery.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", matched.ID),
+		adapter.IsNull("used_at"),
+	}, map[string]any{
+		"used_at": now,
+	})
+	if err != nil {
 		return nil, err
+	}
+	if affected == 0 {
+		return nil, ErrRecoveryCodeNotFound
 	}
 
 	res := &VerifyResult{
@@ -404,14 +448,13 @@ func (s *service) CreateChallenge(ctx context.Context, userID string) (*Challeng
 	now := s.now()
 	expiresAt := now.Add(s.cfg.ChallengeTTL)
 
-	// Persist challenge in store for durability
-	rec := &store.ChallengeRecord{
+	rec := &ChallengeRecord{
 		ID:        challengeID,
 		UserID:    userID,
 		ExpiresAt: expiresAt,
 		CreatedAt: now,
 	}
-	if err := s.store.SaveChallenge(ctx, rec); err != nil {
+	if err := s.challenges.Create(ctx, rec); err != nil {
 		return nil, err
 	}
 
@@ -446,10 +489,10 @@ func (s *service) VerifyChallenge(ctx context.Context, challengeID, code string)
 		userID = entry.UserID
 		expiresAt = entry.ExpiresAt
 	} else {
-		// Fallback to store
-		rec, err := s.store.GetChallenge(ctx, challengeID)
+		// Fallback to adapter
+		rec, err := s.challenges.FindOne(ctx, adapter.Eq("id", challengeID))
 		if err != nil {
-			if err == store.ErrNotFound {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return nil, ErrChallengeNotFound
 			}
 			return nil, err
@@ -474,8 +517,13 @@ func (s *service) VerifyChallenge(ctx context.Context, challengeID, code string)
 		}
 	}
 
-	// Mark challenge used in store
-	_ = s.store.MarkChallengeUsed(ctx, challengeID, now)
+	// Mark challenge used in adapter
+	_, _ = s.challenges.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", challengeID),
+		adapter.IsNull("used_at"),
+	}, map[string]any{
+		"used_at": now,
+	})
 	_ = s.cache.DeleteChallenge(ctx, challengeID)
 
 	return res, nil
@@ -490,7 +538,7 @@ func (s *service) GenerateRecoveryCodes(ctx context.Context, userID string, coun
 	}
 
 	plainCodes := make([]string, 0, count)
-	records := make([]*store.RecoveryCodeRecord, 0, count)
+	records := make([]*RecoveryCodeRecord, 0, count)
 	now := s.now()
 
 	for i := 0; i < count; i++ {
@@ -504,7 +552,7 @@ func (s *service) GenerateRecoveryCodes(ctx context.Context, userID string, coun
 		}
 
 		plainCodes = append(plainCodes, code)
-		records = append(records, &store.RecoveryCodeRecord{
+		records = append(records, &RecoveryCodeRecord{
 			ID:        codeID,
 			UserID:    userID,
 			CodeHash:  HashRecoveryCode(code),
@@ -512,8 +560,10 @@ func (s *service) GenerateRecoveryCodes(ctx context.Context, userID string, coun
 		})
 	}
 
-	if err := s.store.SaveRecoveryCodes(ctx, records); err != nil {
-		return nil, err
+	for _, r := range records {
+		if err := s.recovery.Create(ctx, r); err != nil {
+			return nil, err
+		}
 	}
 
 	return plainCodes, nil
@@ -525,7 +575,7 @@ func (s *service) RotateRecoveryCodes(ctx context.Context, userID string) ([]str
 	}
 
 	// Revoke existing unused recovery codes
-	if err := s.store.DeleteRecoveryCodesByUser(ctx, userID); err != nil {
+	if _, err := s.recovery.Delete(ctx, adapter.Eq("user_id", userID)); err != nil {
 		return nil, err
 	}
 
@@ -536,7 +586,9 @@ func (s *service) GetRemainingRecoveryCodesCount(ctx context.Context, userID str
 	if strings.TrimSpace(userID) == "" {
 		return 0, ErrInvalidInput
 	}
-	codes, err := s.store.ListActiveRecoveryCodesByUser(ctx, userID)
+	codes, err := s.recovery.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("user_id", userID), adapter.IsNull("used_at")},
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -548,10 +600,10 @@ func (s *service) Disable(ctx context.Context, userID string) error {
 		return ErrInvalidInput
 	}
 
-	if err := s.store.DeleteFactorsByUser(ctx, userID); err != nil {
+	if _, err := s.factors.Delete(ctx, adapter.Eq("user_id", userID)); err != nil {
 		return err
 	}
-	if err := s.store.DeleteRecoveryCodesByUser(ctx, userID); err != nil {
+	if _, err := s.recovery.Delete(ctx, adapter.Eq("user_id", userID)); err != nil {
 		return err
 	}
 
@@ -577,9 +629,9 @@ func (s *service) DisableFactor(ctx context.Context, userID, factorID string) er
 		return ErrInvalidInput
 	}
 
-	rec, err := s.store.GetFactor(ctx, factorID)
+	rec, err := s.factors.FindOne(ctx, adapter.Eq("id", factorID))
 	if err != nil {
-		if err == store.ErrNotFound {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return ErrFactorNotFound
 		}
 		return err
@@ -589,7 +641,7 @@ func (s *service) DisableFactor(ctx context.Context, userID, factorID string) er
 		return ErrFactorNotFound
 	}
 
-	if err := s.store.DeleteFactor(ctx, factorID); err != nil {
+	if _, err := s.factors.Delete(ctx, adapter.Eq("id", factorID)); err != nil {
 		return err
 	}
 

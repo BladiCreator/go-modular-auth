@@ -10,9 +10,9 @@ import (
 	"unicode"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-password-policy/store"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/credential"
+	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 )
 
@@ -111,8 +111,8 @@ func (s *service) ValidatePasswordDetailed(ctx context.Context, password string,
 		}
 
 		// B. Check against historical password hashes
-		if !slices.Contains(violations, "reuse_current") && s.cfg.Store != nil {
-			history, _ := s.cfg.Store.GetHistory(ctx, userID, policy.HistoryCount)
+		if !slices.Contains(violations, "reuse_current") {
+			history, _ := s.getHistory(ctx, userID, policy.HistoryCount)
 			for _, h := range history {
 				if err := s.cfg.Hasher.Verify(ctx, h.PasswordHash, password); err == nil {
 					violations = append(violations, "reuse_history")
@@ -229,24 +229,24 @@ func (s *service) RecordHistory(ctx context.Context, userID, hash string) error 
 	}
 
 	// Deduplicate if already recorded as the latest entry
-	recent, _ := s.cfg.Store.GetHistory(ctx, userID, 1)
+	recent, _ := s.getHistory(ctx, userID, 1)
 	if len(recent) > 0 && recent[0].PasswordHash == hash {
 		return nil
 	}
 
-	entry := &store.PasswordHistory{
+	entry := &PasswordHistory{
 		ID:           generateID("pwd_hist"),
 		UserID:       userID,
 		PasswordHash: hash,
 		CreatedAt:    s.cfg.Clock(),
 	}
 
-	if err := s.cfg.Store.SaveHistory(ctx, entry); err != nil {
+	if err := s.saveHistory(ctx, entry); err != nil {
 		return err
 	}
 
 	if s.cfg.Policy.HistoryCount > 0 {
-		_ = s.cfg.Store.PruneHistory(ctx, userID, s.cfg.Policy.HistoryCount)
+		_ = s.pruneHistory(ctx, userID, s.cfg.Policy.HistoryCount)
 	}
 
 	s.emitAudit(ctx, EventHistoryRecorded, HistoryRecordedPayload{
@@ -263,7 +263,7 @@ func (s *service) GetHistory(ctx context.Context, userID string, limit int) ([]*
 	if userID == "" {
 		return nil, ErrInvalidInput
 	}
-	return s.cfg.Store.GetHistory(ctx, userID, limit)
+	return s.getHistory(ctx, userID, limit)
 }
 
 // ClearHistory removes all historical password records for a user.
@@ -271,7 +271,7 @@ func (s *service) ClearHistory(ctx context.Context, userID string) error {
 	if userID == "" {
 		return ErrInvalidInput
 	}
-	return s.cfg.Store.DeleteHistoryByUser(ctx, userID)
+	return s.deleteHistoryByUser(ctx, userID)
 }
 
 // GetPolicy returns the currently active policy configuration.
@@ -280,7 +280,7 @@ func (s *service) GetPolicy() Policy {
 }
 
 func (s *service) recordCurrentPasswordHash(ctx context.Context, userID string) {
-	if s.coreStore == nil || s.cfg.Store == nil || s.cfg.Policy.HistoryCount <= 0 {
+	if s.coreStore == nil || s.cfg.Policy.HistoryCount <= 0 {
 		return
 	}
 
@@ -305,6 +305,55 @@ func (s *service) emitAudit(ctx context.Context, name auth.EventName, payload an
 			Payload: payload,
 		})
 	}
+}
+
+func (s *service) getHistory(ctx context.Context, userID string, limit int) ([]*PasswordHistory, error) {
+	repo := sdk.Model[PasswordHistory](s.ctx, ModelPasswordHistory)
+	hist, err := repo.FindMany(ctx, adapter.Query{
+		Where:  []adapter.Condition{adapter.Eq("user_id", userID)},
+		SortBy: "created_at",
+		Desc:   true,
+		Limit:  limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*PasswordHistory, len(hist))
+	for i := range hist {
+		res[i] = &hist[i]
+	}
+	return res, nil
+}
+
+func (s *service) saveHistory(ctx context.Context, entry *PasswordHistory) error {
+	repo := sdk.Model[PasswordHistory](s.ctx, ModelPasswordHistory)
+	return repo.Create(ctx, entry)
+}
+
+func (s *service) pruneHistory(ctx context.Context, userID string, keepCount int) error {
+	repo := sdk.Model[PasswordHistory](s.ctx, ModelPasswordHistory)
+	all, err := repo.FindMany(ctx, adapter.Query{
+		Where:  []adapter.Condition{adapter.Eq("user_id", userID)},
+		SortBy: "created_at",
+		Desc:   true,
+	})
+	if err != nil {
+		return err
+	}
+	if len(all) <= keepCount {
+		return nil
+	}
+	toDelete := all[keepCount:]
+	for _, entry := range toDelete {
+		_, _ = repo.Delete(ctx, adapter.Eq("id", entry.ID))
+	}
+	return nil
+}
+
+func (s *service) deleteHistoryByUser(ctx context.Context, userID string) error {
+	repo := sdk.Model[PasswordHistory](s.ctx, ModelPasswordHistory)
+	_, err := repo.Delete(ctx, adapter.Eq("user_id", userID))
+	return err
 }
 
 func generateID(prefix string) string {

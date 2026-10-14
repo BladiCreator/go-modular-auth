@@ -10,28 +10,29 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-multisession"
 	"github.com/BladiCreator/go-modular-auth-multisession/plugins"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/session"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type testRig struct {
 	auth   *auth.Auth
-	store  *memstore.Store
+	store  corestore.Store
 	cache  *memcache.Cache
 	plugin multisession.MultiSession
 }
 
 func setupTestRig(t *testing.T, opts ...multisession.Option) *testRig {
 	t.Helper()
-	store := memstore.New()
+	ad := adaptermem.New()
 	cache := memcache.New()
 
 	mod := multisession.New(opts...)
 	app, err := auth.New(auth.Config{
-		Store:   store,
+		Adapter: ad,
 		Cache:   cache,
 		Plugins: []auth.PluginModule{mod},
 	})
@@ -46,7 +47,7 @@ func setupTestRig(t *testing.T, opts ...multisession.Option) *testRig {
 
 	return &testRig{
 		auth:   app,
-		store:  store,
+		store:  app.Store(),
 		cache:  cache,
 		plugin: cap,
 	}

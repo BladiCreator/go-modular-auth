@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	jwtcache "github.com/BladiCreator/go-modular-auth-jwt/cache"
-	"github.com/BladiCreator/go-modular-auth-jwt/store"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
@@ -17,7 +18,6 @@ type service struct {
 	ctx   *sdk.Context
 	cfg   Config
 	km    KeyManager
-	store store.Store
 	cache jwtcache.RevocationCache
 	hooks *Hooks
 }
@@ -29,7 +29,6 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 		ctx:   ctx,
 		cfg:   cfg,
 		km:    cfg.KeyManager,
-		store: cfg.Store,
 		cache: cfg.Cache,
 		hooks: cfg.Hooks,
 	}
@@ -213,15 +212,24 @@ func (s *service) Revoke(ctx context.Context, jti string, expiresAt time.Time, r
 		expiresAt = now.Add(s.cfg.DefaultTTL)
 	}
 
-	if s.store != nil {
-		rec := &store.RevocationRecord{
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		rec := &RevocationRecord{
 			JTI:       jti,
 			Reason:    reason,
 			ExpiresAt: expiresAt,
 			RevokedAt: now,
 		}
-		if err := s.store.RevokeToken(ctx, rec); err != nil {
-			return err
+		repo := sdk.Model[RevocationRecord](s.ctx, ModelJWTRevocations)
+		if err := repo.Create(ctx, rec); err != nil {
+			if errors.Is(err, adapter.ErrConflict) {
+				_, _ = repo.Update(ctx, []adapter.Condition{adapter.Eq("jti", jti)}, map[string]any{
+					"reason":     reason,
+					"expires_at": expiresAt,
+					"revoked_at": now,
+				})
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -254,15 +262,32 @@ func (s *service) RevokeSubject(ctx context.Context, subject string, cutoff time
 		cutoff = now
 	}
 
-	if s.store != nil {
-		rec := &store.SubjectRevocationRecord{
-			Subject:   subject,
-			Cutoff:    cutoff,
-			Reason:    reason,
-			RevokedAt: now,
-		}
-		if err := s.store.RevokeSubject(ctx, rec); err != nil {
-			return err
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		repo := sdk.Model[SubjectRevocationRecord](s.ctx, ModelJWTSubjectRevocations)
+		existing, err := repo.FindOne(ctx, adapter.Eq("subject", subject))
+		if err == nil && existing != nil {
+			if existing.Cutoff.After(cutoff) {
+				// Keep the later cutoff
+			} else {
+				_, err := repo.Update(ctx, []adapter.Condition{adapter.Eq("subject", subject)}, map[string]any{
+					"cutoff":     cutoff,
+					"reason":     reason,
+					"revoked_at": now,
+				})
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			rec := &SubjectRevocationRecord{
+				Subject:   subject,
+				Cutoff:    cutoff,
+				Reason:    reason,
+				RevokedAt: now,
+			}
+			if err := repo.Create(ctx, rec); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -280,6 +305,7 @@ func (s *service) RevokeSubject(ctx context.Context, subject string, cutoff time
 }
 
 func (s *service) IsRevoked(ctx context.Context, jti string, subject string, issuedAt time.Time) (bool, error) {
+	now := s.now()
 	// 1. Check individual token revocation (JTI)
 	if jti != "" {
 		if s.cache != nil {
@@ -289,16 +315,21 @@ func (s *service) IsRevoked(ctx context.Context, jti string, subject string, iss
 				}
 			}
 		}
-		if s.store != nil {
-			revoked, err := s.store.IsTokenRevoked(ctx, jti)
-			if err != nil {
+		if s.ctx != nil && s.ctx.Adapter() != nil {
+			repo := sdk.Model[RevocationRecord](s.ctx, ModelJWTRevocations)
+			rec, err := repo.FindOne(ctx, adapter.Eq("jti", jti))
+			if err != nil && !errors.Is(err, adapter.ErrNotFound) {
 				return false, err
 			}
-			if revoked {
-				if s.cache != nil {
-					_ = s.cache.SetTokenRevoked(ctx, jti, s.cfg.DefaultTTL)
+			if rec != nil {
+				if !rec.ExpiresAt.IsZero() && now.After(rec.ExpiresAt) {
+					// Expired record
+				} else {
+					if s.cache != nil {
+						_ = s.cache.SetTokenRevoked(ctx, jti, s.cfg.DefaultTTL)
+					}
+					return true, nil
 				}
-				return true, nil
 			}
 		}
 	}
@@ -312,13 +343,16 @@ func (s *service) IsRevoked(ctx context.Context, jti string, subject string, iss
 				}
 			}
 		}
-		if s.store != nil {
-			revoked, err := s.store.IsSubjectRevoked(ctx, subject, issuedAt)
-			if err != nil {
+		if s.ctx != nil && s.ctx.Adapter() != nil {
+			repo := sdk.Model[SubjectRevocationRecord](s.ctx, ModelJWTSubjectRevocations)
+			rec, err := repo.FindOne(ctx, adapter.Eq("subject", subject))
+			if err != nil && !errors.Is(err, adapter.ErrNotFound) {
 				return false, err
 			}
-			if revoked {
-				return true, nil
+			if rec != nil {
+				if !issuedAt.After(rec.Cutoff) {
+					return true, nil
+				}
 			}
 		}
 	}

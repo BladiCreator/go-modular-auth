@@ -16,10 +16,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	"github.com/BladiCreator/go-modular-auth/adapter/bridge"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
 	"github.com/BladiCreator/go-modular-auth/password"
 	"github.com/BladiCreator/go-modular-auth/plugin"
+	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/store"
 )
 
@@ -27,6 +30,8 @@ import (
 // no global state: create as many independent instances as needed.
 type Auth struct {
 	cfg          Config
+	adapter      adapter.Adapter
+	schema       *schema.Schema
 	store        store.Store
 	cache        cache.Cache // nil when not configured
 	sessionCache cache.SessionCache
@@ -48,7 +53,8 @@ func New(cfg Config) (*Auth, error) {
 	}
 	a := &Auth{
 		cfg:      cfg,
-		store:    cfg.Store,
+		adapter:  cfg.Adapter,
+		store:    bridge.New(cfg.Adapter),
 		cache:    cfg.Cache,
 		email:    cfg.Email,
 		hasher:   cfg.Hasher,

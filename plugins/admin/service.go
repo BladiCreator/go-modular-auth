@@ -7,8 +7,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth-admin/cache"
-	"github.com/BladiCreator/go-modular-auth-admin/store"
 	"github.com/BladiCreator/go-modular-auth-organizations"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
@@ -19,7 +19,7 @@ import (
 type service struct {
 	ctx        *sdk.Context
 	cfg        Config
-	store      store.Store
+	usersRepo  *sdk.Repository[UserRecord]
 	cache      cache.Cache
 	authorizer Authorizer
 	orgs       organizations.Organization
@@ -28,10 +28,15 @@ type service struct {
 var _ Admin = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
+	var usersRepo *sdk.Repository[UserRecord]
+	if ctx != nil {
+		usersRepo = sdk.Model[UserRecord](ctx, ModelAdminUsers)
+	}
+
 	s := &service{
 		ctx:        ctx,
 		cfg:        cfg,
-		store:      cfg.Store,
+		usersRepo:  usersRepo,
 		cache:      cache.New(ctx.Cache()),
 		authorizer: cfg.Authorizer,
 		orgs:       cfg.Organizations,
@@ -59,6 +64,174 @@ func (s *service) publish(ctx context.Context, name auth.EventName, subject stri
 	}
 }
 
+func (s *service) isAdmin(ctx context.Context, userID string) (bool, error) {
+	if s.usersRepo == nil {
+		return false, nil
+	}
+	rec, err := s.usersRepo.FindOne(ctx, adapter.Eq("user_id", userID))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return rec.IsAdmin, nil
+}
+
+func (s *service) getUser(ctx context.Context, userID string) (*UserRecord, error) {
+	if s.usersRepo == nil {
+		return nil, ErrUserNotFound
+	}
+	rec, err := s.usersRepo.FindOne(ctx, adapter.Eq("user_id", userID))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return rec, nil
+}
+
+func (s *service) isUserDisabled(ctx context.Context, userID string) (bool, error) {
+	if s.usersRepo == nil {
+		return false, nil
+	}
+	rec, err := s.usersRepo.FindOne(ctx, adapter.Eq("user_id", userID))
+	if err != nil {
+		if errors.Is(err, adapter.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return rec.Disabled, nil
+}
+
+func (s *service) upsertUser(ctx context.Context, rec *UserRecord) error {
+	if s.usersRepo == nil {
+		return nil
+	}
+	existing, err := s.usersRepo.FindOne(ctx, adapter.Eq("user_id", rec.UserID))
+	if err == nil && existing != nil {
+		_, err := s.usersRepo.Update(ctx, []adapter.Condition{adapter.Eq("user_id", rec.UserID)}, map[string]any{
+			"email":           rec.Email,
+			"disabled":        rec.Disabled,
+			"disabled_at":     rec.DisabledAt,
+			"disabled_reason": rec.DisabledReason,
+			"is_admin":        rec.IsAdmin,
+			"role":            rec.Role,
+			"metadata":        rec.Metadata,
+			"updated_at":      rec.UpdatedAt,
+		})
+		return err
+	}
+	return s.usersRepo.Create(ctx, rec)
+}
+
+func (s *service) updateUserStatus(ctx context.Context, userID string, disabled bool, reason string, at *time.Time) error {
+	if s.usersRepo == nil {
+		return ErrUserNotFound
+	}
+	affected, err := s.usersRepo.Update(ctx, []adapter.Condition{adapter.Eq("user_id", userID)}, map[string]any{
+		"disabled":        disabled,
+		"disabled_reason": reason,
+		"disabled_at":     at,
+		"updated_at":      s.now(),
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (s *service) deleteUser(ctx context.Context, userID string) error {
+	if s.usersRepo == nil {
+		return nil
+	}
+	_, err := s.usersRepo.Delete(ctx, adapter.Eq("user_id", userID))
+	return err
+}
+
+func (s *service) setAdminRole(ctx context.Context, userID string, isAdmin bool, role string) error {
+	if s.usersRepo == nil {
+		return nil
+	}
+	affected, err := s.usersRepo.Update(ctx, []adapter.Condition{adapter.Eq("user_id", userID)}, map[string]any{
+		"is_admin":   isAdmin,
+		"role":       role,
+		"updated_at": s.now(),
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		coreUser, err := s.ctx.Store().Users().GetByID(ctx, userID)
+		if err != nil {
+			return err
+		}
+		now := s.now()
+		return s.usersRepo.Create(ctx, &UserRecord{
+			UserID:    coreUser.ID,
+			Email:     coreUser.Email,
+			IsAdmin:   isAdmin,
+			Role:      role,
+			CreatedAt: coreUser.CreatedAt,
+			UpdatedAt: now,
+		})
+	}
+	return nil
+}
+
+func (s *service) listUsers(ctx context.Context, filter ListFilter) ([]*UserRecord, int, error) {
+	if s.usersRepo == nil {
+		return []*UserRecord{}, 0, nil
+	}
+	var where []adapter.Condition
+	if filter.Status == "active" {
+		where = append(where, adapter.Eq("disabled", false))
+	} else if filter.Status == "disabled" {
+		where = append(where, adapter.Eq("disabled", true))
+	}
+	if filter.Search != "" {
+		where = append(where, adapter.Condition{
+			Field:    "email",
+			Operator: adapter.OpLike,
+			Value:    "%" + filter.Search + "%",
+		})
+	}
+	total, err := s.usersRepo.Count(ctx, where...)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.usersRepo.FindMany(ctx, adapter.Query{
+		Model:  ModelAdminUsers,
+		Where:  where,
+		Limit:  filter.Limit,
+		Offset: filter.Offset,
+		SortBy: "created_at",
+		Desc:   true,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	records := make([]*UserRecord, len(rows))
+	for i := range rows {
+		records[i] = &rows[i]
+	}
+	return records, int(total), nil
+}
+
+func (s *service) transaction(ctx context.Context, fn func(txCtx context.Context) error) error {
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		return s.ctx.Adapter().Transaction(ctx, func(txCtx context.Context, tx adapter.Adapter) error {
+			return fn(txCtx)
+		})
+	}
+	return fn(ctx)
+}
+
 // authorize verifies that the caller principal has sufficient administrative permissions.
 func (s *service) authorize(ctx context.Context, p auth.Principal, action string, targetUserID string) error {
 	if p.Subject == "" {
@@ -70,7 +243,7 @@ func (s *service) authorize(ctx context.Context, p auth.Principal, action string
 	}
 
 	// Default Authorization: Principal must be registered as an Administrator in Admin Store.
-	isAdmin, err := s.store.IsAdmin(ctx, p.Subject)
+	isAdmin, err := s.isAdmin(ctx, p.Subject)
 	if err != nil || !isAdmin {
 		return ErrUnauthorized
 	}
@@ -90,10 +263,10 @@ func (s *service) internalLookupUser(ctx context.Context, userID string) (*UserD
 	}
 
 	// Fetch or synthesize admin record
-	adminRec, err := s.store.GetUser(ctx, userID)
+	adminRec, err := s.getUser(ctx, userID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			adminRec = &store.UserRecord{
+		if errors.Is(err, ErrUserNotFound) {
+			adminRec = &UserRecord{
 				UserID:    coreUser.ID,
 				Email:     coreUser.Email,
 				Disabled:  false,
@@ -210,7 +383,7 @@ func (s *service) ListUsers(ctx context.Context, p auth.Principal, filter ListFi
 		filter.Offset = 0
 	}
 
-	records, total, err := s.store.ListUsers(ctx, filter)
+	records, total, err := s.listUsers(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +408,8 @@ func (s *service) internalDisableUser(ctx context.Context, actorID, targetUserID
 	}
 
 	// Verify current state
-	disabled, err := s.store.IsUserDisabled(ctx, targetUserID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	disabled, err := s.isUserDisabled(ctx, targetUserID)
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		return err
 	}
 	if disabled {
@@ -246,12 +419,12 @@ func (s *service) internalDisableUser(ctx context.Context, actorID, targetUserID
 	now := s.now()
 
 	// Atomic persistence update
-	err = s.store.Transaction(ctx, func(txCtx context.Context) error {
+	err = s.transaction(ctx, func(txCtx context.Context) error {
 		// Update admin status
-		if err := s.store.UpdateUserStatus(txCtx, targetUserID, true, reason, &now); err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+		if err := s.updateUserStatus(txCtx, targetUserID, true, reason, &now); err != nil {
+			if errors.Is(err, ErrUserNotFound) {
 				// Upsert if record was not previously indexed
-				rec := &store.UserRecord{
+				rec := &UserRecord{
 					UserID:         u.ID,
 					Email:          u.Email,
 					Disabled:       true,
@@ -260,7 +433,7 @@ func (s *service) internalDisableUser(ctx context.Context, actorID, targetUserID
 					CreatedAt:      u.CreatedAt,
 					UpdatedAt:      now,
 				}
-				if err := s.store.UpsertUser(txCtx, rec); err != nil {
+				if err := s.upsertUser(txCtx, rec); err != nil {
 					return err
 				}
 			} else {
@@ -318,8 +491,8 @@ func (s *service) internalEnableUser(ctx context.Context, actorID, targetUserID 
 	}
 
 	// Verify current status
-	disabled, err := s.store.IsUserDisabled(ctx, targetUserID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	disabled, err := s.isUserDisabled(ctx, targetUserID)
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		return err
 	}
 	if !disabled {
@@ -329,8 +502,8 @@ func (s *service) internalEnableUser(ctx context.Context, actorID, targetUserID 
 	now := s.now()
 
 	// Atomic update in admin store
-	err = s.store.Transaction(ctx, func(txCtx context.Context) error {
-		return s.store.UpdateUserStatus(txCtx, targetUserID, false, "", nil)
+	err = s.transaction(ctx, func(txCtx context.Context) error {
+		return s.updateUserStatus(txCtx, targetUserID, false, "", nil)
 	})
 	if err != nil {
 		return err
@@ -628,7 +801,7 @@ func (s *service) DeleteUser(ctx context.Context, p auth.Principal, targetUserID
 		}
 
 		// Delete user in admin store
-		return s.store.DeleteUser(txCtx, targetUserID)
+		return s.deleteUser(txCtx, targetUserID)
 	})
 	if err != nil {
 		return err
@@ -667,7 +840,7 @@ func (s *service) SetAdminStatus(ctx context.Context, p auth.Principal, targetUs
 		return err
 	}
 
-	if err := s.store.SetAdminRole(ctx, targetUserID, isAdmin, role); err != nil {
+	if err := s.setAdminRole(ctx, targetUserID, isAdmin, role); err != nil {
 		return err
 	}
 
@@ -697,9 +870,9 @@ func (s *service) IsUserDisabled(ctx context.Context, userID string) (bool, erro
 		}
 	}
 
-	disabled, err := s.store.IsUserDisabled(ctx, userID)
+	disabled, err := s.isUserDisabled(ctx, userID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, ErrUserNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -777,9 +950,9 @@ func (s *scopedAdminService) ListUsers(ctx context.Context, p auth.Principal, fi
 		return nil, err
 	}
 
-	var users []*store.UserRecord
+	var users []*UserRecord
 	for _, m := range members {
-		rec, err := s.parent.store.GetUser(ctx, m.UserID)
+		rec, err := s.parent.getUser(ctx, m.UserID)
 		if err == nil {
 			if filter.Status == "active" && rec.Disabled {
 				continue

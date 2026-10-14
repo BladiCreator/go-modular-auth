@@ -2,12 +2,7 @@ package audit
 
 import (
 	"context"
-
-	"github.com/BladiCreator/go-modular-auth-audit/store"
 )
-
-// AuditStore is an alias for store.Store for public module consumers.
-type AuditStore = store.Store
 
 // Audit represents the strongly typed public capability provided by the audit plugin.
 // Applications retrieve this capability via auth.Get[plugins.Audit]().

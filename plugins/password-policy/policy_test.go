@@ -7,29 +7,23 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	passwordpolicy "github.com/BladiCreator/go-modular-auth-password-policy"
 	"github.com/BladiCreator/go-modular-auth-password-policy/plugins"
-	"github.com/BladiCreator/go-modular-auth-password-policy/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/verification"
 )
 
-func setupTestAuth(t *testing.T, opts ...passwordpolicy.Option) (*auth.Auth, plugins.PasswordPolicy, *memory.Store) {
+func setupTestAuth(t *testing.T, opts ...passwordpolicy.Option) (*auth.Auth, plugins.PasswordPolicy, adapter.Adapter) {
 	t.Helper()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	pStore := memory.New()
 
-	baseOpts := []passwordpolicy.Option{
-		passwordpolicy.WithStore(pStore),
-	}
-	baseOpts = append(baseOpts, opts...)
-
-	policyModule := passwordpolicy.New(baseOpts...)
+	policyModule := passwordpolicy.New(opts...)
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{policyModule},
 	})
@@ -42,7 +36,7 @@ func setupTestAuth(t *testing.T, opts ...passwordpolicy.Option) (*auth.Auth, plu
 		t.Fatalf("auth.Get[plugins.PasswordPolicy] failed: %v", err)
 	}
 
-	return a, policyPlugin, pStore
+	return a, policyPlugin, ad
 }
 
 func TestPasswordPolicy_Hook_BeforeSignUp(t *testing.T) {

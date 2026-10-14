@@ -6,18 +6,18 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
 	"github.com/BladiCreator/go-modular-auth/password"
-	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
-// Config configures an Auth instance. Only Store is required; every zero
-// value falls back to a secure default.
+// Config configures an Auth instance. Adapter is required;
+// every zero value falls back to a secure default.
 type Config struct {
-	// Store is the source of truth. Required.
-	Store store.Store
+	// Adapter is the generic, schema-driven storage adapter. Required.
+	Adapter adapter.Adapter
 	// Cache is an optional performance layer. When nil every read hits the Store.
 	Cache cache.Cache
 	// Email is an optional sender used by email verification and password reset.
@@ -88,8 +88,8 @@ type Messages struct {
 }
 
 func (c Config) withDefaults() (Config, error) {
-	if c.Store == nil {
-		return c, ErrStoreRequired
+	if c.Adapter == nil {
+		return c, ErrAdapterRequired
 	}
 	if c.Hasher == nil {
 		c.Hasher = password.NewArgon2id(password.DefaultArgon2idParams)

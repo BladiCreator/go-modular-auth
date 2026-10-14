@@ -12,19 +12,18 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	bearer "github.com/BladiCreator/go-modular-auth-bearer"
 	"github.com/BladiCreator/go-modular-auth-bearer/plugins"
-	"github.com/BladiCreator/go-modular-auth-bearer/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func setupTestAuth(t *testing.T, opts ...bearer.Option) (*auth.Auth, bearer.Bearer) {
 	t.Helper()
 
 	cacheAdapter := corecpmem.New()
-	storeAdapter := storememory.New()
+	adapterInstance := adaptermem.New()
 
 	app, err := auth.New(auth.Config{
-		Store:   storeAdapter,
+		Adapter: adapterInstance,
 		Cache:   cacheAdapter,
 		Plugins: []auth.PluginModule{bearer.New(opts...)},
 	})
@@ -384,7 +383,7 @@ func TestBearer_Events(t *testing.T) {
 	)
 
 	app, err := auth.New(auth.Config{
-		Store:   storememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{bearer.New()},
 	})
 	if err != nil {
@@ -429,7 +428,7 @@ func TestBearer_Events(t *testing.T) {
 
 func TestBearer_Concurrency(t *testing.T) {
 	ctx := context.Background()
-	_, plugin := setupTestAuth(t, bearer.WithStore(memory.New()))
+	_, plugin := setupTestAuth(t)
 
 	const workers = 30
 	var wg sync.WaitGroup

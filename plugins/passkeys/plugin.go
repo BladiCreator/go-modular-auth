@@ -3,6 +3,7 @@ package passkey
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID is the unique identifier for this plugin module in GoModularAuth.
@@ -13,7 +14,15 @@ type Module struct {
 	cfg Config
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
+
+// RegisterSchema registers the passkeys model into the compiled schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
 
 // New constructs an installable Passkey plugin module.
 func New(opts ...Option) *Module {

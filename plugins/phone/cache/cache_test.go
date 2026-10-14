@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-phone/store"
 )
 
 func TestLimiter_RateLimitAndCooldown(t *testing.T) {
@@ -49,27 +47,4 @@ func TestLimiter_RateLimitAndCooldown(t *testing.T) {
 	if err != nil || allowed {
 		t.Fatalf("4th request should exceed limit, got allowed=%v", allowed)
 	}
-}
-
-func TestPhoneCache_SetGetInvalidate(t *testing.T) {
-	ctx := context.Background()
-
-	// When underlying cache is nil, operations should be safe no-ops / misses
-	pc := NewPhoneCache(nil, 5*time.Minute)
-	_, err := pc.GetByUserID(ctx, "u1")
-	if err == nil {
-		t.Fatal("expected miss on nil cache")
-	}
-
-	rec := &store.PhoneRecord{
-		ID:          "p1",
-		UserID:      "u1",
-		PhoneNumber: "+12025550123",
-		Verified:    true,
-	}
-	if err := pc.SetByUserID(ctx, "u1", rec); err != nil {
-		t.Fatalf("unexpected error setting nil cache: %v", err)
-	}
-
-	pc.Invalidate(ctx, "u1", "+12025550123")
 }

@@ -3,8 +3,6 @@ package passwordpolicy
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-password-policy/store"
-	"github.com/BladiCreator/go-modular-auth-password-policy/store/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
 )
 
@@ -19,9 +17,6 @@ type Config struct {
 	// Hasher provides password hashing verification for history comparison.
 	// Reuses Core's Argon2id hasher by default.
 	Hasher password.Hasher
-
-	// Store provides persistence for password history records.
-	Store store.Store
 
 	// EnforceOnSignUp controls whether the BeforeSignUp hook validates passwords. Defaults to true.
 	EnforceOnSignUp bool
@@ -100,15 +95,6 @@ func WithHasher(hasher password.Hasher) Option {
 	}
 }
 
-// WithStore sets the password history persistence store.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
-
 // WithEnforceOnSignUp configures whether the BeforeSignUp hook validates passwords.
 func WithEnforceOnSignUp(enforce bool) Option {
 	return func(c *Config) {
@@ -130,7 +116,6 @@ func defaultConfig() Config {
 		Policy:             DefaultPolicy(),
 		CompromisedChecker: DefaultCompromisedChecker,
 		Hasher:             password.NewArgon2id(password.DefaultArgon2idParams),
-		Store:              memory.New(),
 		EnforceOnSignUp:    true,
 		Clock: func() time.Time {
 			return time.Now().UTC()

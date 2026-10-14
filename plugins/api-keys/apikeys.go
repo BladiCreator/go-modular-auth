@@ -7,17 +7,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 )
-
-// APIKey represents the persistent, non-secret state of an issued API key.
-type APIKey = store.APIKey
-
-// ListFilter specifies criteria for querying API keys.
-type ListFilter = store.ListFilter
-
-// Store is the persistence interface required by the API keys plugin.
-type Store = store.Store
 
 type apiKeyContextKey struct{}
 

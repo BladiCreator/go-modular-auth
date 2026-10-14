@@ -3,6 +3,7 @@ package deviceauth
 import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -14,7 +15,15 @@ type Module struct {
 	svc *service
 }
 
-var _ auth.PluginModule = (*Module)(nil)
+var (
+	_ auth.PluginModule   = (*Module)(nil)
+	_ auth.SchemaProvider = (*Module)(nil)
+)
+
+// RegisterSchema registers the device_grants model into the schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
+}
 
 // New creates an installable device authorization PluginModule with options.
 func New(opts ...Option) *Module {
@@ -32,11 +41,11 @@ func (m *Module) ID() string {
 
 // Init configures infrastructure and registers the typed Capability in GoModularAuth.
 func (m *Module) Init(h *auth.Host) error {
-	if m.cfg.Store == nil {
-		return ErrStoreRequired
+	ctx := sdk.NewContext(h)
+	if ctx.Adapter() == nil {
+		return ErrAdapterRequired
 	}
 
-	ctx := sdk.NewContext(h)
 	m.svc = newService(ctx, m.cfg)
 
 	return sdk.Provide[DeviceAuthorization](ctx, m.svc)

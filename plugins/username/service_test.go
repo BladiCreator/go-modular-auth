@@ -8,9 +8,9 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-username"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 var fastHasher = password.NewArgon2id(password.Argon2idParams{Memory: 64, Iterations: 1})
@@ -20,7 +20,7 @@ func setupTestAuth(t *testing.T, opts ...username.Option) (*auth.Auth, username.
 
 	uMod := username.New(opts...)
 	a, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Cache:   memcache.New(),
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{uMod},
@@ -240,7 +240,7 @@ func TestPluginEvents(t *testing.T) {
 
 	uMod := username.New()
 	a, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{uMod},
 	})

@@ -8,20 +8,18 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-organizations"
 	"github.com/BladiCreator/go-modular-auth-organizations/plugins"
-	"github.com/BladiCreator/go-modular-auth-organizations/store/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func setupTestApp(t *testing.T) (*auth.Auth, organizations.Organization) {
 	t.Helper()
 
 	orgModule := organizations.New(
-		organizations.WithStore(memory.New()),
 		organizations.WithCacheTTL(10*time.Minute),
 	)
 
 	a, err := auth.New(auth.Config{
-		Store:   coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	if err != nil {

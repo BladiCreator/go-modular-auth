@@ -1,172 +1,174 @@
-# Transport Adapters (HTTP, gRPC, CLI)
+# Transport Adapters (HTTP & gRPC)
 
 ## 1. Principles of Transport Integration
 
-GoModularAuth is completely **transport-agnostic**. The core engine defines domain operations that receive `context.Context` and pure Go structs.
+GoModularAuth is **completely transport-agnostic**. The core engine defines domain operations that receive `context.Context` and pure Go structs.
 
 The role of a **Transport Adapter** is to:
-1. Extract credentials or session tokens from incoming transport requests (Cookies, `Authorization: Bearer <token>`, HTTP headers, gRPC metadata).
-2. Call the core engine (`app.SignIn`, `app.RequireSession`, etc.).
-3. Inject the resolved `auth.Principal` into the request context.
-4. Format responses, set cookies, or return appropriate HTTP status codes / gRPC errors.
+1. Extract credentials or session tokens from incoming transport requests (Cookies, `Authorization: Bearer <token>`, custom headers, or gRPC metadata).
+2. Call the core engine (`app.GetSession`, `app.RequireSession`).
+3. Inject the resolved `auth.Principal` and `auth.SessionResult` into the request context.
+4. Format responses, set cookies, or return appropriate HTTP status codes or gRPC status codes.
 
 ---
 
-## 2. Standard `net/http` Adapter Example
+## 2. Official HTTP Adapter (`adapters/http`)
 
-### 2.1 Middleware: Authenticating Requests
+Import:
 ```go
-package transport
+import "github.com/BladiCreator/go-modular-auth/adapters/http"
+```
+
+### 2.1 Token Extractors
+Extractors retrieve authentication tokens from incoming requests:
+
+- **`http.BearerExtractor`**: Extracts Bearer token from the standard `Authorization: Bearer <token>` header.
+- **`http.CookieExtractor("session_token")`**: Extracts token from a named HTTP cookie.
+- **`http.HeaderExtractor("X-Auth-Token")`**: Extracts token from a custom HTTP header.
+
+### 2.2 Middleware
+
+#### `http.Authenticate` (Lenient)
+Validates a session if a token is present, binding the session and principal to `r.Context()`. If no token is provided or the token is invalid, the request continues as an unauthenticated guest request:
+
+```go
+handler = http.Authenticate(engine,
+    http.WithExtractor(http.BearerExtractor),
+    http.WithExtractor(http.CookieExtractor("session_token")),
+)(handler)
+```
+
+#### `http.RequireSession` (Strict)
+Demands a valid, unexpired, and unrevoked session. If absent or invalid, it immediately terminates the request with `401 Unauthorized`:
+
+```go
+protectedHandler = http.RequireSession(engine,
+    http.WithExtractor(http.BearerExtractor),
+    http.WithExtractor(http.CookieExtractor("session_token")),
+    http.WithErrorHandler(customErrorHandler), // Optional custom error formatting
+)(protectedHandler)
+```
+
+### 2.3 Context Helpers
+Inside downstream handlers, retrieve the authenticated session and principal directly from the context:
+
+```go
+func ProtectedEndpoint(w http.ResponseWriter, r *http.Request) {
+    // Retrieve session result
+    sessionResult, ok := http.SessionFrom(r.Context())
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Retrieve principal
+    principal, _ := http.PrincipalFrom(r.Context())
+    fmt.Fprintf(w, "Hello User ID: %s", principal.Subject)
+}
+```
+
+---
+
+## 3. Web Framework Integration Examples
+
+### 3.1 Standard Library (`net/http`) & Chi
+```go
+package main
 
 import (
     "net/http"
-    "strings"
-
-    "github.com/BladiCreator/go-modular-auth/auth"
+    "github.com/go-chi/chi/v5"
+    auth "github.com/BladiCreator/go-modular-auth"
+    authhttp "github.com/BladiCreator/go-modular-auth/adapters/http"
 )
 
-func AuthMiddleware(app *auth.Auth) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            token := extractToken(r)
-            if token == "" {
-                next.ServeHTTP(w, r)
-                return
-            }
+func routes(engine *auth.Auth) http.Handler {
+    r := chi.NewRouter()
 
-            sessionRes, err := app.GetSession(r.Context(), token)
-            if err != nil || sessionRes == nil {
-                next.ServeHTTP(w, r)
-                return
-            }
+    // Public routes
+    r.Post("/api/signup", handleSignUp(engine))
+    r.Post("/api/signin", handleSignIn(engine))
 
-            // Inject Principal and User into context
-            ctx := auth.WithPrincipal(r.Context(), sessionRes.Principal())
-            next.ServeHTTP(w, r.WithContext(ctx))
-        })
-    }
-}
+    // Protected sub-router
+    r.Group(func(protected chi.Router) {
+        protected.Use(authhttp.RequireSession(engine,
+            authhttp.WithExtractor(authhttp.BearerExtractor),
+            authhttp.WithExtractor(authhttp.CookieExtractor("session_token")),
+        ))
 
-func extractToken(r *http.Request) string {
-    // 1. Check Authorization: Bearer <token>
-    if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
-        return strings.TrimPrefix(authHeader, "Bearer ")
-    }
-
-    // 2. Fall back to Cookie
-    if cookie, err := r.Cookie("session_token"); err == nil {
-        return cookie.Value
-    }
-
-    return ""
-}
-```
-
-### 2.2 Protecting Routes
-```go
-func RequireAuth(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        principal, ok := auth.PrincipalFrom(r.Context())
-        if !ok {
-            http.Error(w, "Unauthorized", http.StatusUnauthorized)
-            return
-        }
-
-        // Access authenticated identity
-        _ = principal.Subject
-        next.ServeHTTP(w, r)
+        protected.Get("/api/me", handleMe)
     })
+
+    return r
 }
 ```
 
-### 2.3 Sign In Handler
+### 3.2 Gin Web Framework
 ```go
-func HandleSignIn(app *auth.Auth) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        var body struct {
-            Email    string `json:"email"`
-            Password string `json:"password"`
-        }
-        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-            http.Error(w, "Bad Request", http.StatusBadRequest)
-            return
-        }
+func GinAuthMiddleware(engine *auth.Auth) gin.HandlerFunc {
+    authMiddleware := authhttp.RequireSession(engine, authhttp.WithExtractor(authhttp.BearerExtractor))
 
-        res, err := app.SignIn(r.Context(), auth.SignInInput{
-            Email:    body.Email,
-            Password: body.Password,
-            Session: auth.SessionOptions{
-                IPAddress: r.RemoteAddr,
-                UserAgent: r.UserAgent(),
-            },
-        })
-        if err != nil {
-            if errors.Is(err, auth.ErrInvalidCredentials) {
-                http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-                return
-            }
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-            return
-        }
-
-        // Set secure HTTP-only cookie
-        http.SetCookie(w, &http.Cookie{
-            Name:     "session_token",
-            Value:    res.Token,
-            Path:     "/",
-            HttpOnly: true,
-            Secure:   true,
-            SameSite: http.SameSiteStrictMode,
-        })
-
-        w.WriteHeader(http.StatusOK)
+    return func(c *gin.Context) {
+        authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            c.Request = r
+            c.Next()
+        })).ServeHTTP(c.Writer, c.Request)
     }
 }
 ```
 
 ---
 
-## 3. Framework Adaptations (Gin, Fiber, Echo)
+## 4. Official gRPC Adapter (`adapters/grpc`)
 
-The same pattern applies cleanly to popular web frameworks:
+Import:
+```go
+import "github.com/BladiCreator/go-modular-auth/adapters/grpc"
+```
 
-- **Gin**:
-  ```go
-  func GinAuthMiddleware(app *auth.Auth) gin.HandlerFunc {
-      return func(c *gin.Context) {
-          token := extractTokenFromHeaderOrCookie(c.Request)
-          if token != "" {
-              if res, err := app.GetSession(c.Request.Context(), token); err == nil && res != nil {
-                  c.Set("principal", res.Principal())
-                  c.Request = c.Request.WithContext(auth.WithPrincipal(c.Request.Context(), res.Principal()))
-              }
-          }
-          c.Next()
-      }
-  }
-  ```
+The gRPC adapter extracts authentication credentials from incoming gRPC `metadata.MD` and propagates the authenticated `Principal` and `Session` into RPC handlers.
 
-- **Fiber**:
-  ```go
-  func FiberAuthMiddleware(app *auth.Auth) fiber.Handler {
-      return func(c *fiber.Ctx) error {
-          token := c.Get("Authorization")
-          if strings.HasPrefix(token, "Bearer ") {
-              token = strings.TrimPrefix(token, "Bearer ")
-          } else {
-              token = c.Cookies("session_token")
-          }
+### 4.1 Unary & Streaming Server Interceptors
 
-          if token != "" {
-              if res, err := app.GetSession(c.Context(), token); err == nil && res != nil {
-                  c.Locals("principal", res.Principal())
-              }
-          }
-          return c.Next()
-      }
-  }
-  ```
+```go
+package main
 
-- **gRPC**:
-  Implement a unary and stream server interceptor extracting the bearer token from `metadata.FromIncomingContext(ctx)`, resolving it with `app.GetSession`, and injecting the authenticated `Principal` into the gRPC handler context via `auth.WithPrincipal(ctx, principal)`.
+import (
+    "google.golang.org/grpc"
+    auth "github.com/BladiCreator/go-modular-auth"
+    authgrpc "github.com/BladiCreator/go-modular-auth/adapters/grpc"
+)
 
+func NewGRPCServer(engine *auth.Auth) *grpc.Server {
+    server := grpc.NewServer(
+        grpc.UnaryInterceptor(authgrpc.UnaryServerInterceptor(engine,
+            authgrpc.WithExtractor(authgrpc.BearerMetadataExtractor),
+            authgrpc.WithLenient(false), // Strict: returns codes.Unauthenticated if missing/invalid
+        )),
+        grpc.StreamInterceptor(authgrpc.StreamServerInterceptor(engine,
+            authgrpc.WithExtractor(authgrpc.BearerMetadataExtractor),
+            authgrpc.WithLenient(false),
+        )),
+    )
+
+    return server
+}
+```
+
+### 4.2 Consuming Authentication in RPC Handlers
+
+```go
+func (s *ProfileServer) GetProfile(ctx context.Context, req *pb.GetProfileRequest) (*pb.ProfileResponse, error) {
+    principal, ok := authgrpc.PrincipalFrom(ctx)
+    if !ok {
+        return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+    }
+
+    sessionResult, _ := authgrpc.SessionFrom(ctx)
+
+    return &pb.ProfileResponse{
+        UserId: principal.Subject,
+        Email:  sessionResult.User.Email,
+    }, nil
+}
+```

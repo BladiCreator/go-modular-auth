@@ -6,17 +6,17 @@
 package memory
 
 import (
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	cachemem "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/email"
 	emailmem "github.com/BladiCreator/go-modular-auth/email/memory"
-	"github.com/BladiCreator/go-modular-auth/store"
-	storemem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-// NewStore creates a thread-safe in-memory Store adapter satisfying store.Store.
-func NewStore() store.Store {
-	return storemem.New()
+// NewAdapter creates a thread-safe in-memory generic database Adapter satisfying adapter.Adapter.
+func NewAdapter() adapter.Adapter {
+	return adaptermem.New()
 }
 
 // NewCache creates an in-memory Cache adapter satisfying cache.Cache.

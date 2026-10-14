@@ -6,14 +6,13 @@ import (
 	"sync"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth-policy/cache"
-	"github.com/BladiCreator/go-modular-auth-policy/store"
 )
 
 type service struct {
 	ctx   *sdk.Context
-	store store.Store
 	cache cache.Cache
 	cfg   Config
 
@@ -32,7 +31,6 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 
 	s := &service{
 		ctx:         ctx,
-		store:       cfg.Store,
 		cache:       c,
 		cfg:         cfg,
 		policies:    make(map[string]Evaluator),
@@ -264,9 +262,9 @@ func (s *service) RegisterPolicy(p Evaluator) error {
 	s.policies[p.ID()] = p
 	s.policyOrder = append(s.policyOrder, p.ID())
 
-	if s.store != nil {
+	if s.ctx != nil && s.ctx.Adapter() != nil {
 		now := s.cfg.Clock()
-		_ = s.store.SavePolicyRecord(context.Background(), &store.PolicyRecord{
+		_ = sdk.Model[PolicyRecord](s.ctx, ModelPolicies).Create(context.Background(), &PolicyRecord{
 			ID:          p.ID(),
 			Description: p.Description(),
 			Combinator:  string(s.cfg.Combinator),
@@ -317,8 +315,8 @@ func (s *service) RemovePolicy(policyID string) error {
 	}
 	s.policyOrder = newOrder
 
-	if s.store != nil {
-		_ = s.store.DeletePolicyRecord(context.Background(), policyID)
+	if s.ctx != nil && s.ctx.Adapter() != nil {
+		_, _ = sdk.Model[PolicyRecord](s.ctx, ModelPolicies).Delete(context.Background(), adapter.Eq("id", policyID))
 	}
 
 	if s.cache != nil {

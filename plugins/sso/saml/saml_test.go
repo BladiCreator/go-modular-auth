@@ -8,7 +8,6 @@ import (
 	"time"
 
 	ssosaml "github.com/BladiCreator/go-modular-auth-sso/saml"
-	"github.com/BladiCreator/go-modular-auth-sso/store"
 )
 
 func TestSAML_BuildAuthnRequest(t *testing.T) {
@@ -69,7 +68,7 @@ func TestSAML_ParseAndValidateResponse(t *testing.T) {
 
 	b64Response := base64.StdEncoding.EncodeToString([]byte(rawXML))
 
-	cfg := &store.SAMLConfig{
+	cfg := &ssosaml.SAMLConfig{
 		EntityID:   "https://idp.example.com",
 		SPEntityID: spAudience,
 	}

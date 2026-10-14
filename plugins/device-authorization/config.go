@@ -2,8 +2,6 @@ package deviceauth
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-device-authorization/store"
 )
 
 // Default configuration parameters according to RFC 8628 recommendations.
@@ -18,7 +16,6 @@ const (
 
 // Config encapsulates configuration settings for the device authorization plugin.
 type Config struct {
-	Store                   store.Store
 	VerificationURI         string
 	VerificationURIComplete string
 	ExpiresIn               time.Duration
@@ -30,13 +27,6 @@ type Config struct {
 
 // Option configures device authorization plugin settings.
 type Option func(*Config)
-
-// WithStore sets the persistent store adapter for device authorization grants.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithVerificationURI sets the base verification URL where users enter their code.
 func WithVerificationURI(uri string) Option {

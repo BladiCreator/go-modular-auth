@@ -7,7 +7,6 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-anonymous/store"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
@@ -19,9 +18,6 @@ const ProviderAnonymous = "anonymous"
 // Authorization policies and middleware should inspect this to deny anonymous users access
 // to privileged operations reserved for permanent users.
 const PrincipalAnonymous auth.PrincipalType = "anonymous"
-
-// Identity is an alias to store.Identity exposing the anonymous identity model in the public package.
-type Identity = store.Identity
 
 // AuthenticateInput holds options for creating an anonymous identity and session.
 type AuthenticateInput struct {

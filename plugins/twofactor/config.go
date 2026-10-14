@@ -2,17 +2,10 @@ package twofactor
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-twofactor/store"
-	"github.com/BladiCreator/go-modular-auth-twofactor/store/memory"
 )
 
 // Config holds the configuration options for the twofactor plugin module.
 type Config struct {
-	// Store is the persistence adapter for factors, recovery codes and challenges.
-	// If nil, defaults to an in-memory store.
-	Store store.Store
-
 	// Protector encrypts and decrypts factor secrets at rest.
 	// If nil, defaults to an AES-256-GCM protector initialized with a secure random key.
 	Protector SecretProtector
@@ -40,15 +33,6 @@ type Config struct {
 
 // Option configures the Config struct.
 type Option func(*Config)
-
-// WithStore sets a custom persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithSecretProtector sets a custom SecretProtector implementation.
 func WithSecretProtector(p SecretProtector) Option {
@@ -117,7 +101,6 @@ func defaultConfig() Config {
 	protector, _ := NewAESGCMProtector(randomKey)
 
 	return Config{
-		Store:                     memory.New(),
 		Protector:                 protector,
 		Issuer:                    "GoModularAuth",
 		StepDuration:              30 * time.Second,

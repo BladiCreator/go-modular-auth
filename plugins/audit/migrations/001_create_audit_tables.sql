@@ -1,7 +1,7 @@
 -- Migration: 001_create_audit_tables.sql
--- Description: Creates auth_audit_records table for structured security audit logging.
+-- Description: Creates audit_records table for structured security audit logging.
 
-CREATE TABLE IF NOT EXISTS auth_audit_records (
+CREATE TABLE IF NOT EXISTS audit_records (
     id VARCHAR(64) PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
     event VARCHAR(255) NOT NULL,
@@ -18,17 +18,17 @@ CREATE TABLE IF NOT EXISTS auth_audit_records (
     error_message TEXT NOT NULL DEFAULT ''
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_audit_timestamp
-    ON auth_audit_records (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp
+    ON audit_records (timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_auth_audit_actor
-    ON auth_audit_records (actor_subject);
+CREATE INDEX IF NOT EXISTS idx_audit_actor
+    ON audit_records (actor_subject);
 
-CREATE INDEX IF NOT EXISTS idx_auth_audit_target
-    ON auth_audit_records (target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_audit_target
+    ON audit_records (target_type, target_id);
 
-CREATE INDEX IF NOT EXISTS idx_auth_audit_org_ts
-    ON auth_audit_records (organization_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_org_ts
+    ON audit_records (organization_id, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_auth_audit_event
-    ON auth_audit_records (event);
+CREATE INDEX IF NOT EXISTS idx_audit_event
+    ON audit_records (event);

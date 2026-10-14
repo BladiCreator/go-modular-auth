@@ -7,8 +7,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth-bearer/cache"
-	"github.com/BladiCreator/go-modular-auth-bearer/store"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 
@@ -16,7 +16,7 @@ import (
 type service struct {
 	ctx    *sdk.Context
 	cfg    Config
-	store  store.Store
+	tokens *sdk.Repository[TokenRecord]
 	cache  *cache.Cache
 	logger *slog.Logger
 }
@@ -28,7 +28,7 @@ func newService(ctx *sdk.Context, cfg Config) *service {
 	return &service{
 		ctx:    ctx,
 		cfg:    cfg,
-		store:  cfg.Store,
+		tokens: sdk.Model[TokenRecord](ctx, ModelBearerTokens),
 		cache:  cache.New(ctx.Cache()),
 		logger: ctx.Logger(),
 	}
@@ -39,6 +39,42 @@ func (s *service) now() time.Time {
 		return s.ctx.Now()
 	}
 	return time.Now().UTC()
+}
+
+func cachedToRecord(c *cache.CachedToken) *TokenRecord {
+	if c == nil {
+		return nil
+	}
+	return &TokenRecord{
+		ID:            c.ID,
+		TokenHash:     c.TokenHash,
+		Subject:       c.Subject,
+		PrincipalType: c.PrincipalType,
+		Scopes:        c.Scopes,
+		Metadata:      c.Metadata,
+		ExpiresAt:     c.ExpiresAt,
+		RevokedAt:     c.RevokedAt,
+		CreatedAt:     c.CreatedAt,
+		UpdatedAt:     c.UpdatedAt,
+	}
+}
+
+func recordToCached(r *TokenRecord) *cache.CachedToken {
+	if r == nil {
+		return nil
+	}
+	return &cache.CachedToken{
+		ID:            r.ID,
+		TokenHash:     r.TokenHash,
+		Subject:       r.Subject,
+		PrincipalType: r.PrincipalType,
+		Scopes:        r.Scopes,
+		Metadata:      r.Metadata,
+		ExpiresAt:     r.ExpiresAt,
+		RevokedAt:     r.RevokedAt,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
+	}
 }
 
 // Authenticate validates bearer credentials and resolves the Principal.
@@ -56,17 +92,17 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 	tokenHash := HashToken(in.Token)
 
 	// 1. Try cache lookup
-	var record *store.TokenRecord
+	var record *TokenRecord
 	cachedRec, err := s.cache.GetByHash(ctx, tokenHash)
 	if err == nil && cachedRec != nil {
-		record = cachedRec
+		record = cachedToRecord(cachedRec)
 	}
 
-	// 2. Cache miss -> query Store (source of truth)
+	// 2. Cache miss -> query Adapter (source of truth)
 	if record == nil {
-		rec, err := s.store.GetByTokenHash(ctx, tokenHash)
+		rec, err := s.tokens.FindOne(ctx, adapter.Eq("token_hash", tokenHash))
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, adapter.ErrNotFound) {
 				return nil, ErrInvalidToken
 			}
 			return nil, err
@@ -80,7 +116,7 @@ func (s *service) Authenticate(ctx context.Context, in AuthenticateInput) (*Auth
 			if !record.ExpiresAt.IsZero() && remainingTTL < cacheTTL {
 				cacheTTL = remainingTTL
 			}
-			_ = s.cache.Set(ctx, record, cacheTTL)
+			_ = s.cache.Set(ctx, recordToCached(record), cacheTTL)
 		}
 	}
 
@@ -162,7 +198,7 @@ func (s *service) Issue(ctx context.Context, in IssueInput) (*IssueResult, error
 		pType = auth.PrincipalUser
 	}
 
-	record := &store.TokenRecord{
+	record := &TokenRecord{
 		ID:            id,
 		TokenHash:     tokenHash,
 		Subject:       in.Subject,
@@ -174,7 +210,7 @@ func (s *service) Issue(ctx context.Context, in IssueInput) (*IssueResult, error
 		UpdatedAt:     now,
 	}
 
-	if err := s.store.Create(ctx, record); err != nil {
+	if err := s.tokens.Create(ctx, record); err != nil {
 		return nil, err
 	}
 
@@ -183,7 +219,7 @@ func (s *service) Issue(ctx context.Context, in IssueInput) (*IssueResult, error
 	if ttl < cacheTTL {
 		cacheTTL = ttl
 	}
-	_ = s.cache.Set(ctx, record, cacheTTL)
+	_ = s.cache.Set(ctx, recordToCached(record), cacheTTL)
 
 	info := recordToInfo(record)
 	result := &IssueResult{
@@ -221,11 +257,15 @@ func (s *service) Revoke(ctx context.Context, tokenID string) error {
 	// Invalidate cache first
 	_ = s.cache.DeleteByID(ctx, tokenID)
 
-	if err := s.store.Revoke(ctx, tokenID, now); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return ErrTokenNotFound
-		}
+	affected, err := s.tokens.Update(ctx, []adapter.Condition{adapter.Eq("id", tokenID)}, map[string]any{
+		"revoked_at": now,
+		"updated_at": now,
+	})
+	if err != nil {
 		return err
+	}
+	if affected == 0 {
+		return ErrTokenNotFound
 	}
 
 	if err := s.cfg.Hooks.runAfterRevoke(ctx, tokenID); err != nil {
@@ -247,7 +287,12 @@ func (s *service) RevokeBySubject(ctx context.Context, subject string) error {
 	}
 
 	now := s.now()
-	records, err := s.store.ListBySubject(ctx, subject)
+	records, err := s.tokens.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{
+			adapter.Eq("subject", subject),
+			adapter.IsNull("revoked_at"),
+		},
+	})
 	if err == nil {
 		for _, rec := range records {
 			_ = s.cache.DeleteByHash(ctx, rec.TokenHash)
@@ -255,7 +300,14 @@ func (s *service) RevokeBySubject(ctx context.Context, subject string) error {
 		}
 	}
 
-	if err := s.store.RevokeBySubject(ctx, subject, now); err != nil {
+	_, err = s.tokens.Update(ctx, []adapter.Condition{
+		adapter.Eq("subject", subject),
+		adapter.IsNull("revoked_at"),
+	}, map[string]any{
+		"revoked_at": now,
+		"updated_at": now,
+	})
+	if err != nil {
 		return err
 	}
 
@@ -273,9 +325,9 @@ func (s *service) Get(ctx context.Context, tokenID string) (*TokenInfo, error) {
 		return nil, ErrInvalidInput
 	}
 
-	rec, err := s.store.GetByID(ctx, tokenID)
+	rec, err := s.tokens.FindOne(ctx, adapter.Eq("id", tokenID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrTokenNotFound
 		}
 		return nil, err
@@ -290,14 +342,16 @@ func (s *service) ListBySubject(ctx context.Context, subject string) ([]*TokenIn
 		return nil, ErrInvalidInput
 	}
 
-	records, err := s.store.ListBySubject(ctx, subject)
+	records, err := s.tokens.FindMany(ctx, adapter.Query{
+		Where: []adapter.Condition{adapter.Eq("subject", subject)},
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	infos := make([]*TokenInfo, 0, len(records))
-	for _, rec := range records {
-		infos = append(infos, recordToInfo(rec))
+	for i := range records {
+		infos = append(infos, recordToInfo(&records[i]))
 	}
 	return infos, nil
 }
@@ -310,18 +364,28 @@ func (s *service) Delete(ctx context.Context, tokenID string) error {
 
 	_ = s.cache.DeleteByID(ctx, tokenID)
 
-	if err := s.store.Delete(ctx, tokenID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return ErrTokenNotFound
-		}
+	affected, err := s.tokens.Delete(ctx, adapter.Eq("id", tokenID))
+	if err != nil {
 		return err
+	}
+	if affected == 0 {
+		return ErrTokenNotFound
 	}
 	return nil
 }
 
 // PurgeExpired permanently removes expired and revoked tokens from persistence.
 func (s *service) PurgeExpired(ctx context.Context) (int, error) {
-	return s.store.DeleteExpired(ctx, s.now())
+	now := s.now()
+	delExp, err := s.tokens.Delete(ctx, adapter.Lte("expires_at", now))
+	if err != nil {
+		return 0, err
+	}
+	delRev, err := s.tokens.Delete(ctx, adapter.IsNotNull("revoked_at"))
+	if err != nil {
+		return int(delExp), err
+	}
+	return int(delExp + delRev), nil
 }
 
 func (s *service) publishEvent(ctx context.Context, name auth.EventName, subject string, payload any) {
@@ -335,7 +399,7 @@ func (s *service) publishEvent(ctx context.Context, name auth.EventName, subject
 	}
 }
 
-func recordToInfo(r *store.TokenRecord) *TokenInfo {
+func recordToInfo(r *TokenRecord) *TokenInfo {
 	if r == nil {
 		return nil
 	}

@@ -2,8 +2,6 @@ package apikeys
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-apikeys/store"
 )
 
 // SubjectStrategy defines how an API key resolves its auth.Principal.Subject.
@@ -19,9 +17,6 @@ const (
 
 // Config configures the API keys plugin module.
 type Config struct {
-	// Store provides persistence for API keys. Required.
-	Store store.Store
-
 	// KeyPrefix is the default prefix prepended to issued API keys (defaults to "gma_").
 	KeyPrefix string
 
@@ -47,13 +42,6 @@ type Config struct {
 
 // Option modifies Config.
 type Option func(*Config)
-
-// WithStore configures the persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithKeyPrefix sets the default prefix for newly generated API keys.
 func WithKeyPrefix(p string) Option {

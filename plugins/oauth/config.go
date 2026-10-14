@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth-oauth/provider"
-	"github.com/BladiCreator/go-modular-auth-oauth/store"
-	"github.com/BladiCreator/go-modular-auth-oauth/store/memory"
 )
 
 const (
@@ -15,10 +13,6 @@ const (
 
 // Config configures the OAuth plugin module.
 type Config struct {
-	// Store is the persistence store for in-flight OAuth state sessions.
-	// Defaults to an in-memory store if nil.
-	Store store.Store
-
 	// Providers maps provider name to its Provider implementation.
 	Providers map[string]provider.Provider
 
@@ -47,13 +41,6 @@ type Config struct {
 
 // Option customizes a Config struct.
 type Option func(*Config)
-
-// WithStore sets the state persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		c.Store = s
-	}
-}
 
 // WithProvider registers a single OAuth identity provider.
 func WithProvider(p provider.Provider) Option {
@@ -120,9 +107,6 @@ func WithHooks(h *Hooks) Option {
 }
 
 func (c Config) withDefaults() Config {
-	if c.Store == nil {
-		c.Store = memory.New()
-	}
 	if c.Providers == nil {
 		c.Providers = make(map[string]provider.Provider)
 	}

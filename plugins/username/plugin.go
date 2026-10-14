@@ -4,6 +4,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth-username/cache"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/schema"
 )
 
 // PluginID identifies this plugin in the GoModularAuth runtime.
@@ -12,6 +13,14 @@ const PluginID = "username"
 // Module implements auth.PluginModule using plugin-sdk.
 type Module struct {
 	cfg Config
+}
+
+var _ auth.PluginModule = (*Module)(nil)
+var _ auth.SchemaProvider = (*Module)(nil)
+
+// RegisterSchema registers the plugin's models into the schema.
+func (m *Module) RegisterSchema(s *schema.Schema) error {
+	return RegisterSchema(s)
 }
 
 // New creates an installable username PluginModule with optional functional configurations.
@@ -42,10 +51,10 @@ func (m *Module) Init(h *auth.Host) error {
 	ctx := sdk.NewContext(h)
 	cacheAdapter := cache.New(ctx.Cache(), m.cfg.CacheTTL)
 	svc := &service{
-		cfg:   m.cfg,
-		ctx:   ctx,
-		store: m.cfg.Store,
-		cache: cacheAdapter,
+		cfg:     m.cfg,
+		ctx:     ctx,
+		records: sdk.Model[Record](ctx, ModelUsernames),
+		cache:   cacheAdapter,
 	}
 
 	return sdk.Provide[Capability](ctx, svc)

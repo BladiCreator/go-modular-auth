@@ -6,21 +6,11 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-passkeys/store"
 	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // ProviderPasskey is the provider identifier used when recording linked passkey accounts in Core.
 const ProviderPasskey = "passkey"
-
-// Passkey represents a WebAuthn / FIDO2 credential registered by a user.
-type Passkey = store.Credential
-
-// FromWebAuthn constructs a domain Passkey from a validated webauthn.Credential.
-func FromWebAuthn(userID, friendlyName string, cred *webauthn.Credential, now time.Time) *Passkey {
-	return store.FromWebAuthn(userID, friendlyName, cred, now)
-}
 
 // BeginRegistrationInput contains options for starting a credential registration ceremony.
 type BeginRegistrationInput struct {

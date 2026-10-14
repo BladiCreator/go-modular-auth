@@ -1,8 +1,8 @@
 -- Migration: 001_create_email_otps.sql
--- Description: Creates the auth_email_otps table for GoModularAuth Email OTP plugin.
+-- Description: Creates the email_otps table for GoModularAuth Email OTP plugin.
 -- Compatible with PostgreSQL, SQLite, and MySQL.
 
-CREATE TABLE IF NOT EXISTS auth_email_otps (
+CREATE TABLE IF NOT EXISTS email_otps (
     id VARCHAR(64) PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
     subject VARCHAR(255) NOT NULL,
@@ -16,5 +16,5 @@ CREATE TABLE IF NOT EXISTS auth_email_otps (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_email_otps_email ON auth_email_otps(email);
-CREATE INDEX IF NOT EXISTS idx_auth_email_otps_expires ON auth_email_otps(expires_at);
+CREATE INDEX IF NOT EXISTS idx_email_otps_email ON email_otps(email);
+CREATE INDEX IF NOT EXISTS idx_email_otps_expires ON email_otps(expires_at);

@@ -19,9 +19,8 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	saml "github.com/BladiCreator/go-modular-auth-saml"
 	"github.com/BladiCreator/go-modular-auth-saml/plugins"
-	samlmemory "github.com/BladiCreator/go-modular-auth-saml/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 type samlTestHarness struct {
@@ -62,18 +61,16 @@ func setupTestHarness(t *testing.T) *samlTestHarness {
 	spACSURL := "https://myapp.com/saml/acs"
 	entityID := "https://idp.example.com"
 
-	cStore := corememory.New()
+	adapter := adaptermem.New()
 	cCache := corecache.New()
-	sStore := samlmemory.New()
 
 	samlModule := saml.New(
-		saml.WithStore(sStore),
 		saml.WithSPEntityID(spEntityID),
 		saml.WithSPACSURL(spACSURL),
 	)
 
 	engine, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: adapter,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{samlModule},
 	})

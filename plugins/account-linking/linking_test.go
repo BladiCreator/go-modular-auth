@@ -7,25 +7,22 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapter"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	accountlinking "github.com/BladiCreator/go-modular-auth-account-linking"
 	"github.com/BladiCreator/go-modular-auth-account-linking/plugins"
-	"github.com/BladiCreator/go-modular-auth-account-linking/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
-func setupTestAuth(t *testing.T) (*auth.Auth, plugins.AccountLinking, *memory.Store) {
+func setupTestAuth(t *testing.T) (*auth.Auth, plugins.AccountLinking, adapter.Adapter) {
 	t.Helper()
-	cStore := corestore.New()
+	ad := adaptermem.New()
 	cCache := corecache.New()
-	lStore := memory.New()
 
-	linkingModule := accountlinking.New(
-		accountlinking.WithStore(lStore),
-	)
+	linkingModule := accountlinking.New()
 
 	a, err := auth.New(auth.Config{
-		Store:   cStore,
+		Adapter: ad,
 		Cache:   cCache,
 		Plugins: []auth.PluginModule{linkingModule},
 	})
@@ -38,7 +35,7 @@ func setupTestAuth(t *testing.T) (*auth.Auth, plugins.AccountLinking, *memory.St
 		t.Fatalf("auth.Get[plugins.AccountLinking] failed: %v", err)
 	}
 
-	return a, linking, lStore
+	return a, linking, ad
 }
 
 func TestAccountLinking_DirectLinkingAndQueries(t *testing.T) {

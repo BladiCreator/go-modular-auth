@@ -2,9 +2,6 @@ package organizations
 
 import (
 	"time"
-
-	"github.com/BladiCreator/go-modular-auth-organizations/store"
-	"github.com/BladiCreator/go-modular-auth-organizations/store/memory"
 )
 
 // Default configurations.
@@ -15,10 +12,6 @@ const (
 
 // Config configures the organizations plugin module.
 type Config struct {
-	// Store provides persistence for organizations, members, teams, and invitations.
-	// If nil, defaults to an in-memory store.
-	Store store.Store
-
 	// CacheTTL controls how long organizations and memberships are cached.
 	// Defaults to 5 minutes. If non-positive, caching is disabled.
 	CacheTTL time.Duration
@@ -30,7 +23,6 @@ type Config struct {
 
 func defaultConfig() Config {
 	return Config{
-		Store:                memory.New(),
 		CacheTTL:             DefaultCacheTTL,
 		DefaultInvitationTTL: DefaultInvitationTTL,
 	}
@@ -38,15 +30,6 @@ func defaultConfig() Config {
 
 // Option configures a Config.
 type Option func(*Config)
-
-// WithStore sets the persistence store adapter.
-func WithStore(s store.Store) Option {
-	return func(c *Config) {
-		if s != nil {
-			c.Store = s
-		}
-	}
-}
 
 // WithCacheTTL configures the caching TTL duration for organizations and memberships.
 func WithCacheTTL(ttl time.Duration) Option {

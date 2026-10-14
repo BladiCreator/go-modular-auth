@@ -8,35 +8,48 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-saml/store"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 type service struct {
-	ctx    *sdk.Context
-	cfg    Config
-	logger *slog.Logger
+	ctx        *sdk.Context
+	cfg        Config
+	logger     *slog.Logger
+	idps       *sdk.Repository[IdPConfig]
+	requests   *sdk.Repository[RequestSession]
+	assertions *sdk.Repository[AssertionRecord]
 }
 
 var _ SAML = (*service)(nil)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	var logger *slog.Logger
+	var idps *sdk.Repository[IdPConfig]
+	var requests *sdk.Repository[RequestSession]
+	var assertions *sdk.Repository[AssertionRecord]
 	if ctx != nil {
 		logger = ctx.Logger()
+		idps = sdk.Model[IdPConfig](ctx, ModelSAMLIdPs)
+		requests = sdk.Model[RequestSession](ctx, ModelSAMLRequests)
+		assertions = sdk.Model[AssertionRecord](ctx, ModelSAMLAssertions)
 	} else {
 		logger = slog.Default()
 	}
 
 	return &service{
-		ctx:    ctx,
-		cfg:    cfg,
-		logger: logger,
+		ctx:        ctx,
+		cfg:        cfg,
+		logger:     logger,
+		idps:       idps,
+		requests:   requests,
+		assertions: assertions,
 	}
 }
 
@@ -79,7 +92,7 @@ func (s *service) RegisterIdP(ctx context.Context, in RegisterIdPInput) (*IdPCon
 		attrMapping.Custom = in.AttributeMapping.Custom
 	}
 
-	cfg := &store.IdPConfig{
+	cfg := &IdPConfig{
 		ID:               in.ID,
 		OrganizationID:   in.OrganizationID,
 		EntityID:         in.EntityID,
@@ -98,7 +111,7 @@ func (s *service) RegisterIdP(ctx context.Context, in RegisterIdPInput) (*IdPCon
 		UpdatedAt:        now,
 	}
 
-	if err := s.cfg.Store.SaveIdP(ctx, cfg); err != nil {
+	if err := s.idps.Create(ctx, cfg); err != nil {
 		return nil, err
 	}
 
@@ -138,9 +151,9 @@ func (s *service) GetIdP(ctx context.Context, id string) (*IdPConfig, error) {
 	if id == "" {
 		return nil, ErrInvalidInput
 	}
-	cfg, err := s.cfg.Store.GetIdP(ctx, id)
+	cfg, err := s.idps.FindOne(ctx, adapter.Eq("id", id))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrProviderNotFound
 		}
 		return nil, err
@@ -153,9 +166,9 @@ func (s *service) GetIdPByEntityID(ctx context.Context, entityID string) (*IdPCo
 	if entityID == "" {
 		return nil, ErrInvalidInput
 	}
-	cfg, err := s.cfg.Store.GetIdPByEntityID(ctx, entityID)
+	cfg, err := s.idps.FindOne(ctx, adapter.Eq("entity_id", entityID))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, adapter.ErrNotFound) {
 			return nil, ErrProviderNotFound
 		}
 		return nil, err
@@ -165,7 +178,19 @@ func (s *service) GetIdPByEntityID(ctx context.Context, entityID string) (*IdPCo
 
 // ListIdPs returns registered IdPs, optionally scoped to an organization.
 func (s *service) ListIdPs(ctx context.Context, orgID string) ([]*IdPConfig, error) {
-	return s.cfg.Store.ListIdPs(ctx, orgID)
+	q := adapter.Query{Model: ModelSAMLIdPs}
+	if orgID != "" {
+		q.Where = []adapter.Condition{adapter.Eq("organization_id", orgID)}
+	}
+	items, err := s.idps.FindMany(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*IdPConfig, len(items))
+	for i := range items {
+		results[i] = &items[i]
+	}
+	return results, nil
 }
 
 // UpdateIdP updates an existing IdP configuration.
@@ -218,8 +243,8 @@ func (s *service) UpdateIdP(ctx context.Context, in UpdateIdPInput) (*IdPConfig,
 	existing.UpdatedAt = s.cfg.Clock()
 
 	// Update by saving modified record
-	_ = s.cfg.Store.DeleteIdP(ctx, in.ID)
-	if err := s.cfg.Store.SaveIdP(ctx, existing); err != nil {
+	_, _ = s.idps.Delete(ctx, adapter.Eq("id", in.ID))
+	if err := s.idps.Create(ctx, existing); err != nil {
 		return nil, err
 	}
 
@@ -236,7 +261,7 @@ func (s *service) DeleteIdP(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrInvalidInput
 	}
-	if err := s.cfg.Store.DeleteIdP(ctx, id); err != nil {
+	if _, err := s.idps.Delete(ctx, adapter.Eq("id", id)); err != nil {
 		return err
 	}
 	s.emitAudit(ctx, EventIdPDeleted, map[string]any{"provider_id": id})
@@ -283,7 +308,7 @@ func (s *service) InitiateAuth(ctx context.Context, in InitiateAuthInput) (*Init
 	}
 
 	expiresAt := now.Add(s.cfg.RequestTTL)
-	reqSess := &store.RequestSession{
+	reqSess := &RequestSession{
 		ID:             requestID,
 		RelayState:     relayState,
 		ProviderID:     idp.ID,
@@ -293,7 +318,7 @@ func (s *service) InitiateAuth(ctx context.Context, in InitiateAuthInput) (*Init
 		CreatedAt:      now,
 	}
 
-	if err := s.cfg.Store.SaveRequest(ctx, reqSess); err != nil {
+	if err := s.requests.Create(ctx, reqSess); err != nil {
 		return nil, err
 	}
 
@@ -316,12 +341,12 @@ func (s *service) ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResu
 
 	// 1. Resolve in-flight request session via RelayState if present
 	var (
-		reqSess  *store.RequestSession
+		reqSess  *RequestSession
 		targetID string
 	)
 
 	if in.RelayState != "" {
-		rs, err := s.cfg.Store.GetRequestByRelayState(ctx, in.RelayState)
+		rs, err := s.requests.FindOne(ctx, adapter.Eq("relay_state", in.RelayState))
 		if err == nil && rs != nil {
 			reqSess = rs
 			targetID = rs.ProviderID
@@ -332,7 +357,7 @@ func (s *service) ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResu
 	if reqSess == nil {
 		inRespTo := ExtractInResponseTo(in.SAMLResponse)
 		if inRespTo != "" {
-			rs, err := s.cfg.Store.GetRequest(ctx, inRespTo)
+			rs, err := s.requests.FindOne(ctx, adapter.Eq("id", inRespTo))
 			if err == nil && rs != nil {
 				reqSess = rs
 				targetID = rs.ProviderID
@@ -352,7 +377,7 @@ func (s *service) ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResu
 		// Attempt resolution via XML Issuer
 		issuer := ExtractIssuer(in.SAMLResponse)
 		if issuer != "" {
-			cfg, err := s.cfg.Store.GetIdPByEntityID(ctx, issuer)
+			cfg, err := s.idps.FindOne(ctx, adapter.Eq("entity_id", issuer))
 			if err == nil && cfg != nil {
 				idp = cfg
 			}
@@ -381,11 +406,8 @@ func (s *service) ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResu
 
 	// 3. Atomically consume Request Session if matched
 	if reqSess != nil {
-		consumed, err := s.cfg.Store.ConsumeRequest(ctx, reqSess.ID, now)
+		consumed, err := s.consumeRequest(ctx, reqSess.ID, now)
 		if err != nil {
-			if errors.Is(err, store.ErrRequestConsumed) {
-				return nil, ErrStateConsumed
-			}
 			return nil, err
 		}
 		if consumed.Expired(now) {
@@ -416,10 +438,7 @@ func (s *service) ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResu
 	}
 
 	// 5. Replay Protection: Check & Record Assertion ID
-	if err := s.cfg.Store.RecordAssertion(ctx, parsed.Assertion.ID, idp.ID, parsed.ExpiresAt, now); err != nil {
-		if errors.Is(err, store.ErrAssertionReplayed) {
-			return nil, ErrAssertionReplayed
-		}
+	if err := s.recordAssertion(ctx, parsed.Assertion.ID, idp.ID, parsed.ExpiresAt, now); err != nil {
 		return nil, err
 	}
 
@@ -613,4 +632,50 @@ func (s *service) emitAudit(ctx context.Context, eventType auth.EventName, paylo
 			Payload: payload,
 		})
 	}
+}
+
+func (s *service) consumeRequest(ctx context.Context, id string, now time.Time) (*RequestSession, error) {
+	if s.requests == nil {
+		return nil, ErrInvalidState
+	}
+	req, err := s.requests.FindOne(ctx, adapter.Eq("id", id))
+	if errors.Is(err, adapter.ErrNotFound) || req == nil {
+		return nil, ErrInvalidState
+	}
+	if req.IsConsumed() {
+		return nil, ErrStateConsumed
+	}
+	if req.Expired(now) {
+		return nil, ErrStateExpired
+	}
+
+	n, err := s.requests.Update(ctx, []adapter.Condition{
+		adapter.Eq("id", id),
+		adapter.IsNull("consumed_at"),
+	}, map[string]any{
+		"consumed_at": now,
+	})
+	if err != nil || n == 0 {
+		return nil, ErrStateConsumed
+	}
+	req.ConsumedAt = &now
+	return req, nil
+}
+
+func (s *service) recordAssertion(ctx context.Context, assertionID, providerID string, expiresAt, now time.Time) error {
+	if s.assertions == nil {
+		return nil
+	}
+	existing, err := s.assertions.FindOne(ctx, adapter.Eq("id", assertionID))
+	if err == nil && existing != nil {
+		if !now.After(existing.ExpiresAt) {
+			return ErrAssertionReplayed
+		}
+	}
+	return s.assertions.Create(ctx, &AssertionRecord{
+		ID:         assertionID,
+		ProviderID: providerID,
+		ExpiresAt:  expiresAt,
+		CreatedAt:  now,
+	})
 }

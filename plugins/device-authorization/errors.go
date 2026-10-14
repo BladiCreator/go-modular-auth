@@ -62,6 +62,9 @@ var (
 	// ErrInvalidInput indicates missing or invalid request parameters.
 	ErrInvalidInput = errors.New("device auth: invalid input parameters")
 
-	// ErrStoreRequired indicates that a persistent store was not configured.
-	ErrStoreRequired = errors.New("device auth: store is required")
+	// ErrAdapterRequired indicates that a database adapter was not configured.
+	ErrAdapterRequired = errors.New("device auth: adapter is required")
+
+	// ErrStoreRequired is an alias for ErrAdapterRequired for backward compatibility.
+	ErrStoreRequired = ErrAdapterRequired
 )

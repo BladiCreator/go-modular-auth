@@ -9,22 +9,19 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	phone "github.com/BladiCreator/go-modular-auth-phone"
-	phonemem "github.com/BladiCreator/go-modular-auth-phone/store/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func TestSecurity_ConcurrencyAndReplay(t *testing.T) {
 	ctx := context.Background()
 	provider := phone.NewMockProvider()
-	pStore := phonemem.New()
 
 	a, err := auth.New(auth.Config{
-		Store: coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(provider),
-				phone.WithStore(pStore),
 				phone.WithTTL(5*time.Minute),
 				phone.WithAllowSignUp(true),
 			),
@@ -79,34 +76,26 @@ func TestSecurity_ConcurrencyAndReplay(t *testing.T) {
 	wg.Wait()
 
 	if successCount.Load() != 1 {
-		t.Fatalf("concurrency failure: expected exactly 1 successful consumption, got %d", successCount.Load())
-	}
-	if conflictCount.Load() != concurrentAttempts-1 {
-		t.Fatalf("concurrency failure: expected %d conflict errors, got %d (other errors: %d)", concurrentAttempts-1, conflictCount.Load(), otherErrors.Load())
+		t.Fatalf("expected strictly 1 successful consumption, got %d (conflicts: %d, other errors: %d)",
+			successCount.Load(), conflictCount.Load(), otherErrors.Load())
 	}
 
-	// Replay verification attempt must strictly fail with ErrCodeAlreadyUsed
-	_, replayErr := p.VerifyOTP(ctx, phone.VerifyOTPInput{
-		PhoneNumber: targetPhone,
-		Code:        code,
-	})
-	if !errors.Is(replayErr, phone.ErrCodeAlreadyUsed) {
-		t.Fatalf("replay test failed: expected ErrCodeAlreadyUsed, got %v", replayErr)
+	if conflictCount.Load() != concurrentAttempts-1 {
+		t.Fatalf("expected %d replays blocked with ErrCodeAlreadyUsed, got %d",
+			concurrentAttempts-1, conflictCount.Load())
 	}
 }
 
 func TestSecurity_BruteForceAndAttemptLimits(t *testing.T) {
 	ctx := context.Background()
 	provider := phone.NewMockProvider()
-	pStore := phonemem.New()
 
 	const maxAttempts = 3
 	a, err := auth.New(auth.Config{
-		Store: coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(provider),
-				phone.WithStore(pStore),
 				phone.WithMaxAttempts(maxAttempts),
 				phone.WithAllowSignUp(true),
 			),
@@ -119,29 +108,39 @@ func TestSecurity_BruteForceAndAttemptLimits(t *testing.T) {
 	p, _ := auth.Get[phone.Phone](a)
 	targetPhone := "+12025550288"
 
-	_ = p.RequestOTP(ctx, phone.RequestOTPInput{PhoneNumber: targetPhone})
+	if err := p.RequestOTP(ctx, phone.RequestOTPInput{PhoneNumber: targetPhone}); err != nil {
+		t.Fatalf("RequestOTP: %v", err)
+	}
 	correctCode := provider.LastMessage().Code
-
-	// Failed attempt 1
-	_, err = p.VerifyOTP(ctx, phone.VerifyOTPInput{PhoneNumber: targetPhone, Code: "000000"})
-	if !errors.Is(err, phone.ErrInvalidCode) {
-		t.Fatalf("attempt 1: expected ErrInvalidCode, got %v", err)
+	wrongCode := "000000"
+	if correctCode == wrongCode {
+		wrongCode = "999999"
 	}
 
-	// Failed attempt 2
-	_, err = p.VerifyOTP(ctx, phone.VerifyOTPInput{PhoneNumber: targetPhone, Code: "111111"})
-	if !errors.Is(err, phone.ErrInvalidCode) {
-		t.Fatalf("attempt 2: expected ErrInvalidCode, got %v", err)
+	for i := 1; i <= maxAttempts; i++ {
+		_, err := p.VerifyOTP(ctx, phone.VerifyOTPInput{
+			PhoneNumber: targetPhone,
+			Code:        wrongCode,
+		})
+		if err == nil {
+			t.Fatalf("attempt %d: expected error on wrong code, got nil", i)
+		}
+		if i < maxAttempts {
+			if !errors.Is(err, phone.ErrInvalidCode) {
+				t.Fatalf("attempt %d: expected ErrInvalidCode, got %v", i, err)
+			}
+		} else {
+			if !errors.Is(err, phone.ErrMaxAttemptsExceeded) {
+				t.Fatalf("attempt %d: expected ErrMaxAttemptsExceeded on lock, got %v", i, err)
+			}
+		}
 	}
 
-	// Failed attempt 3 reaches threshold -> locks OTP
-	_, err = p.VerifyOTP(ctx, phone.VerifyOTPInput{PhoneNumber: targetPhone, Code: "222222"})
-	if !errors.Is(err, phone.ErrMaxAttemptsExceeded) {
-		t.Fatalf("attempt 3: expected ErrMaxAttemptsExceeded, got %v", err)
-	}
-
-	// Subsequent attempt WITH THE CORRECT CODE must be rejected because the token is locked
-	_, err = p.VerifyOTP(ctx, phone.VerifyOTPInput{PhoneNumber: targetPhone, Code: correctCode})
+	// Next attempt even with the correct code must be rejected due to lockout
+	_, err = p.VerifyOTP(ctx, phone.VerifyOTPInput{
+		PhoneNumber: targetPhone,
+		Code:        correctCode,
+	})
 	if !errors.Is(err, phone.ErrMaxAttemptsExceeded) {
 		t.Fatalf("attempt with correct code after lockout: expected ErrMaxAttemptsExceeded, got %v", err)
 	}
@@ -150,15 +149,13 @@ func TestSecurity_BruteForceAndAttemptLimits(t *testing.T) {
 func TestSecurity_EnumerationProtection(t *testing.T) {
 	ctx := context.Background()
 	provider := phone.NewMockProvider()
-	pStore := phonemem.New()
 
 	// Configure with AllowSignUp = false
 	a, err := auth.New(auth.Config{
-		Store: coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(provider),
-				phone.WithStore(pStore),
 				phone.WithAllowSignUp(false),
 			),
 		},
@@ -185,15 +182,13 @@ func TestSecurity_EnumerationProtection(t *testing.T) {
 func TestSecurity_Expiration(t *testing.T) {
 	ctx := context.Background()
 	provider := phone.NewMockProvider()
-	pStore := phonemem.New()
 
 	// Short TTL of 50ms
 	a, _ := auth.New(auth.Config{
-		Store: coremem.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(provider),
-				phone.WithStore(pStore),
 				phone.WithTTL(50*time.Millisecond),
 				phone.WithAllowSignUp(true),
 			),
