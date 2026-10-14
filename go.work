@@ -36,6 +36,7 @@ use (
 	./plugins/passkeys
 	./plugins/password-policy
 	./plugins/phone
+	./plugins/polar
 	./plugins/policy
 	./plugins/rate-limit
 	./plugins/rbac
@@ -44,6 +45,7 @@ use (
 	./plugins/scim
 	./plugins/service-accounts
 	./plugins/sso
+	./plugins/stripe
 	./plugins/twofactor
 	./plugins/username
 )
