@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-multisession
+module github.com/BladiCreator/go-modular-auth/plugins/multisession
 
 go 1.27.1
 

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	passwordpolicy "github.com/BladiCreator/go-modular-auth-password-policy"
+	passwordpolicy "github.com/BladiCreator/go-modular-auth/plugins/password-policy"
 )
 
 func TestSecurity_DetailedViolations(t *testing.T) {

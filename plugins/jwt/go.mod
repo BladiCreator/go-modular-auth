@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-jwt
+module github.com/BladiCreator/go-modular-auth/plugins/jwt
 
 go 1.27.1
 

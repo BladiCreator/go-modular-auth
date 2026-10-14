@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-email-otp
+module github.com/BladiCreator/go-modular-auth/plugins/email-otp
 
 go 1.27.1
 

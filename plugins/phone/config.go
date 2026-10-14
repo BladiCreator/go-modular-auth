@@ -3,7 +3,7 @@ package phone
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-phone/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/phone/cache"
 )
 
 // RateLimitConfig configures throttling and abuse mitigation.

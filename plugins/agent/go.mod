@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-agent
+module github.com/BladiCreator/go-modular-auth/plugins/agent
 
 go 1.27.1
 

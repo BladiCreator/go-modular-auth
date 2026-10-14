@@ -8,7 +8,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-policy/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/policy/cache"
 )
 
 type service struct {

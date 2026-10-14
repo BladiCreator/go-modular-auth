@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkeys/challenge"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 

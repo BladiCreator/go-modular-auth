@@ -25,7 +25,7 @@ Enterprise SaaS applications require multi-tenant identity federation:
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-sso
+go get github.com/BladiCreator/go-modular-auth/plugins/sso
 ```
 
 ---
@@ -36,8 +36,8 @@ go get github.com/BladiCreator/go-modular-auth-sso
 import (
     "time"
     auth "github.com/BladiCreator/go-modular-auth"
-    sso "github.com/BladiCreator/go-modular-auth-sso"
-    ssomemory "github.com/BladiCreator/go-modular-auth-sso/store/memory"
+    sso "github.com/BladiCreator/go-modular-auth/plugins/sso"
+    ssomemory "github.com/BladiCreator/go-modular-auth/plugins/sso/store/memory"
 )
 
 ssoModule := sso.New(
@@ -108,7 +108,7 @@ type SSO interface {
 | :--- | :--- | :--- |
 | `github.com/BladiCreator/go-modular-auth` | Core GoModularAuth engine | Core User, Account, Session, and Store |
 | `github.com/BladiCreator/go-modular-auth/plugin-sdk` | Plugin runtime SDK | Dependency injection and capability registration |
-| `github.com/BladiCreator/go-modular-auth-organizations` | Multi-tenant organization support | Optional JIT organization membership assignment |
+| `github.com/BladiCreator/go-modular-auth/plugins/organizations` | Multi-tenant organization support | Optional JIT organization membership assignment |
 | Go Standard Library (`crypto/*`, `net/http`, `encoding/xml`) | Pure Go Cryptography & Networking | No external third-party SAML/JWT dependencies |
 
 ---

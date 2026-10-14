@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	oauthprovider "github.com/BladiCreator/go-modular-auth-oauth-provider"
+	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
 )
 
 func TestSecurity_PKCE_Enforcement(t *testing.T) {

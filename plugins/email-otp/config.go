@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-email-otp/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
 )
 

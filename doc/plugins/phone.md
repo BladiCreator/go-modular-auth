@@ -1,6 +1,6 @@
 # gomodularauth-phone
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-phone.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-phone)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/phone.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/phone)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-phone` is an official plugin module for **[GoModularAuth](https://github.com/BladiCreator/go-modular-auth)**. It provides first-class phone-number identity mappings and single-use phone OTP (One-Time Password) authentication through a provider-agnostic server-side interface.
@@ -63,7 +63,7 @@ The plugin depends on the Core; the Core has zero compile-time knowledge of this
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-phone
+go get github.com/BladiCreator/go-modular-auth/plugins/phone
 ```
 
 ---
@@ -81,9 +81,9 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/auth"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
-	phone "github.com/BladiCreator/go-modular-auth-phone"
-	"github.com/BladiCreator/go-modular-auth-phone/plugins"
-	phonestore "github.com/BladiCreator/go-modular-auth-phone/store/memory"
+	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
+	"github.com/BladiCreator/go-modular-auth/plugins/phone/plugins"
+	phonestore "github.com/BladiCreator/go-modular-auth/plugins/phone/store/memory"
 )
 
 // Example Twilio or custom SMS provider

@@ -42,7 +42,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-oauth-provider
+go get github.com/BladiCreator/go-modular-auth/plugins/oauth-provider
 ```
 
 ---
@@ -59,9 +59,9 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
-	oauthprovider "github.com/BladiCreator/go-modular-auth-oauth-provider"
-	"github.com/BladiCreator/go-modular-auth-oauth-provider/plugins"
-	oauthmemory "github.com/BladiCreator/go-modular-auth-oauth-provider/store/memory"
+	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/plugins"
+	oauthmemory "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/store/memory"
 )
 
 func main() {

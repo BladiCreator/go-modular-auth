@@ -8,7 +8,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	audit "github.com/BladiCreator/go-modular-auth-audit"
+	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 )
 
 func TestSecurity_Sanitizer_NeverStoresSecrets(t *testing.T) {

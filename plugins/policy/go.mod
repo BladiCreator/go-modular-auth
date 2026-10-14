@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-policy
+module github.com/BladiCreator/go-modular-auth/plugins/policy
 
 go 1.27.1
 

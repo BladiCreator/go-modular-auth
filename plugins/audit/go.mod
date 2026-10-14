@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-audit
+module github.com/BladiCreator/go-modular-auth/plugins/audit
 
 go 1.27.1
 

@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-apikeys
+module github.com/BladiCreator/go-modular-auth/plugins/api-keys
 
 go 1.27.1
 

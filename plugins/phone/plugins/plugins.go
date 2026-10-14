@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	phone "github.com/BladiCreator/go-modular-auth-phone"
+	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
 )
 
 // Phone is the strongly typed capability provided by the phone module.

@@ -1,7 +1,7 @@
 package generator
 
 import (
-	"github.com/BladiCreator/go-modular-auth-openapi/spec"
+	"github.com/BladiCreator/go-modular-auth/plugins/openapi/spec"
 )
 
 type Generator struct {

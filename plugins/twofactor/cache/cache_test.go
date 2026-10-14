@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-twofactor/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/twofactor/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 

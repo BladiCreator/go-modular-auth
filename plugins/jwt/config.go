@@ -3,7 +3,7 @@ package jwt
 import (
 	"time"
 
-	jwtcache "github.com/BladiCreator/go-modular-auth-jwt/cache"
+	jwtcache "github.com/BladiCreator/go-modular-auth/plugins/jwt/cache"
 )
 
 // Config configures the JWT plugin module.

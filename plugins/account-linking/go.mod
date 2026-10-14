@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-account-linking
+module github.com/BladiCreator/go-modular-auth/plugins/account-linking
 
 go 1.27.1
 

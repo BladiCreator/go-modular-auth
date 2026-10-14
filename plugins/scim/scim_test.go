@@ -6,8 +6,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	scim "github.com/BladiCreator/go-modular-auth-scim"
-	v2 "github.com/BladiCreator/go-modular-auth-scim/v2"
+	scim "github.com/BladiCreator/go-modular-auth/plugins/scim"
+	v2 "github.com/BladiCreator/go-modular-auth/plugins/scim/v2"
 )
 
 func TestSCIMProvider_UserAndGroupProvisioning(t *testing.T) {

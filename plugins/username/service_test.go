@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-username"
+	"github.com/BladiCreator/go-modular-auth/plugins/username"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/password"

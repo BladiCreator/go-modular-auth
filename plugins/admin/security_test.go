@@ -7,9 +7,9 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	admin "github.com/BladiCreator/go-modular-auth-admin"
-	"github.com/BladiCreator/go-modular-auth-admin/plugins"
-	orgplugin "github.com/BladiCreator/go-modular-auth-organizations"
+	admin "github.com/BladiCreator/go-modular-auth/plugins/admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin/plugins"
+	orgplugin "github.com/BladiCreator/go-modular-auth/plugins/organizations"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 

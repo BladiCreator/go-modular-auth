@@ -32,7 +32,7 @@ Modern enterprise applications require users to authenticate via multiple identi
 ## 3. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-account-linking
+go get github.com/BladiCreator/go-modular-auth/plugins/account-linking
 ```
 
 ---
@@ -48,9 +48,9 @@ import (
     "log"
 
     auth "github.com/BladiCreator/go-modular-auth"
-    accountlinking "github.com/BladiCreator/go-modular-auth-account-linking"
-    "github.com/BladiCreator/go-modular-auth-account-linking/plugins"
-    linkingmem "github.com/BladiCreator/go-modular-auth-account-linking/store/memory"
+    accountlinking "github.com/BladiCreator/go-modular-auth/plugins/account-linking"
+    "github.com/BladiCreator/go-modular-auth/plugins/account-linking/plugins"
+    linkingmem "github.com/BladiCreator/go-modular-auth/plugins/account-linking/store/memory"
 )
 
 func main() {

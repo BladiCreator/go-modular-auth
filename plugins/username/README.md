@@ -1,6 +1,6 @@
 # GoModularAuth Username Plugin (`gomodularauth-username`)
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-username.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-username)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/username.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/username)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An optional, production-ready identity plugin for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth) that provides username-based authentication, normalization, validation, and lifecycle management without polluting the Core `user.User` entity.
@@ -74,7 +74,7 @@ auth.Get[username.Capability](app) / auth.Get[username.Username](app)
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-username
+go get github.com/BladiCreator/go-modular-auth/plugins/username
 ```
 
 ---
@@ -92,7 +92,7 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
-	"github.com/BladiCreator/go-modular-auth-username"
+	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
 func main() {
@@ -229,7 +229,7 @@ type Store interface {
 }
 ```
 
-An in-memory implementation (`github.com/BladiCreator/go-modular-auth-username/store/memory`) is provided for testing and lightweight development.
+An in-memory implementation (`github.com/BladiCreator/go-modular-auth/plugins/username/store/memory`) is provided for testing and lightweight development.
 
 ---
 

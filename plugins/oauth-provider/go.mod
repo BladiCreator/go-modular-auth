@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-oauth-provider
+module github.com/BladiCreator/go-modular-auth/plugins/oauth-provider
 
 go 1.27.1
 

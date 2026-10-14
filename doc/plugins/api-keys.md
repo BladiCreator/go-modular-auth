@@ -1,6 +1,6 @@
 # GoModularAuth API Keys Plugin (`gomodularauth-api-key`)
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-apikeys.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-apikeys)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/api-keys.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/api-keys)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Production-grade API key authentication, lifecycle management, and identity resolution plugin for **[GoModularAuth](https://github.com/BladiCreator/go-modular-auth)**.
@@ -23,7 +23,7 @@ The `gomodularauth-api-key` plugin provides high-performance, cryptographic API 
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-apikeys
+go get github.com/BladiCreator/go-modular-auth/plugins/api-keys
 ```
 
 ---
@@ -38,9 +38,9 @@ package main
 import (
 	"log"
 
-	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
-	"github.com/BladiCreator/go-modular-auth-apikeys/plugins"
-	apikeystore "github.com/BladiCreator/go-modular-auth-apikeys/store/memory"
+	apikeys "github.com/BladiCreator/go-modular-auth/plugins/api-keys"
+	"github.com/BladiCreator/go-modular-auth/plugins/api-keys/plugins"
+	apikeystore "github.com/BladiCreator/go-modular-auth/plugins/api-keys/store/memory"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"

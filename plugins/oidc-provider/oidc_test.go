@@ -9,7 +9,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/user"
-	oidcprovider "github.com/BladiCreator/go-modular-auth-oidc-provider"
+	oidcprovider "github.com/BladiCreator/go-modular-auth/plugins/oidc-provider"
 )
 
 func TestOIDCProvider_DiscoveryAndTokens(t *testing.T) {

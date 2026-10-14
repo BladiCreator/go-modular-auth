@@ -10,8 +10,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-magiclink"
-	"github.com/BladiCreator/go-modular-auth-magiclink/plugins"
+	"github.com/BladiCreator/go-modular-auth/plugins/magic-link"
+	"github.com/BladiCreator/go-modular-auth/plugins/magic-link/plugins"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"

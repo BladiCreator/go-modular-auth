@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
+	twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
 // TwoFactor is the strongly typed capability provided by the twofactor module.

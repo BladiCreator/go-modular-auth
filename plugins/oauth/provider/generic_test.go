@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 )
 
 func TestGenericProvider_AuthCodeURL(t *testing.T) {

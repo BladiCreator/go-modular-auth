@@ -11,7 +11,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-rbac/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/rbac/cache"
 )
 
 type service struct {

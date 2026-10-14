@@ -48,7 +48,7 @@ oauthCapability, err := auth.Get[plugins.OAuth](engine)
 ## 3. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-oauth
+go get github.com/BladiCreator/go-modular-auth/plugins/oauth
 ```
 
 ---
@@ -65,9 +65,9 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
 
-	oauth "github.com/BladiCreator/go-modular-auth-oauth"
-	"github.com/BladiCreator/go-modular-auth-oauth/plugins"
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	oauth "github.com/BladiCreator/go-modular-auth/plugins/oauth"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/plugins"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 )
 
 func main() {
@@ -173,7 +173,7 @@ For production deployments, configure the PostgreSQL state store:
 import (
     "database/sql"
     _ "github.com/jackc/pgx/v5/stdlib"
-    pgstore "github.com/BladiCreator/go-modular-auth-oauth/store/postgres"
+    pgstore "github.com/BladiCreator/go-modular-auth/plugins/oauth/store/postgres"
 )
 
 db, _ := sql.Open("pgx", "postgres://user:pass@localhost:5432/auth_db")

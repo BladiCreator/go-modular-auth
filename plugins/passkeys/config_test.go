@@ -6,7 +6,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
+	passkey "github.com/BladiCreator/go-modular-auth/plugins/passkeys"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 

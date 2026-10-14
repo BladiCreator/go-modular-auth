@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-lastlogin
+module github.com/BladiCreator/go-modular-auth/plugins/lastlogin
 
 go 1.27.1
 

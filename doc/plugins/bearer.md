@@ -1,6 +1,6 @@
 # gomodularauth-bearer
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-bearer.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-bearer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/bearer.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/bearer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-bearer` provides transport-independent Bearer token authentication for server-side APIs built with [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
@@ -31,7 +31,7 @@ Standard authentication frameworks tightly couple token extraction with HTTP req
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-bearer
+go get github.com/BladiCreator/go-modular-auth/plugins/bearer
 ```
 
 ---
@@ -74,8 +74,8 @@ import (
 
     "github.com/BladiCreator/go-modular-auth/auth"
     storememory "github.com/BladiCreator/go-modular-auth/store/memory"
-    bearer "github.com/BladiCreator/go-modular-auth-bearer"
-    "github.com/BladiCreator/go-modular-auth-bearer/plugins"
+    bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
+    "github.com/BladiCreator/go-modular-auth/plugins/bearer/plugins"
 )
 
 func main() {
@@ -197,7 +197,7 @@ import (
     "net/http"
 
     "github.com/BladiCreator/go-modular-auth/auth"
-    bearer "github.com/BladiCreator/go-modular-auth-bearer"
+    bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
 )
 
 func BearerAuthMiddleware(b bearer.Bearer, requiredScopes ...string) func(http.Handler) http.Handler {
@@ -308,14 +308,14 @@ type Store interface {
 1. **In-Memory Store (`store/memory`)**:
    Thread-safe in-process store with `sync.RWMutex`. Used for tests and ephemeral environments.
    ```go
-   import "github.com/BladiCreator/go-modular-auth-bearer/store/memory"
+   import "github.com/BladiCreator/go-modular-auth/plugins/bearer/store/memory"
 
    module := bearer.New(bearer.WithStore(memory.New()))
    ```
 2. **PostgreSQL Store (`store/postgres`)**:
    Production-ready implementation compatible with `*sql.DB` and connection poolers (PgBouncer).
    ```go
-   import "github.com/BladiCreator/go-modular-auth-bearer/store/postgres"
+   import "github.com/BladiCreator/go-modular-auth/plugins/bearer/store/postgres"
 
    module := bearer.New(bearer.WithStore(postgres.New(db)))
    ```

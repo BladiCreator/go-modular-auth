@@ -1,6 +1,6 @@
 # gomodularauth-email-otp
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-email-otp.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-email-otp)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/email-otp.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/email-otp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A production-ready, passwordless authentication plugin for **GoModularAuth** providing short-lived, single-use email One-Time Password (OTP) verification codes.
@@ -42,7 +42,7 @@ Email OTP Plugin           Store Adapter
 ## 3. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-email-otp
+go get github.com/BladiCreator/go-modular-auth/plugins/email-otp
 ```
 
 ---
@@ -57,8 +57,8 @@ import (
 	"log"
 	"time"
 
-	emailotp "github.com/BladiCreator/go-modular-auth-email-otp"
-	"github.com/BladiCreator/go-modular-auth-email-otp/plugins"
+	emailotp "github.com/BladiCreator/go-modular-auth/plugins/email-otp"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 	emailmemory "github.com/BladiCreator/go-modular-auth/email/memory"

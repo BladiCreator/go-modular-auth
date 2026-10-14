@@ -9,8 +9,8 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	accountlinking "github.com/BladiCreator/go-modular-auth-account-linking"
-	"github.com/BladiCreator/go-modular-auth-account-linking/plugins"
+	accountlinking "github.com/BladiCreator/go-modular-auth/plugins/account-linking"
+	"github.com/BladiCreator/go-modular-auth/plugins/account-linking/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 

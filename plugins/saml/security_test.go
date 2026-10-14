@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	saml "github.com/BladiCreator/go-modular-auth-saml"
+	saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
 )
 
 func TestSAML_Security_AssertionReplayProtection(t *testing.T) {

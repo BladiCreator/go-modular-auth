@@ -7,7 +7,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	agent "github.com/BladiCreator/go-modular-auth-agent"
+	agent "github.com/BladiCreator/go-modular-auth/plugins/agent"
 )
 
 func TestAgent_Lifecycle(t *testing.T) {

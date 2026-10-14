@@ -17,8 +17,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	saml "github.com/BladiCreator/go-modular-auth-saml"
-	"github.com/BladiCreator/go-modular-auth-saml/plugins"
+	saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
+	"github.com/BladiCreator/go-modular-auth/plugins/saml/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

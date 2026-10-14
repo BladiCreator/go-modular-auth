@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-organizations"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 )
 
 // HTTPClient abstracts outbound HTTP request execution. It is satisfied by *http.Client.

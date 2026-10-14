@@ -1,6 +1,6 @@
 # GoModularAuth Organizations Plugin
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-organizations.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-organizations)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/organizations.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/organizations)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `gomodularauth-organizations` provides multi-tenant organizations, memberships, role-based member permissions, teams, team memberships, invitations, organization metadata, ownership lifecycle, and organization-scoped authorization for GoModularAuth.
@@ -50,7 +50,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-organizations
+go get github.com/BladiCreator/go-modular-auth/plugins/organizations
 ```
 
 ---
@@ -68,9 +68,9 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
-	"github.com/BladiCreator/go-modular-auth-organizations"
-	"github.com/BladiCreator/go-modular-auth-organizations/plugins"
-	orgpostgres "github.com/BladiCreator/go-modular-auth-organizations/store/postgres"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations/plugins"
+	orgpostgres "github.com/BladiCreator/go-modular-auth/plugins/organizations/store/postgres"
 )
 
 func main() {

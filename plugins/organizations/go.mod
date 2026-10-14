@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-organizations
+module github.com/BladiCreator/go-modular-auth/plugins/organizations
 
 go 1.27.1
 

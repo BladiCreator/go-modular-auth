@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-scim
+module github.com/BladiCreator/go-modular-auth/plugins/scim
 
 go 1.27.1
 

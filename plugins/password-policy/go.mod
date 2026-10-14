@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-password-policy
+module github.com/BladiCreator/go-modular-auth/plugins/password-policy
 
 go 1.27.1
 

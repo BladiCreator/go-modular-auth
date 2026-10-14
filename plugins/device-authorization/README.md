@@ -58,7 +58,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-device-authorization
+go get github.com/BladiCreator/go-modular-auth/plugins/device-authorization
 ```
 
 ---
@@ -76,9 +76,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	deviceauth "github.com/BladiCreator/go-modular-auth-device-authorization"
-	"github.com/BladiCreator/go-modular-auth-device-authorization/plugins"
-	devicemem "github.com/BladiCreator/go-modular-auth-device-authorization/store/memory"
+	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
+	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
+	devicemem "github.com/BladiCreator/go-modular-auth/plugins/device-authorization/store/memory"
 	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 

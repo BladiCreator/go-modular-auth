@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	"github.com/BladiCreator/go-modular-auth-bearer"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer"
 )
 
 // Bearer is the strongly typed capability provided by the bearer module.

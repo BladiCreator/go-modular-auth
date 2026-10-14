@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	oauthprovider "github.com/BladiCreator/go-modular-auth-oauth-provider"
+	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
 )
 
 // OAuthProvider is the strongly typed capability provided by the oauth-provider module.

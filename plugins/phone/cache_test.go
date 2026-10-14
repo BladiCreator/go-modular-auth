@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	phone "github.com/BladiCreator/go-modular-auth-phone"
+	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
 )
 
 func TestPhoneCache_SetGetInvalidate(t *testing.T) {

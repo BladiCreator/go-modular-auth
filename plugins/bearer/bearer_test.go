@@ -10,8 +10,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	bearer "github.com/BladiCreator/go-modular-auth-bearer"
-	"github.com/BladiCreator/go-modular-auth-bearer/plugins"
+	bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

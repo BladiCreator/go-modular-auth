@@ -1,10 +1,10 @@
-module github.com/BladiCreator/go-modular-auth-admin
+module github.com/BladiCreator/go-modular-auth/plugins/admin
 
 go 1.27.1
 
 require (
 	github.com/BladiCreator/go-modular-auth v0.0.0
-	github.com/BladiCreator/go-modular-auth-organizations v0.0.0
+	github.com/BladiCreator/go-modular-auth/plugins/organizations v0.0.0
 	github.com/BladiCreator/go-modular-auth/plugin-sdk v0.0.0
 )
 
@@ -17,4 +17,4 @@ replace github.com/BladiCreator/go-modular-auth => ../../core
 
 replace github.com/BladiCreator/go-modular-auth/plugin-sdk => ../../plugin-sdk
 
-replace github.com/BladiCreator/go-modular-auth-organizations => ../organizations
+replace github.com/BladiCreator/go-modular-auth/plugins/organizations => ../organizations

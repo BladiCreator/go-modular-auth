@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-magiclink
+module github.com/BladiCreator/go-modular-auth/plugins/magic-link
 
 go 1.27.1
 

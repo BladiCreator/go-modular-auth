@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-oidc
+module github.com/BladiCreator/go-modular-auth/plugins/oidc
 
 go 1.27.1
 

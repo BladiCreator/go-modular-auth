@@ -2,7 +2,7 @@
 package events
 
 import (
-	deviceauth "github.com/BladiCreator/go-modular-auth-device-authorization"
+	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
 )
 
 const (

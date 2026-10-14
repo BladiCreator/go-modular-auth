@@ -10,7 +10,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	stripe "github.com/BladiCreator/go-modular-auth-stripe"
+	stripe "github.com/BladiCreator/go-modular-auth/plugins/stripe"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 

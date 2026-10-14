@@ -8,8 +8,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	rbac "github.com/BladiCreator/go-modular-auth-rbac"
-	"github.com/BladiCreator/go-modular-auth-rbac/cache"
+	rbac "github.com/BladiCreator/go-modular-auth/plugins/rbac"
+	"github.com/BladiCreator/go-modular-auth/plugins/rbac/cache"
 )
 
 func setupTestRBAC(t *testing.T, opts ...rbac.Option) (*auth.Auth, rbac.RBAC) {

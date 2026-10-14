@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-twofactor
+module github.com/BladiCreator/go-modular-auth/plugins/twofactor
 
 go 1.27.1
 

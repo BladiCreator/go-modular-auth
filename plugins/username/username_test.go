@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/BladiCreator/go-modular-auth-username"
+	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
 func TestDefaultNormalizer(t *testing.T) {

@@ -1,6 +1,6 @@
 # gomodularauth-anonymous
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-anonymous.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-anonymous)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/anonymous.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/anonymous)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An official production-ready plugin for **GoModularAuth** that provides anonymous user identities, session issuance, lifecycle expiration, in-place conversion to permanent authenticated accounts, and account linking/merging with explicit authentication and privilege escalation prevention.
@@ -63,7 +63,7 @@ Plugin Store (Memory / PostgreSQL) + Optional Cache
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-anonymous
+go get github.com/BladiCreator/go-modular-auth/plugins/anonymous
 ```
 
 ---
@@ -99,8 +99,8 @@ import (
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
 
-	"github.com/BladiCreator/go-modular-auth-anonymous"
-	"github.com/BladiCreator/go-modular-auth-anonymous/plugins"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/plugins"
 )
 
 func main() {
@@ -218,7 +218,7 @@ The plugin ships with two stores implementing `store.Store`:
 Ideal for automated unit tests, integration tests, and local development.
 
 ```go
-import "github.com/BladiCreator/go-modular-auth-anonymous/store/memory"
+import "github.com/BladiCreator/go-modular-auth/plugins/anonymous/store/memory"
 
 anonPlugin := anonymous.New(
     anonymous.WithStore(memory.New()),
@@ -231,7 +231,7 @@ Production-grade persistence using `database/sql`.
 ```go
 import (
     "database/sql"
-    "github.com/BladiCreator/go-modular-auth-anonymous/store/postgres"
+    "github.com/BladiCreator/go-modular-auth/plugins/anonymous/store/postgres"
 )
 
 db, _ := sql.Open("pgx", connStr)

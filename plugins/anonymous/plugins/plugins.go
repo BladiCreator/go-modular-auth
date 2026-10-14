@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	"github.com/BladiCreator/go-modular-auth-anonymous"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
 )
 
 // Anonymous is the strongly typed capability provided by the anonymous module.

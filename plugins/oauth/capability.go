@@ -3,7 +3,7 @@ package oauth
 import (
 	"context"
 
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 	"github.com/BladiCreator/go-modular-auth/account"
 )
 

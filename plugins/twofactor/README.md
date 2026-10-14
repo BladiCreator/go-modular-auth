@@ -22,7 +22,7 @@
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-twofactor
+go get github.com/BladiCreator/go-modular-auth/plugins/twofactor
 ```
 
 ---
@@ -39,8 +39,8 @@ import (
 
     "github.com/BladiCreator/go-modular-auth/auth"
     storememory "github.com/BladiCreator/go-modular-auth/store/memory"
-    twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
-    "github.com/BladiCreator/go-modular-auth-twofactor/plugins"
+    twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
+    "github.com/BladiCreator/go-modular-auth/plugins/twofactor/plugins"
 )
 
 func main() {

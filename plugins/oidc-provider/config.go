@@ -5,7 +5,7 @@ import (
 	"crypto/rsa"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-oidc-provider/discovery"
+	"github.com/BladiCreator/go-modular-auth/plugins/oidc-provider/discovery"
 )
 
 type Config struct {

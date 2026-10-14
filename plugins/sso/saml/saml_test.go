@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	ssosaml "github.com/BladiCreator/go-modular-auth-sso/saml"
+	ssosaml "github.com/BladiCreator/go-modular-auth/plugins/sso/saml"
 )
 
 func TestSAML_BuildAuthnRequest(t *testing.T) {

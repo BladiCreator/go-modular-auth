@@ -7,7 +7,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	ott "github.com/BladiCreator/go-modular-auth-one-time-token"
+	ott "github.com/BladiCreator/go-modular-auth/plugins/one-time-token"
 )
 
 func setupTest(t *testing.T, opts ...ott.Option) (*auth.Auth, ott.OneTimeToken) {

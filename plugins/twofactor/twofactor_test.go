@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	twofactor "github.com/BladiCreator/go-modular-auth-twofactor"
+	twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
 )
 
 func newTestService(t *testing.T) twofactor.TwoFactor {

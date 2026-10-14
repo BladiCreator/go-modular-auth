@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	oidc "github.com/BladiCreator/go-modular-auth-oidc"
+	oidc "github.com/BladiCreator/go-modular-auth/plugins/oidc"
 )
 
 // OIDC is the strongly typed capability provided by the oidc module.

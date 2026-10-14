@@ -21,7 +21,7 @@ Provides WebAuthn and Passkey registration and authentication as an optional ser
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-passkeys
+go get github.com/BladiCreator/go-modular-auth/plugins/passkeys
 ```
 
 ---
@@ -69,8 +69,8 @@ import (
 	"log"
 	"time"
 
-	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
-	"github.com/BladiCreator/go-modular-auth-passkeys/plugins"
+	passkey "github.com/BladiCreator/go-modular-auth/plugins/passkeys"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkeys/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	"github.com/BladiCreator/go-modular-auth/store/memory"
 )

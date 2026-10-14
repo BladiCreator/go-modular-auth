@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-username
+module github.com/BladiCreator/go-modular-auth/plugins/username
 
 go 1.27.1
 

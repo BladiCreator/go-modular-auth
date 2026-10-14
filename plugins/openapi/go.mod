@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-openapi
+module github.com/BladiCreator/go-modular-auth/plugins/openapi
 
 go 1.27.1
 

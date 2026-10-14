@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
-	"github.com/BladiCreator/go-modular-auth-openapi/generator"
-	"github.com/BladiCreator/go-modular-auth-openapi/spec"
+	"github.com/BladiCreator/go-modular-auth/plugins/openapi/generator"
+	"github.com/BladiCreator/go-modular-auth/plugins/openapi/spec"
 )
 
 type OpenAPIGenerator interface {

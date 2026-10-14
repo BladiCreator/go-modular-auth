@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	ratelimit "github.com/BladiCreator/go-modular-auth-rate-limit"
+	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
 )
 
 // RateLimit is the strongly typed capability provided by the rate-limit module.

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	organizations "github.com/BladiCreator/go-modular-auth-organizations"
-	sso "github.com/BladiCreator/go-modular-auth-sso"
+	organizations "github.com/BladiCreator/go-modular-auth/plugins/organizations"
+	sso "github.com/BladiCreator/go-modular-auth/plugins/sso"
 )
 
 func TestSSO_Security_CrossTenantViolation(t *testing.T) {

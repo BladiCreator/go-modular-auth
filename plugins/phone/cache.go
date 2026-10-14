@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-phone/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/phone/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 )
 

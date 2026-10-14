@@ -33,7 +33,7 @@ Default authentication configurations often enforce only basic length boundaries
 ## 3. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-password-policy
+go get github.com/BladiCreator/go-modular-auth/plugins/password-policy
 ```
 
 ---
@@ -49,9 +49,9 @@ import (
     "log"
 
     auth "github.com/BladiCreator/go-modular-auth"
-    passwordpolicy "github.com/BladiCreator/go-modular-auth-password-policy"
-    "github.com/BladiCreator/go-modular-auth-password-policy/plugins"
-    policymem "github.com/BladiCreator/go-modular-auth-password-policy/store/memory"
+    passwordpolicy "github.com/BladiCreator/go-modular-auth/plugins/password-policy"
+    "github.com/BladiCreator/go-modular-auth/plugins/password-policy/plugins"
+    policymem "github.com/BladiCreator/go-modular-auth/plugins/password-policy/store/memory"
 )
 
 func main() {

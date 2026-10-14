@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	accountlinking "github.com/BladiCreator/go-modular-auth-account-linking"
+	accountlinking "github.com/BladiCreator/go-modular-auth/plugins/account-linking"
 )
 
 func TestSecurity_AccountConflict_NeverSilentMerge(t *testing.T) {

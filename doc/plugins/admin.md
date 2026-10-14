@@ -44,7 +44,7 @@ The plugin adheres strictly to GoModularAuth's architectural principles:
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-admin
+go get github.com/BladiCreator/go-modular-auth/plugins/admin
 ```
 
 ---
@@ -59,9 +59,9 @@ import (
 	"log"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	admin "github.com/BladiCreator/go-modular-auth-admin"
-	"github.com/BladiCreator/go-modular-auth-admin/plugins"
-	adminmemory "github.com/BladiCreator/go-modular-auth-admin/store/memory"
+	admin "github.com/BladiCreator/go-modular-auth/plugins/admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin/plugins"
+	adminmemory "github.com/BladiCreator/go-modular-auth/plugins/admin/store/memory"
 	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 

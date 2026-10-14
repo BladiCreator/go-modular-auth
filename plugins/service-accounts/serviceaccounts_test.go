@@ -6,7 +6,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	serviceaccounts "github.com/BladiCreator/go-modular-auth-service-accounts"
+	serviceaccounts "github.com/BladiCreator/go-modular-auth/plugins/service-accounts"
 )
 
 func TestServiceAccounts_Lifecycle(t *testing.T) {

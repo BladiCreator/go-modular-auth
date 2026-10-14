@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	"github.com/BladiCreator/go-modular-auth-organizations"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 )
 
 // Organization is the strongly typed capability provided by the organizations module.

@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	"github.com/BladiCreator/go-modular-auth-admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 )
 
 // Admin is the strongly typed capability provided by the admin module.

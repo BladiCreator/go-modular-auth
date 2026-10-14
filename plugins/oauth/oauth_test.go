@@ -7,9 +7,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-oauth"
-	"github.com/BladiCreator/go-modular-auth-oauth/plugins"
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/plugins"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 

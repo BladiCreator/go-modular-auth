@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	audit "github.com/BladiCreator/go-modular-auth-audit"
+	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 )
 
 // Audit is the strongly typed capability provided by the audit module.

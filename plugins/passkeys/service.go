@@ -10,7 +10,7 @@ import (
 	"io"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-passkeys/challenge"
+	"github.com/BladiCreator/go-modular-auth/plugins/passkeys/challenge"
 	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"

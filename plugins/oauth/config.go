@@ -3,7 +3,7 @@ package oauth
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 )
 
 const (

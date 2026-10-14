@@ -18,10 +18,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	organizations "github.com/BladiCreator/go-modular-auth-organizations"
-	sso "github.com/BladiCreator/go-modular-auth-sso"
-	"github.com/BladiCreator/go-modular-auth-sso/oidc"
-	"github.com/BladiCreator/go-modular-auth-sso/plugins"
+	organizations "github.com/BladiCreator/go-modular-auth/plugins/organizations"
+	sso "github.com/BladiCreator/go-modular-auth/plugins/sso"
+	"github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
+	"github.com/BladiCreator/go-modular-auth/plugins/sso/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

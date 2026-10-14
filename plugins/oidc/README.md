@@ -29,7 +29,7 @@ However, naive OIDC client implementations suffer from severe vulnerabilities:
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-oidc
+go get github.com/BladiCreator/go-modular-auth/plugins/oidc
 ```
 
 ---
@@ -40,8 +40,8 @@ go get github.com/BladiCreator/go-modular-auth-oidc
 import (
     "time"
     auth "github.com/BladiCreator/go-modular-auth"
-    oidc "github.com/BladiCreator/go-modular-auth-oidc"
-    oidcmemory "github.com/BladiCreator/go-modular-auth-oidc/store/memory"
+    oidc "github.com/BladiCreator/go-modular-auth/plugins/oidc"
+    oidcmemory "github.com/BladiCreator/go-modular-auth/plugins/oidc/store/memory"
 )
 
 // Configure OIDC Provider

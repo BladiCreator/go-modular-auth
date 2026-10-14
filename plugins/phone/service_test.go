@@ -7,8 +7,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	phone "github.com/BladiCreator/go-modular-auth-phone"
-	"github.com/BladiCreator/go-modular-auth-phone/plugins"
+	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
+	"github.com/BladiCreator/go-modular-auth/plugins/phone/plugins"
 )
 
 func setupTestAuth(t *testing.T, opts ...phone.Option) (*auth.Auth, phone.Phone, *phone.MockProvider) {

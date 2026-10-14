@@ -8,7 +8,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
-	"github.com/BladiCreator/go-modular-auth-bearer/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 

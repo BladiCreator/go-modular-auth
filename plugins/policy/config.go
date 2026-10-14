@@ -3,7 +3,7 @@ package policy
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-policy/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/policy/cache"
 )
 
 // CombinatorType defines the root policy composition algorithm.

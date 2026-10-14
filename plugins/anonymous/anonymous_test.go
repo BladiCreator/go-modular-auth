@@ -7,8 +7,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-anonymous"
-	"github.com/BladiCreator/go-modular-auth-anonymous/plugins"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

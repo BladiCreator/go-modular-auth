@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-bearer/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

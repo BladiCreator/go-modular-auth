@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	saml "github.com/BladiCreator/go-modular-auth-saml"
+	saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
 )
 
 // SAML is the strongly typed capability provided by the saml module.

@@ -21,7 +21,7 @@ The Audit plugin functions as a zero-trust observational event consumer across G
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-audit
+go get github.com/BladiCreator/go-modular-auth/plugins/audit
 ```
 
 ---
@@ -54,9 +54,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	audit "github.com/BladiCreator/go-modular-auth-audit"
-	"github.com/BladiCreator/go-modular-auth-audit/plugins"
-	auditpg "github.com/BladiCreator/go-modular-auth-audit/store/postgres"
+	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
+	"github.com/BladiCreator/go-modular-auth/plugins/audit/plugins"
+	auditpg "github.com/BladiCreator/go-modular-auth/plugins/audit/store/postgres"
 	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 

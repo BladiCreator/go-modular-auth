@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-rbac
+module github.com/BladiCreator/go-modular-auth/plugins/rbac
 
 go 1.27.1
 

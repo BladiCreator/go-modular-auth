@@ -2,7 +2,7 @@
 package events
 
 import (
-	"github.com/BladiCreator/go-modular-auth-admin"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin"
 )
 
 const (

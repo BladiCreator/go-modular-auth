@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	polar "github.com/BladiCreator/go-modular-auth-polar"
+	polar "github.com/BladiCreator/go-modular-auth/plugins/polar"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 

@@ -10,7 +10,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	phone "github.com/BladiCreator/go-modular-auth-phone"
+	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
 )
 
 func TestSecurity_ConcurrencyAndReplay(t *testing.T) {

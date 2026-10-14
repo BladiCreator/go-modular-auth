@@ -6,7 +6,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/verification"
-	"github.com/BladiCreator/go-modular-auth-one-time-token/events"
+	"github.com/BladiCreator/go-modular-auth/plugins/one-time-token/events"
 )
 
 type service struct {

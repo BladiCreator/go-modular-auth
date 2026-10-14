@@ -15,7 +15,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-policy
+go get github.com/BladiCreator/go-modular-auth/plugins/policy
 ```
 
 ## Quick Start
@@ -29,8 +29,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
-	policy "github.com/BladiCreator/go-modular-auth-policy"
-	"github.com/BladiCreator/go-modular-auth-policy/plugins"
+	policy "github.com/BladiCreator/go-modular-auth/plugins/policy"
+	"github.com/BladiCreator/go-modular-auth/plugins/policy/plugins"
 )
 
 func main() {

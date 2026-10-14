@@ -6,7 +6,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	openapi "github.com/BladiCreator/go-modular-auth-openapi"
+	openapi "github.com/BladiCreator/go-modular-auth/plugins/openapi"
 )
 
 func TestOpenAPI_SpecGeneration(t *testing.T) {

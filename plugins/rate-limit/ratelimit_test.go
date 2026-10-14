@@ -7,8 +7,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	ratelimit "github.com/BladiCreator/go-modular-auth-rate-limit"
-	"github.com/BladiCreator/go-modular-auth-rate-limit/plugins"
+	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
+	"github.com/BladiCreator/go-modular-auth/plugins/rate-limit/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )

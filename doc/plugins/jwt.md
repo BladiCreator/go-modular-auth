@@ -1,6 +1,6 @@
 # GoModularAuth JWT Plugin (`gomodularauth-jwt`)
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-jwt.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-jwt)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/jwt.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/jwt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An optional, production-grade JWT (JSON Web Token) plugin library for **[GoModularAuth](https://github.com/BladiCreator/go-modular-auth)**.
@@ -21,7 +21,7 @@ It provides stateless, cryptographically signed token issuance and verification 
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-jwt
+go get github.com/BladiCreator/go-modular-auth/plugins/jwt
 ```
 
 ---
@@ -52,8 +52,8 @@ import (
 	"log"
 	"time"
 
-	jwt "github.com/BladiCreator/go-modular-auth-jwt"
-	"github.com/BladiCreator/go-modular-auth-jwt/plugins"
+	jwt "github.com/BladiCreator/go-modular-auth/plugins/jwt"
+	"github.com/BladiCreator/go-modular-auth/plugins/jwt/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
@@ -166,7 +166,7 @@ When individual token invalidation or subject logout is required:
 
 ```go
 import (
-    "github.com/BladiCreator/go-modular-auth-jwt/store/postgres"
+    "github.com/BladiCreator/go-modular-auth/plugins/jwt/store/postgres"
     // or store/memory for local development
 )
 

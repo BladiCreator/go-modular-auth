@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/BladiCreator/go-modular-auth-oauth/provider"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 )
 
 // Hooks provides lifecycle interceptors for OAuth authentication flows.

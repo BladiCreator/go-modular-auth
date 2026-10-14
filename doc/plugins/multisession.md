@@ -1,6 +1,6 @@
 # GoModularAuth MultiSession Plugin
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-multisession.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-multisession)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/multisession.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/multisession)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `gomodularauth-multi-session` provides advanced management of multiple concurrent Core Sessions for GoModularAuth users while strictly preserving Core session semantics.
@@ -43,7 +43,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-multisession
+go get github.com/BladiCreator/go-modular-auth/plugins/multisession
 ```
 
 ---
@@ -61,8 +61,8 @@ import (
 	"github.com/BladiCreator/go-modular-auth/auth"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
-	multisession "github.com/BladiCreator/go-modular-auth-multisession"
-	"github.com/BladiCreator/go-modular-auth-multisession/plugins"
+	multisession "github.com/BladiCreator/go-modular-auth/plugins/multisession"
+	"github.com/BladiCreator/go-modular-auth/plugins/multisession/plugins"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-bearer
+module github.com/BladiCreator/go-modular-auth/plugins/bearer
 
 go 1.27.1
 

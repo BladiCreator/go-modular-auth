@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	rbac "github.com/BladiCreator/go-modular-auth-rbac"
+	rbac "github.com/BladiCreator/go-modular-auth/plugins/rbac"
 )
 
 // RBAC is the strongly typed capability provided by the gomodularauth-rbac module.

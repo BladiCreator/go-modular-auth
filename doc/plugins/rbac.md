@@ -15,7 +15,7 @@
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-rbac
+go get github.com/BladiCreator/go-modular-auth/plugins/rbac
 ```
 
 ## Quick Start
@@ -29,8 +29,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
-	rbac "github.com/BladiCreator/go-modular-auth-rbac"
-	"github.com/BladiCreator/go-modular-auth-rbac/plugins"
+	rbac "github.com/BladiCreator/go-modular-auth/plugins/rbac"
+	"github.com/BladiCreator/go-modular-auth/plugins/rbac/plugins"
 )
 
 func main() {

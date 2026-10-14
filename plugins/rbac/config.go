@@ -3,7 +3,7 @@ package rbac
 import (
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth-rbac/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/rbac/cache"
 )
 
 // Config holds configuration parameters for the RBAC plugin.

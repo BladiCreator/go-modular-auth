@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-rate-limit
+module github.com/BladiCreator/go-modular-auth/plugins/rate-limit
 
 go 1.27.1
 

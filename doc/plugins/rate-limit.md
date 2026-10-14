@@ -28,7 +28,7 @@ The Rate Limit plugin prevents brute-force attacks, credential stuffing, enumera
 ## Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-rate-limit
+go get github.com/BladiCreator/go-modular-auth/plugins/rate-limit
 ```
 
 ---
@@ -61,8 +61,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	ratelimit "github.com/BladiCreator/go-modular-auth-rate-limit"
-	"github.com/BladiCreator/go-modular-auth-rate-limit/plugins"
+	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
+	"github.com/BladiCreator/go-modular-auth/plugins/rate-limit/plugins"
 	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )

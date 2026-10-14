@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/BladiCreator/go-modular-auth-rate-limit"
+	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
 )
 
 func TestSecurity_KeyIsolation_And_NoSecretExposure(t *testing.T) {

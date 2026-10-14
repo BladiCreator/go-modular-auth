@@ -9,8 +9,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	rbac "github.com/BladiCreator/go-modular-auth-rbac"
-	"github.com/BladiCreator/go-modular-auth-rbac/cache"
+	rbac "github.com/BladiCreator/go-modular-auth/plugins/rbac"
+	"github.com/BladiCreator/go-modular-auth/plugins/rbac/cache"
 )
 
 func TestSecurity_RoleInUseProtection(t *testing.T) {

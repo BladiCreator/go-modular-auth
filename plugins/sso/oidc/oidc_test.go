@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	ssooidc "github.com/BladiCreator/go-modular-auth-sso/oidc"
+	ssooidc "github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
 )
 
 func TestOIDCClient_DiscoveryAndBuildURL(t *testing.T) {

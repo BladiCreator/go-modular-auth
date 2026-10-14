@@ -1,6 +1,6 @@
 # gomodularauth-magic-link
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth-magiclink.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth-magiclink)
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/magic-link.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/magic-link)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-magic-link` provides passwordless authentication through secure, single-use, expiring email magic links for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
@@ -26,7 +26,7 @@ Passwordless authentication using email magic links eliminates passwords while p
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-magiclink
+go get github.com/BladiCreator/go-modular-auth/plugins/magic-link
 ```
 
 ---
@@ -42,7 +42,7 @@ import (
     "log"
 
     "github.com/BladiCreator/go-modular-auth/auth"
-    "github.com/BladiCreator/go-modular-auth-magiclink"
+    "github.com/BladiCreator/go-modular-auth/plugins/magic-link"
 )
 
 func main() {

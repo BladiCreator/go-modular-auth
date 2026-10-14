@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-phone
+module github.com/BladiCreator/go-modular-auth/plugins/phone
 
 go 1.27.1
 

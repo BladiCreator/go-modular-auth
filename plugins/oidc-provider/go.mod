@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-oidc-provider
+module github.com/BladiCreator/go-modular-auth/plugins/oidc-provider
 
 go 1.27.1
 
@@ -14,6 +14,6 @@ require (
 
 replace github.com/BladiCreator/go-modular-auth => ../../core
 
-replace github.com/BladiCreator/go-modular-auth-jwt => ../jwt
+replace github.com/BladiCreator/go-modular-auth/plugins/jwt => ../jwt
 
 replace github.com/BladiCreator/go-modular-auth/plugin-sdk => ../../plugin-sdk

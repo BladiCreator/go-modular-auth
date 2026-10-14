@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-anonymous
+module github.com/BladiCreator/go-modular-auth/plugins/anonymous
 
 go 1.27.1
 

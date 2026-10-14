@@ -10,7 +10,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
-	jwtcache "github.com/BladiCreator/go-modular-auth-jwt/cache"
+	jwtcache "github.com/BladiCreator/go-modular-auth/plugins/jwt/cache"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 )
 

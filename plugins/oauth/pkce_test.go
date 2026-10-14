@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/BladiCreator/go-modular-auth-oauth"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth"
 )
 
 func TestGeneratePKCE(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-saml
+module github.com/BladiCreator/go-modular-auth/plugins/saml
 
 go 1.27.1
 

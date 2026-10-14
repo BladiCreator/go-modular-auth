@@ -7,7 +7,7 @@ import (
 
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/user"
-	"github.com/BladiCreator/go-modular-auth-saml-provider/metadata"
+	"github.com/BladiCreator/go-modular-auth/plugins/saml-provider/metadata"
 )
 
 type SAMLProvider interface {

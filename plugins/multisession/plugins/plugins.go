@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	multisession "github.com/BladiCreator/go-modular-auth-multisession"
+	multisession "github.com/BladiCreator/go-modular-auth/plugins/multisession"
 )
 
 // MultiSession is the strongly typed capability provided by the multisession module.

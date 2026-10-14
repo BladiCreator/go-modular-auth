@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	passkey "github.com/BladiCreator/go-modular-auth-passkeys"
+	passkey "github.com/BladiCreator/go-modular-auth/plugins/passkeys"
 )
 
 // Passkeys is the strongly typed capability provided by the passkey module.

@@ -35,7 +35,7 @@ It acts as a compliant SAML 2.0 Service Provider (SP), abstracting all XML, XMLD
 ## 2. Installation
 
 ```bash
-go get github.com/BladiCreator/go-modular-auth-saml
+go get github.com/BladiCreator/go-modular-auth/plugins/saml
 ```
 
 ---
@@ -51,8 +51,8 @@ import (
     "log"
 
     "github.com/BladiCreator/go-modular-auth/core"
-    saml "github.com/BladiCreator/go-modular-auth-saml"
-    samlmem "github.com/BladiCreator/go-modular-auth-saml/store/memory"
+    saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
+    samlmem "github.com/BladiCreator/go-modular-auth/plugins/saml/store/memory"
 )
 
 func main() {

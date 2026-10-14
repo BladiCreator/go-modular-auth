@@ -7,7 +7,7 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	lastlogin "github.com/BladiCreator/go-modular-auth-lastlogin"
+	lastlogin "github.com/BladiCreator/go-modular-auth/plugins/lastlogin"
 )
 
 func TestLastLogin_RecordAndGet(t *testing.T) {

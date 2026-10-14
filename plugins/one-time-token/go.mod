@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-one-time-token
+module github.com/BladiCreator/go-modular-auth/plugins/one-time-token
 
 go 1.27.1
 

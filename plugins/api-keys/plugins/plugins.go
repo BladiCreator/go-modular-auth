@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	apikeys "github.com/BladiCreator/go-modular-auth-apikeys"
+	apikeys "github.com/BladiCreator/go-modular-auth/plugins/api-keys"
 )
 
 // APIKeys is the strongly typed capability provided by the apikeys module.

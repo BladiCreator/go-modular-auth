@@ -11,7 +11,7 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth-anonymous/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/cache"
 	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/credential"

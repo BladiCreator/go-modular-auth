@@ -2,7 +2,7 @@
 package plugins
 
 import (
-	"github.com/BladiCreator/go-modular-auth-magiclink"
+	"github.com/BladiCreator/go-modular-auth/plugins/magic-link"
 )
 
 // MagicLink is the strongly typed capability provided by the magiclink module.

@@ -1,4 +1,4 @@
-module github.com/BladiCreator/go-modular-auth-device-authorization
+module github.com/BladiCreator/go-modular-auth/plugins/device-authorization
 
 go 1.27.1
 

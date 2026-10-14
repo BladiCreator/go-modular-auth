@@ -14,8 +14,8 @@ import (
 
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
 	"github.com/BladiCreator/go-modular-auth/user"
-	"github.com/BladiCreator/go-modular-auth-oidc-provider/discovery"
-	"github.com/BladiCreator/go-modular-auth-oidc-provider/jwks"
+	"github.com/BladiCreator/go-modular-auth/plugins/oidc-provider/discovery"
+	"github.com/BladiCreator/go-modular-auth/plugins/oidc-provider/jwks"
 )
 
 var (
