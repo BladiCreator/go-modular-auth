@@ -42,16 +42,17 @@ func (a *Auth) ConsumeToken(ctx context.Context, purpose verification.Purpose, t
 	}
 	t, err := a.store.Tokens().GetByHash(ctx, secure.HashToken(token))
 	if errors.Is(err, store.ErrNotFound) {
-		return nil, ErrInvalidToken
+			return nil, ErrInvalidToken
 	}
 	if err != nil {
 		return nil, err
 	}
 	now := a.Now()
 	if t.Purpose != purpose || t.Used() || t.Expired(now) {
-		return nil, ErrInvalidToken
+			return nil, ErrInvalidToken
 	}
-	if err := a.store.Tokens().MarkUsed(ctx, t.ID, now); err != nil {
+	err = a.store.Tokens().MarkUsed(ctx, t.ID, now)
+	if err != nil {
 		if errors.Is(err, store.ErrConflict) || errors.Is(err, store.ErrNotFound) {
 			return nil, ErrInvalidToken
 		}

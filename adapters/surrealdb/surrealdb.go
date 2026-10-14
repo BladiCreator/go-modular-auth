@@ -6,6 +6,8 @@ package surrealdb
 
 import (
 	"context"
+	"time"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -76,7 +78,7 @@ func (a *Adapter) Create(ctx context.Context, model string, data map[string]any)
 		if k == pkField && hasPK {
 			continue
 		}
-		payload[k] = v
+		payload[k] = a.preparePayloadValue(model, k, v)
 	}
 
 	var res *map[string]any
@@ -183,7 +185,7 @@ func (a *Adapter) Update(ctx context.Context, model string, where []adapter.Cond
 	updatePayload := make(map[string]any, len(update))
 	for k, v := range update {
 		if k != "id" {
-			updatePayload[k] = v
+			updatePayload[k] = a.preparePayloadValue(model, k, v)
 		}
 	}
 	vars["update_content"] = updatePayload
@@ -208,7 +210,11 @@ func (a *Adapter) Update(ctx context.Context, model string, where []adapter.Cond
 
 	first := (*res)[0]
 	if first.Error != nil {
-		return 0, a.mapError(first.Error)
+		mapped := a.mapError(first.Error)
+		if errors.Is(mapped, adapter.ErrNotFound) {
+			return 0, nil
+		}
+		return 0, mapped
 	}
 
 	return int64(len(first.Result)), nil
@@ -241,7 +247,11 @@ func (a *Adapter) Delete(ctx context.Context, model string, where []adapter.Cond
 
 	first := (*res)[0]
 	if first.Error != nil {
-		return 0, a.mapError(first.Error)
+		mapped := a.mapError(first.Error)
+		if errors.Is(mapped, adapter.ErrNotFound) {
+			return 0, nil
+		}
+		return 0, mapped
 	}
 
 	return int64(len(first.Result)), nil
@@ -274,7 +284,11 @@ func (a *Adapter) Count(ctx context.Context, model string, where []adapter.Condi
 
 	first := (*res)[0]
 	if first.Error != nil {
-		return 0, a.mapError(first.Error)
+		mapped := a.mapError(first.Error)
+		if errors.Is(mapped, adapter.ErrNotFound) {
+			return 0, nil
+		}
+		return 0, mapped
 	}
 
 	if len(first.Result) == 0 {
@@ -350,4 +364,41 @@ func createRecord[T any, TWhat surreal.TableOrRecord](ctx context.Context, a *Ad
 		return nil, fmt.Errorf("surrealdb: database connection is nil")
 	}
 	return surreal.Create[T](ctx, a.db, what, data)
+}
+
+func (a *Adapter) preparePayloadValue(model, field string, v any) any {
+	if v == nil {
+		return nil
+	}
+
+	isTimeField := false
+	a.mu.RLock()
+	if a.schema != nil {
+		if m, ok := a.schema.GetModel(model); ok {
+			if f, ok := m.GetField(field); ok && f.Type == schema.TypeTime {
+				isTimeField = true
+			}
+		}
+	}
+	a.mu.RUnlock()
+
+	if !isTimeField && (strings.HasSuffix(field, "_at") || strings.HasSuffix(field, "_time") || field == "expires_at") {
+		isTimeField = true
+	}
+
+	if isTimeField {
+		switch val := v.(type) {
+		case string:
+			if t, err := time.Parse(time.RFC3339Nano, val); err == nil {
+				return models.CustomDateTime{Time: t}
+			}
+			if t, err := time.Parse(time.RFC3339, val); err == nil {
+				return models.CustomDateTime{Time: t}
+			}
+		case time.Time:
+			return models.CustomDateTime{Time: val}
+		}
+	}
+
+	return v
 }

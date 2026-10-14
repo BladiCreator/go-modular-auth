@@ -139,13 +139,20 @@ func normalizeID(model string, v any) any {
 
 func normalizeValue(v any) any {
 	switch val := v.(type) {
+	case models.CustomDateTime:
+		return val.Time
+	case *models.CustomDateTime:
+		if val == nil {
+			return nil
+		}
+		return val.Time
 	case models.RecordID:
-		return val.String()
+		return fmt.Sprintf("%v", val.ID)
 	case *models.RecordID:
 		if val == nil {
 			return nil
 		}
-		return val.String()
+		return fmt.Sprintf("%v", val.ID)
 	default:
 		return v
 	}

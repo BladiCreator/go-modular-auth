@@ -62,7 +62,14 @@ func (a *Adapter) buildModelDDL(m *schema.Model) []string {
 		}
 
 		surrealType := mapSurrealType(f.Type)
-		stmts = append(stmts, fmt.Sprintf("DEFINE FIELD IF NOT EXISTS %s ON TABLE %s TYPE %s;", quoteField(dbName), table, surrealType))
+		if !f.Required && surrealType != "any" {
+			surrealType = "option<" + surrealType + " | null>"
+		}
+		defaultClause := ""
+		if f.Default != nil {
+			defaultClause = fmt.Sprintf(" DEFAULT %v", f.Default)
+		}
+		stmts = append(stmts, fmt.Sprintf("DEFINE FIELD IF NOT EXISTS %s ON TABLE %s TYPE %s%s;", quoteField(dbName), table, surrealType, defaultClause))
 
 		if f.Unique {
 			idxName := fmt.Sprintf("idx_%s_%s_unique", table, dbName)

@@ -334,9 +334,7 @@ func toCredential(r map[string]any) *credential.Credential {
 		CreatedAt: getTime(r, "created_at"),
 		UpdatedAt: getTime(r, "updated_at"),
 	}
-	if t, ok := r["revoked_at"].(time.Time); ok {
-		c.RevokedAt = &t
-	}
+	c.RevokedAt = getOptionalTime(r, "revoked_at")
 	return c
 }
 
@@ -445,9 +443,7 @@ func toSession(r map[string]any) *session.Session {
 		ExpiresAt: getTime(r, "expires_at"),
 		CreatedAt: getTime(r, "created_at"),
 	}
-	if t, ok := r["revoked_at"].(time.Time); ok {
-		sess.RevokedAt = &t
-	}
+	sess.RevokedAt = getOptionalTime(r, "revoked_at")
 	return sess
 }
 
@@ -523,9 +519,7 @@ func toToken(r map[string]any) *verification.Token {
 		ExpiresAt: getTime(r, "expires_at"),
 		CreatedAt: getTime(r, "created_at"),
 	}
-	if u, ok := r["used_at"].(time.Time); ok {
-		t.UsedAt = &u
-	}
+	t.UsedAt = getOptionalTime(r, "used_at")
 	return t
 }
 
@@ -537,8 +531,36 @@ func getString(r map[string]any, k string) string {
 }
 
 func getTime(r map[string]any, k string) time.Time {
-	if t, ok := r[k].(time.Time); ok {
-		return t
+	val, ok := r[k]
+	if !ok || val == nil {
+		return time.Time{}
+	}
+	switch v := val.(type) {
+	case time.Time:
+		return v
+	case *time.Time:
+		if v != nil {
+			return *v
+		}
+	case string:
+		if t, err := time.Parse(time.RFC3339Nano, v); err == nil {
+			return t
+		}
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			return t
+		}
 	}
 	return time.Time{}
+}
+
+func getOptionalTime(r map[string]any, k string) *time.Time {
+	val, ok := r[k]
+	if !ok || val == nil {
+		return nil
+	}
+	t := getTime(r, k)
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
