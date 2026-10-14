@@ -142,7 +142,8 @@ func (s *service) BeginRegistration(ctx context.Context, in BeginRegistrationInp
 	excludeList := make([]protocol.CredentialDescriptor, 0, len(existing))
 	for _, c := range existing {
 		if c.Active() {
-			excludeList = append(excludeList, c.ToWebAuthn().Descriptor())
+			w := c.ToWebAuthn()
+			excludeList = append(excludeList, w.Descriptor())
 		}
 	}
 
