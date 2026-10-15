@@ -51,7 +51,7 @@ func main() {
 
 	// 3. Register with GoModularAuth
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{policyPlugin},
 	})
 	if err != nil {

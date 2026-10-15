@@ -91,7 +91,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/auth"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
@@ -100,7 +100,7 @@ func main() {
 
 	// 1. Initialize GoModularAuth with the Username plugin
 	app, err := auth.New(auth.Config{
-		Store: memstore.New(),
+		Adapter: adaptermem.New(),
 		Cache: memcache.New(),
 		Plugins: []auth.PluginModule{
 			username.New(), // Uses in-memory username store by default
@@ -147,7 +147,6 @@ Configure the plugin using functional options in `username.New(...)`:
 
 ```go
 uMod := username.New(
-    username.WithStore(customStore),              // Custom persistence store adapter
     username.WithMinLength(4),                   // Minimum length (default: 3)
     username.WithMaxLength(20),                  // Maximum length (default: 30)
     username.WithCaseSensitive(false),           // Case sensitivity (default: false)

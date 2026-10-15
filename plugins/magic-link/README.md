@@ -47,7 +47,7 @@ import (
 
 func main() {
     a, err := auth.New(auth.Config{
-        Store: storeAdapter,
+        Adapter: adaptermem.New(),
         Cache: cacheAdapter,
         Email: emailAdapter,
 

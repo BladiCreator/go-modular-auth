@@ -41,8 +41,8 @@ func main() {
 
     // 2. Wire into Auth Engine
     engine, err := auth.New(auth.Config{
-        Store: myStore,
-        Email: mailer,
+        Adapter: myAdapter,
+        Email:   mailer,
         EmailVerification: auth.EmailVerificationConfig{
             Required:     true,
             SendOnSignUp: true,

@@ -109,15 +109,19 @@ orgID, ok := auth.OrganizationFrom(ctx)
 ### 2.1 Initialization (`auth.New`)
 ```go
 import (
+    "database/sql"
     auth "github.com/BladiCreator/go-modular-auth"
     "github.com/BladiCreator/go-modular-auth/adapters/postgres"
 )
 
+db, _ := sql.Open("pgx", "postgres://user:pass@localhost:5432/authdb?sslmode=disable")
+
 engine, err := auth.New(auth.Config{
-    Store: postgres.New(db),
+    Adapter: postgres.New(db),
 })
 ```
 - Validates configuration and applies secure defaults.
+- Dynamically compiles and ensures the database schema across Core and all installed plugins.
 - Compiles dummy timing hashes to prevent user enumeration attacks.
 - Resolves plugin dependency graphs and initializes plugins topologically.
 
@@ -135,8 +139,8 @@ res, err := engine.SignUp(ctx, auth.SignUpInput{
 1. Executes `BeforeSignUp` hooks.
 2. Normalizes email and validates password against `PasswordPolicy`.
 3. Hashes password using Argon2id outside the database transaction (prevents holding database locks during CPU-heavy hashing).
-4. Begins an atomic `Store.Transaction`:
-   - Checks email uniqueness (`store.ErrConflict`).
+4. Begins an atomic database transaction via `Adapter.Transaction`:
+   - Checks email uniqueness (`adapter.ErrConflict`).
    - Persists `User`, `Account`, and `Credential`.
    - Creates `Session` (unless email verification is required).
 5. Post-commit:

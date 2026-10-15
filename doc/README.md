@@ -14,17 +14,17 @@ GoModularAuth separates identity verification and authentication workflows from 
              ┌──────────────────────────┼──────────────────────────┐
              │                          │                          │
      Transport Adapters               Core                   Plugin System
-             │                          │                     (33 Plugins)
+             │                          │                     (35 Plugins)
       ┌──────┴──────┐            ┌──────┴──────┐                   │
       │             │            │             │            ┌──────┴──────┐
-     HTTP          gRPC        Store         Cache         OAuth         2FA
+     HTTP          gRPC       Adapter        Cache         OAuth         2FA
  (Middleware,  (Interceptors,  (Truth)     (Ephemeral)    Passkeys       SCIM
   Extractors)   Metadata)        │             │         Organizations  Admin
                                  │             │          SAML / OIDC   Agents
-                                 ▼             ▼             ...         ...
+                                 ▼             ▼             Billing     ...
                            SQLite/Postgres/  Redis/
-                            MySQL/Memory     Valkey/
-                                             Memory
+                            MySQL/SurrealDB/ Valkey/
+                                Memory       Memory
 ```
 
 ---
@@ -35,7 +35,7 @@ GoModularAuth separates identity verification and authentication workflows from 
    - Core philosophy: server-only, transport-agnostic, function-first.
    - Authentication (who) vs Authorization (what) separation.
    - Component taxonomy: Core vs Adapters vs Plugin SDK vs Plugins.
-   - Authoritative Store vs Ephemeral Cache invariants.
+   - Authoritative Database Adapter vs Ephemeral Cache invariants.
    - Cross-module transaction propagation via `sqltx`.
 
 2. [**Core Engine & Domain Operations**](core.md)
@@ -46,16 +46,18 @@ GoModularAuth separates identity verification and authentication workflows from 
    - Password hashing with Argon2id (OWASP recommended parameters).
    - Zero-allocation semantic caching and configuration defaults.
 
-3. [**Store Adapters (Persistence)**](store-adapter.md)
-   - The Store as the authoritative source of truth.
-   - Sub-store contracts: `UserStore`, `AccountStore`, `CredentialStore`, `SessionStore`, `TokenStore`.
-   - Atomic database transactions and error normalization (`store.ErrNotFound`, `store.ErrConflict`).
-   - Production SQL adapters:
+3. [**Database Adapters (Persistence & Schema)**](store-adapter.md)
+   - The Database Adapter (`adapter.Adapter`) as the authoritative source of truth.
+   - Schema-driven DDL and dynamic compilation via `schema.Schema`.
+   - Model repositories via `sdk.Model[T]`.
+   - Atomic database transactions and error normalization (`adapter.ErrNotFound`, `adapter.ErrConflict`).
+   - Production database adapters:
      - **PostgreSQL Adapter** (`adapters/postgres`)
      - **SQLite Adapter** (`adapters/sqlite`)
      - **MySQL Adapter** (`adapters/mysql`)
-     - **In-Memory Store** (`adapters/memory`)
-   - Cross-plugin transaction sharing via `sqltx.Executor`.
+     - **SurrealDB Adapter** (`adapters/surrealdb`)
+     - **In-Memory Adapter** (`adapters/memory`)
+   - Internal core bridging via `core/adapter/bridge` to `store.Store`.
 
 4. [**Cache Adapters (Performance & Ephemeral State)**](cache-adapter.md)
    - Ephemeral Cache vs Authoritative Persistence.
@@ -74,21 +76,23 @@ GoModularAuth separates identity verification and authentication workflows from 
    - Production **SMTP Adapter** (`adapters/smtp`): TLS, STARTTLS, authentication, and multipart MIME.
    - In-memory mock sender for unit and integration testing.
 
-8. [**Official Adapters Directory**](adapters/README.md)
-   - Detailed usage guides for all 9 adapters:
+6. [**Official Adapters Directory**](adapters/README.md)
+   - Detailed usage guides for all 10 adapters:
      - Transport: [HTTP](adapters/http.md), [gRPC](adapters/grpc.md)
-     - Persistence: [PostgreSQL](adapters/postgres.md), [SQLite](adapters/sqlite.md), [MySQL](adapters/mysql.md), [In-Memory Store](adapters/memory.md)
+     - Persistence: [PostgreSQL](adapters/postgres.md), [SQLite](adapters/sqlite.md), [MySQL](adapters/mysql.md), [SurrealDB](adapters/surrealdb.md), [In-Memory](adapters/memory.md)
      - Caching: [Redis](adapters/redis.md), [Valkey](adapters/valkey.md), [In-Memory Cache](adapters/memory.md)
      - Messaging: [SMTP](adapters/smtp.md), [In-Memory Mock](adapters/memory.md)
 
-9. [**Official Plugins Directory**](plugins/README.md)
-   - Comprehensive implementation and usage guides for all 33 plugins:
-     - [Authentication Factors & Passwordless](plugins/auth-factors.md) (Passkeys, 2FA, Magic Link, Email OTP, Phone, etc.)
-     - [Token Protocols & Sessions](plugins/tokens-sessions.md) (JWT, Bearer, Multi-session, One-Time Token)
-     - [SSO & Client Protocols](plugins/sso.md) (OAuth, OIDC, SAML, Unified SSO)
-     - [Identity Provider Servers](plugins/identity-providers.md) (OAuth 2.1 Provider, OIDC IdP, SAML IdP, SCIM 2.0)
-     - [Multi-Tenancy & Organizations](plugins/organizations.md) (Organizations, Teams, Invitations)
-     - [Authorization & Access Control](plugins/authorization.md) (RBAC, Policy/ABAC, API Keys, Admin)
-     - [Autonomous Identities & Agents](plugins/agents.md) (AI Agents / MCP, Device Flow RFC 8628, Service Accounts)
+7. [**Official Plugins Directory**](plugins/README.md)
+   - Comprehensive implementation and usage guides for all 35 plugins:
+     - [Authentication Factors & Passwordless](plugins/README.md#1-authentication-factors--passwordless) (Passkeys, 2FA, Magic Link, Email OTP, Phone, etc.)
+     - [Token Protocols & Sessions](plugins/README.md#2-tokens--session-management) (JWT, Bearer, Multi-session, One-Time Token)
+     - [SSO & Client Protocols](plugins/README.md#3-single-sign-on-sso--client-protocols) (OAuth, OIDC, SAML, Unified SSO)
+     - [Identity Provider Servers](plugins/README.md#4-identity-provider-idp-servers) (OAuth 2.1 Provider, OIDC IdP, SAML IdP, SCIM 2.0)
+     - [Multi-Tenancy & Organizations](plugins/README.md#5-multi-tenancy--organizations) (Organizations)
+     - [Authorization & Access Control](plugins/README.md#6-authorization--access-control) (RBAC, Policy/ABAC, API Keys, Admin)
+     - [Autonomous Identities & Agents](plugins/README.md#7-autonomous-identities--modern-clients) (AI Agents / MCP, Device Flow RFC 8628, Service Accounts)
+     - [Monetization & Subscriptions](plugins/README.md#9-monetization--subscriptions) (Stripe, Polar)
+     - [Governance & Security](plugins/README.md#8-governance-security--observability) (Audit Logging, Rate Limiting, Password Policy, OpenAPI, Last Login)- [Autonomous Identities & Agents](plugins/agents.md) (AI Agents / MCP, Device Flow RFC 8628, Service Accounts)
      - [Governance & Security](plugins/governance.md) (Audit Logging, Rate Limiting, Password Policy, OpenAPI, Last Login)
 

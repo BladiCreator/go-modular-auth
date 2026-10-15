@@ -39,7 +39,7 @@ func main() {
     agentMod := agent.New()
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{agentMod},
     })
     if err != nil {

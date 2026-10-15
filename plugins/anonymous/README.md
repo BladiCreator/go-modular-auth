@@ -74,7 +74,6 @@ The plugin provides functional options through `anonymous.New(opts...)`:
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `WithStore(s)` | `store.Store` | In-Memory Store | Configures the identity persistence store |
 | `WithIdentityTTL(d)` | `time.Duration` | `30 * 24 * time.Hour` | Expiration lifespan for unconverted anonymous identities |
 | `WithSessionTTL(d)` | `time.Duration` | `30 * 24 * time.Hour` | Lifetime granted to anonymous user sessions |
 | `WithCacheTTL(d)` | `time.Duration` | `5 * time.Minute` | TTL for cached anonymous identity records |
@@ -97,7 +96,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 
 	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
 	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/plugins"
@@ -108,7 +107,7 @@ func main() {
 	cacheAdapter := corecache.New()
 
 	engine, err := auth.New(auth.Config{
-		Store: storeAdapter,
+		Adapter: adaptermem.New(),
 		Cache: cacheAdapter,
 		Plugins: []auth.PluginModule{
 			anonymous.New(
@@ -210,39 +209,9 @@ linkRes, err := anon.Link(ctx, anonymous.LinkInput{
 
 ---
 
-## Persistence and Stores
+## Persistence & Schema
 
-The plugin ships with two stores implementing `store.Store`:
-
-### In-Memory (`store/memory`)
-Ideal for automated unit tests, integration tests, and local development.
-
-```go
-import "github.com/BladiCreator/go-modular-auth/plugins/anonymous/store/memory"
-
-anonPlugin := anonymous.New(
-    anonymous.WithStore(memory.New()),
-)
-```
-
-### PostgreSQL (`store/postgres`)
-Production-grade persistence using `database/sql`.
-
-```go
-import (
-    "database/sql"
-    "github.com/BladiCreator/go-modular-auth/plugins/anonymous/store/postgres"
-)
-
-db, _ := sql.Open("pgx", connStr)
-pgStore := postgres.New(db)
-
-anonPlugin := anonymous.New(
-    anonymous.WithStore(pgStore),
-)
-```
-
-Database migrations are located in `migrations/001_create_anonymous_identities.sql`.
+The plugin registers its database model `anonymous_identities` via `RegisterSchema(s *schema.Schema)` and accesses persistence through `sdk.Model[AnonymousIdentity]` on the configured `adapter.Adapter` (PostgreSQL, SQLite, MySQL, SurrealDB, or In-Memory).
 
 ---
 

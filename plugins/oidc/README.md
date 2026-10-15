@@ -41,7 +41,6 @@ import (
     "time"
     auth "github.com/BladiCreator/go-modular-auth"
     oidc "github.com/BladiCreator/go-modular-auth/plugins/oidc"
-    oidcmemory "github.com/BladiCreator/go-modular-auth/plugins/oidc/store/memory"
 )
 
 // Configure OIDC Provider
@@ -57,7 +56,6 @@ googleConfig := oidc.ProviderConfig{
 // Instantiate Plugin
 oidcPlugin := oidc.New(
     oidc.WithProvider(googleConfig),
-    oidc.WithStore(oidcmemory.New()), // Use database store adapter in production
     oidc.WithStateTTL(10 * time.Minute),
     oidc.WithLinkingPolicy(oidc.LinkingPolicyVerifiedEmail),
 )
@@ -69,7 +67,7 @@ oidcPlugin := oidc.New(
 
 ```go
 engine, err := auth.New(auth.Config{
-    Store: coreStore,
+    Adapter: adaptermem.New(),
     Cache: coreCache,
     Plugins: []auth.PluginModule{
         oidcPlugin,

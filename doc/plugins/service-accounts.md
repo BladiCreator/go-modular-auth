@@ -34,7 +34,7 @@ func main() {
     saMod := serviceaccounts.New()
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{saMod},
     })
     if err != nil {

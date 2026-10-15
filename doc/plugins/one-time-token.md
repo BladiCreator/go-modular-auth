@@ -42,7 +42,7 @@ func main() {
     )
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{ottMod},
     })
     if err != nil {

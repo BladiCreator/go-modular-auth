@@ -52,16 +52,13 @@ import (
 
     "github.com/BladiCreator/go-modular-auth/core"
     saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
-    samlmem "github.com/BladiCreator/go-modular-auth/plugins/saml/store/memory"
 )
 
 func main() {
-    samlStore := samlmem.New()
 
     auth, err := core.New(core.Config{
         Plugins: []core.PluginModule{
             saml.New(
-                saml.WithStore(samlStore),
                 saml.WithSPEntityID("https://myapp.com/saml/metadata"),
                 saml.WithSPACSURL("https://myapp.com/saml/acs"),
                 saml.WithAutoProvision(true),

@@ -38,7 +38,7 @@ import (
     "log"
 
     "github.com/BladiCreator/go-modular-auth/auth"
-    storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
     twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
     "github.com/BladiCreator/go-modular-auth/plugins/twofactor/plugins"
 )
@@ -47,7 +47,7 @@ func main() {
     masterKey, _ := twofactor.GenerateRandomKey() // 32 bytes for AES-256-GCM
 
     authEngine, err := auth.New(auth.Config{
-        Store: storememory.New(),
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{
             twofactor.New(
                 twofactor.WithEncryptionKey(masterKey),

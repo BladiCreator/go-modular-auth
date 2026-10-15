@@ -37,11 +37,9 @@ import (
     "time"
     auth "github.com/BladiCreator/go-modular-auth"
     sso "github.com/BladiCreator/go-modular-auth/plugins/sso"
-    ssomemory "github.com/BladiCreator/go-modular-auth/plugins/sso/store/memory"
 )
 
 ssoModule := sso.New(
-    sso.WithStore(ssomemory.New()), // Use SQL store adapter in production
     sso.WithStateTTL(10 * time.Minute),
     sso.WithSPEntityID("urn:myapp:sp"),
     sso.WithSPACSURL("https://myapp.com/sso/saml/acs"),
@@ -54,7 +52,7 @@ ssoModule := sso.New(
 
 ```go
 engine, err := auth.New(auth.Config{
-    Store: coreStore,
+    Adapter: adaptermem.New(),
     Cache: coreCache,
     Plugins: []auth.PluginModule{
         organizationsModule, // Optional: for JIT membership assignment

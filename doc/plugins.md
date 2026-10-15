@@ -53,7 +53,10 @@ func (m *Module) Init(h *auth.Host) error {
 
 The `*sdk.Context` exposes:
 - `ctx.Core()`: Core authentication engine instance.
-- `ctx.Store()`: Primary store adapter (participates in `sqltx` transactions).
+- `ctx.Adapter()`: Primary generic schema-driven database adapter.
+- `ctx.DB()`: Typed database facade wrapping the adapter.
+- `ctx.Schema()`: Compiled global schema across Core and all plugins.
+- `ctx.Store()`: Core repository bridge.
 - `ctx.Cache()`: Shared cache adapter with namespacing helpers.
 - `ctx.Email()`: Transactional email sender.
 - `ctx.Hooks()`: Registration for synchronous lifecycle hooks.
@@ -73,9 +76,9 @@ orgs := auth.MustGet[organizations.Organization](engine)
 
 ---
 
-## 3. Catalog of Official Plugins (33 Plugins)
+## 3. Catalog of Official Plugins (35 Plugins)
 
-The repository provides **33 production-ready plugins** structured into 7 distinct categories:
+The repository provides **35 production-ready plugins** structured into 8 distinct categories:
 
 ### 3.1 Authentication Factors & Passwordless (8 Plugins)
 
@@ -135,7 +138,14 @@ The repository provides **33 production-ready plugins** structured into 7 distin
 | **`device-authorization`** | `.../plugins/device-authorization` | `deviceauth.DeviceAuthorization` | OAuth 2.0 Device Authorization Grant (RFC 8628) for CLIs, smart TVs, and headless devices. |
 | **`service-accounts`** | `.../plugins/service-accounts` | `serviceaccounts.ServiceAccounts` | Machine-to-machine (M2M) identity management with API keys and custom metadata. |
 
-### 3.7 Governance, Security & Observability (5 Plugins)
+### 3.7 Monetization & Subscriptions (2 Plugins)
+
+| Plugin | Import Path | Capability Interface | Description |
+| :--- | :--- | :--- | :--- |
+| **`stripe`** | `.../plugins/stripe` | `stripe.Stripe` | Stripe Checkout sessions, customer billing portal, subscription checks, and webhooks. |
+| **`polar`** | `.../plugins/polar` | `polar.Polar` | Polar SaaS subscriptions, checkout, benefit and license key grants, and webhooks. |
+
+### 3.8 Governance, Security & Observability (5 Plugins)
 
 | Plugin | Import Path | Capability Interface | Description |
 | :--- | :--- | :--- | :--- |
@@ -153,8 +163,10 @@ The repository provides **33 production-ready plugins** structured into 7 distin
 package main
 
 import (
+    "database/sql"
     "log"
 
+    _ "github.com/jackc/pgx/v5/stdlib"
     auth "github.com/BladiCreator/go-modular-auth"
     "github.com/BladiCreator/go-modular-auth/adapters/postgres"
     "github.com/BladiCreator/go-modular-auth/plugins/admin"
@@ -163,14 +175,20 @@ import (
 )
 
 func main() {
+    db, err := sql.Open("pgx", "postgres://user:pass@localhost:5432/authdb?sslmode=disable")
+    if err != nil {
+        log.Fatalf("failed to connect to db: %v", err)
+    }
+    ad := postgres.New(db)
+
     // 1. Initialize plugin modules
     orgModule := organizations.New()
     twoFactorModule := twofactor.New()
     adminModule := admin.New()
 
-    // 2. Initialize engine with topological resolution
+    // 2. Initialize engine with topological resolution and schema-driven adapter
     engine, err := auth.New(auth.Config{
-        Store:   postgres.New(db),
+        Adapter: ad,
         Plugins: []auth.PluginModule{orgModule, twoFactorModule, adminModule},
     })
     if err != nil {

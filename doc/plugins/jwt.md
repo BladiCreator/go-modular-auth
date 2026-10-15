@@ -55,7 +55,7 @@ import (
 	jwt "github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
@@ -72,7 +72,7 @@ func main() {
 
 	// Initialize GoModularAuth
 	app, err := auth.New(auth.Config{
-		Store: storememory.New(), // Core opaque session store
+		Adapter: adaptermem.New(), // Core opaque session store
 		Plugins: []auth.PluginModule{
 			jwt.New(
 				jwt.WithKey(rsaKey),
@@ -165,14 +165,8 @@ jwksJSON, _ := jwks.JSON()
 When individual token invalidation or subject logout is required:
 
 ```go
-import (
-    "github.com/BladiCreator/go-modular-auth/plugins/jwt/store/postgres"
-    // or store/memory for local development
-)
-
 jwtModule := jwt.New(
     jwt.WithKey(rsaKey),
-    jwt.WithStore(postgres.New(db)), // Persistent revocation tracking
 )
 
 // Revoke a specific token by JTI
@@ -195,7 +189,6 @@ err := jwtService.RevokeSubject(ctx, "usr_123", time.Now(), "password reset")
 | `WithDefaultTTL(ttl time.Duration)` | Sets default validity duration (default: 15m). |
 | `WithAllowedAlgorithms(algs ...Algorithm)` | Restricts allowed algorithms to a strict whitelist. |
 | `WithDefaultLeeway(leeway time.Duration)` | Clock skew tolerance for expiration validation (default: 1m). |
-| `WithStore(s store.Store)` | Attaches a persistent revocation store. |
 | `WithRevocationCache(c cache.RevocationCache)` | Attaches a revocation cache adapter. |
 | `WithHooks(h *Hooks)` | Registers lifecycle interception hooks. |
 

@@ -38,7 +38,7 @@ func main() {
     )
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{samlIdPMod},
     })
     if err != nil {

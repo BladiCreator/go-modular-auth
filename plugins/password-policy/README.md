@@ -51,16 +51,13 @@ import (
     auth "github.com/BladiCreator/go-modular-auth"
     passwordpolicy "github.com/BladiCreator/go-modular-auth/plugins/password-policy"
     "github.com/BladiCreator/go-modular-auth/plugins/password-policy/plugins"
-    policymem "github.com/BladiCreator/go-modular-auth/plugins/password-policy/store/memory"
 )
 
 func main() {
-    policyStore := policymem.New()
 
     engine, err := auth.New(auth.Config{
         Plugins: []auth.PluginModule{
             passwordpolicy.New(
-                passwordpolicy.WithStore(policyStore),
                 passwordpolicy.WithMinLength(10),
                 passwordpolicy.WithComplexity(true, true, true, true), // upper, lower, digit, symbol
                 passwordpolicy.WithHistoryCount(5),                    // prevent reuse of last 5 passwords

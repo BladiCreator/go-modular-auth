@@ -22,11 +22,11 @@
 
 - **Server-Only & Domain-First**: Pure domain operations. Zero global state.
 - **Transport-Agnostic**: The core engine **never** imports `net/http`, `grpc`, `fiber`, or `gin`. Transport adapters bridge HTTP requests or gRPC RPCs to core operations.
-- **Store = Source of Truth**: All identities, credentials, accounts, and sessions live in the authoritative Store Adapter.
+- **Adapter = Source of Truth**: All identities, credentials, accounts, and sessions live in the authoritative schema-driven Database Adapter.
 - **Cache = Ephemeral Acceleration**: Optional Cache-Aside acceleration with bounded TTLs, post-commit invalidation, and graceful degradation to the Store on cache outage.
 - **ACID Cross-Module Transactions**: Transactions propagate seamlessly between Core and Plugins via package `sqltx`.
 - **Topological Plugin Graph**: Plugins declare dependencies; the engine sorts them topologically and prevents dependency cycles.
-- **Enterprise & Modern Auth Ready**: 33 official plugins covering WebAuthn Passkeys, TOTP (AAL1/AAL2), OAuth 2.1 Provider, SCIM 2.0, SAML/OIDC SSO, Multi-Tenancy Organizations, and AI Agent identities.
+- **Enterprise & Modern Auth Ready**: 35 official plugins covering WebAuthn Passkeys, TOTP (AAL1/AAL2), OAuth 2.1 Provider, SCIM 2.0, SAML/OIDC SSO, Multi-Tenancy Organizations, Monetization (Stripe/Polar), and AI Agent identities.
 
 > 📚 **Comprehensive Documentation**: Complete in-depth guides and API references are available in the [**`doc/`**](doc/README.md) directory.
 
@@ -39,20 +39,21 @@
                                          │
              ┌───────────────────────────┼───────────────────────────┐
              │                           │                           │
-     Transport Adapters             Core Engine                 Plugin SDK &
-             │                           │                       33 Plugins
+      Transport Adapters             Core Engine                 Plugin SDK &
+             │                           │                       35 Plugins
       ┌──────┴──────┐             ┌──────┴──────┐                    │
       │             │             │             │             ┌──────┴──────┐
-     HTTP          gRPC         Store         Cache          OAuth         2FA
+     HTTP          gRPC        Adapter        Cache          OAuth         2FA
  (Middleware,  (Interceptors,  (Truth)     (Ephemeral)     Passkeys       SCIM
   Extractors)   Metadata)         │             │          Organizations  Admin
                                   │             │           SAML / OIDC   Agents
-                                  ▼             ▼              ...         ...
+                                  ▼             ▼             Billing      ...
                            ┌──────────────┐ ┌──────────────┐
                            │ SQLite       │ │ Redis        │
                            │ PostgreSQL   │ │ Valkey       │
                            │ MySQL        │ │ Memory       │
-                           │ Memory       │ └──────────────┘
+                           │ SurrealDB    │ └──────────────┘
+                           │ Memory       │
                            └──────────────┘
 ```
 
@@ -65,6 +66,7 @@
   - `adapters/postgres`: Production PostgreSQL store with automatic migrations and connection pooling.
   - `adapters/sqlite`: Production SQLite store (WAL mode, busy timeout support).
   - `adapters/mysql`: Production MySQL store.
+  - `adapters/surrealdb`: Production SurrealDB multi-model database adapter with dynamic schema generation.
   - `adapters/memory`: In-memory thread-safe store for unit and integration testing.
 - **Caching & Ephemeral State**:
   - `adapters/redis`: Distributed cache and atomic counter for rate limiting.
@@ -77,13 +79,14 @@
   - `adapters/http`: HTTP middleware (`Authenticate`, `RequireSession`) and extractors (`BearerExtractor`, `CookieExtractor`).
   - `adapters/grpc`: Unary and streaming gRPC server interceptors with metadata token extractors.
 
-### 33 Official Plugins (`plugins/`)
+### 35 Official Plugins (`plugins/`)
 - **Authentication**: `passkeys` (WebAuthn/FIDO2), `twofactor` (TOTP RFC 6238 + AAL1/AAL2), `magic-link`, `email-otp`, `phone` (SMS OTP), `account-linking`, `username`, `anonymous`.
 - **Tokens & Sessions**: `jwt`, `bearer`, `multisession`, `one-time-token`.
 - **SSO & Client Protocols**: `oauth` (Google, GitHub, etc.), `oidc`, `saml`, `sso`.
 - **Identity Provider (IdP) Servers**: `oauth-provider` (OAuth 2.1 Server with PKCE S256), `oidc-provider`, `saml-provider`, `scim` (SCIM 2.0 Provisioning).
 - **Multi-Tenancy & Authorization**: `organizations`, `rbac`, `policy` (ABAC engine), `admin`, `api-keys`.
 - **Autonomous Identities**: `agent` (Autonomous AI agents & MCP client credentials), `device-authorization` (RFC 8628), `service-accounts`.
+- **Monetization & Subscriptions**: `stripe` (Stripe billing & customer portal), `polar` (Polar SaaS & benefit licensing).
 - **Security & Governance**: `audit`, `rate-limit`, `password-policy`, `lastlogin`, `openapi` (Spec generator).
 
 ---
@@ -123,22 +126,19 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// 1. Initialize PostgreSQL database and store adapter
+	// 1. Initialize PostgreSQL database and storage adapter
 	db, err := sql.Open("pgx", "postgres://user:pass@localhost:5432/authdb?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
-	store := postgres.New(db)
-	if err := store.Migrate(ctx); err != nil {
-		log.Fatalf("migration failed: %v", err)
-	}
+	ad := postgres.New(db)
 
 	// 2. Initialize Organizations plugin
 	orgModule := organizations.New()
 
-	// 3. Initialize GoModularAuth Engine
+	// 3. Initialize GoModularAuth Engine with schema-driven adapter
 	engine, err := auth.New(auth.Config{
-		Store:   store,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{orgModule},
 	})
 	if err != nil {
@@ -189,8 +189,8 @@ func main() {
 - [Cache Adapters (Performance & Ephemeral State)](doc/cache-adapter.md)
 - [Email Adapters (Transactional Messaging)](doc/email-adapter.md)
 - [Transport Adapters (HTTP & gRPC)](doc/transport.md)
-- [Official Adapters Directory (9 Adapters)](doc/adapters/README.md)
-- [Official Plugins Directory (33 Plugins)](doc/plugins/README.md)
+- [Official Adapters Directory (10 Adapters)](doc/adapters/README.md)
+- [Official Plugins Directory (35 Plugins)](doc/plugins/README.md)
 
 ---
 

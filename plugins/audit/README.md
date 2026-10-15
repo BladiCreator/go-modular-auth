@@ -56,8 +56,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 	"github.com/BladiCreator/go-modular-auth/plugins/audit/plugins"
-	auditpg "github.com/BladiCreator/go-modular-auth/plugins/audit/store/postgres"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
@@ -66,16 +65,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	auditStore := auditpg.New(db)
-
 	auditModule := audit.New(
-		audit.WithStore(auditStore),
 		// Optional: Buffer events asynchronously with 2 workers and batch size of 50
 		audit.WithAsync(2, 1024, 50, 250*time.Millisecond),
 	)
 
 	appAuth, err := auth.New(auth.Config{
-		Store:   corememory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{auditModule},
 	})
 	if err != nil {

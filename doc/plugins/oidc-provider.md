@@ -42,7 +42,7 @@ func main() {
 
     // 2. Wire into engine
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{oidcMod},
     })
     if err != nil {

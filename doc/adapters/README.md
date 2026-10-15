@@ -19,7 +19,8 @@ Adapters bridge GoModularAuth to external systems, drivers, protocols, and netwo
   │ HTTP      │       │ Postgres  │             │ Redis     │       │ SMTP      │
   │ gRPC      │       │ SQLite    │             │ Valkey    │       │ Memory    │
   │ Fiber     │       │ MySQL     │             │ Memory    │       └───────────┘
-  └───────────┘       │ Memory    │             └───────────┘
+  └───────────┘       │ SurrealDB │             └───────────┘
+                      │ Memory    │
                       └───────────┘
 ```
 
@@ -35,6 +36,7 @@ Adapters bridge GoModularAuth to external systems, drivers, protocols, and netwo
 - [**PostgreSQL Adapter** (`postgres.md`)](postgres.md): Production PostgreSQL database adapter using `database/sql`, dynamic DDL migrations, connection pooling, and `sqltx` atomic transaction propagation.
 - [**SQLite Adapter** (`sqlite.md`)](sqlite.md): Production SQLite database adapter supporting WAL mode, busy timeout handlers, and dynamic schemas.
 - [**MySQL Adapter** (`mysql.md`)](mysql.md): Production MySQL 8.0+ database adapter with index constraints and connection pooling.
+- [**SurrealDB Adapter** (`surrealdb.md`)](surrealdb.md): Multi-model cloud-native database adapter generating dynamic SurrealQL schemas.
 - [**In-Memory Adapter** (`memory.md#database`)](memory.md#1-in-memory-database-adapter-adapteradapter): Thread-safe in-memory adapter with snapshot rollback for unit and integration tests.
 
 ### 3. Cache & Ephemeral Adapters (`cache.Cache` & `cache.Counter`)

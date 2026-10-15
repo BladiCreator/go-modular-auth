@@ -40,7 +40,6 @@ passkey.New(
     passkey.WithResidentKey(protocol.ResidentKeyRequirementPreferred),
     passkey.WithTimeout(60 * time.Second),
     passkey.WithEnforceSignCounter(true),
-    passkey.WithStore(postgresStore), // or in-memory store
 )
 ```
 
@@ -72,7 +71,7 @@ import (
 	passkey "github.com/BladiCreator/go-modular-auth/plugins/passkeys"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkeys/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
-	"github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
@@ -82,7 +81,7 @@ func main() {
 	)
 
 	authEngine, err := auth.New(auth.Config{
-		Store:   memory.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{passkeyMod},
 	})
 	if err != nil {

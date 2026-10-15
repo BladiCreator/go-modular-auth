@@ -29,8 +29,8 @@ func main() {
     valkeyCache := valkey.New(clientWrapper)
 
     engine, err := auth.New(auth.Config{
-        Store: myStore,
-        Cache: valkeyCache,
+        Adapter: myAdapter,
+        Cache:   valkeyCache,
     })
     if err != nil {
         panic(err)

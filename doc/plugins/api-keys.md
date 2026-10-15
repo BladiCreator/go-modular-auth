@@ -40,21 +40,18 @@ import (
 
 	apikeys "github.com/BladiCreator/go-modular-auth/plugins/api-keys"
 	"github.com/BladiCreator/go-modular-auth/plugins/api-keys/plugins"
-	apikeystore "github.com/BladiCreator/go-modular-auth/plugins/api-keys/store/memory"
 	"github.com/BladiCreator/go-modular-auth/auth"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
-	keyStore := apikeystore.New() // or postgres.New(db)
 
 	engine, err := auth.New(auth.Config{
-		Store: corestore.New(),
+		Adapter: adaptermem.New(),
 		Cache: corecache.New(),
 		Plugins: []auth.PluginModule{
 			apikeys.New(
-				apikeys.WithStore(keyStore),
 				apikeys.WithKeyPrefix("gma_live_"),
 				apikeys.WithSubjectStrategy(apikeys.SubjectStrategyKeyID),
 			),

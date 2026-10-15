@@ -65,8 +65,8 @@ func main() {
     cacheAdapter := redis.New(&redisWrapper{client: rdb})
 
     engine, err := auth.New(auth.Config{
-        Store: myStore,
-        Cache: cacheAdapter, // Injects Redis into sessionCache and userCache
+        Adapter: myAdapter,
+        Cache:   cacheAdapter, // Injects Redis into sessionCache and userCache
     })
     if err != nil {
         panic(err)

@@ -58,16 +58,14 @@ import (
 	"log"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/plugins"
-	oauthmemory "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/store/memory"
 )
 
 func main() {
 	// Initialize OAuth Provider plugin module
 	oauthMod := oauthprovider.New(
-		oauthprovider.WithStore(oauthmemory.New()), // or postgres.New(db)
 		oauthprovider.WithIssuer("https://auth.example.com"),
 		oauthprovider.WithRequirePKCE(true),
 		oauthprovider.WithRotateRefreshTokens(true),
@@ -75,7 +73,7 @@ func main() {
 
 	// Initialize GoModularAuth Engine
 	engine, err := auth.New(auth.Config{
-		Store:   corestore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{oauthMod},
 	})
 	if err != nil {
@@ -202,7 +200,6 @@ err := provider.RevokeToken(ctx, oauthprovider.RevokeTokenInput{
 
 | Option | Default | Description |
 |---|---|---|
-| `WithStore(s store.Store)` | `memory.New()` | Persistence adapter (`memory` or `postgres`). |
 | `WithIssuer(url string)` | `""` | Canonical authorization server identifier URL. |
 | `WithAuthorizationCodeTTL(d)` | `5m` | Lifetime of issued authorization codes. |
 | `WithAccessTokenTTL(d)` | `1h` | Lifetime of issued bearer access tokens. |

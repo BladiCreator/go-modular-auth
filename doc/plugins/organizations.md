@@ -65,31 +65,30 @@ import (
 	"database/sql"
 	"log"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapters/postgres"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 	"github.com/BladiCreator/go-modular-auth/plugins/organizations/plugins"
-	orgpostgres "github.com/BladiCreator/go-modular-auth/plugins/organizations/store/postgres"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// 1. Database connection pool (e.g. PostgreSQL)
-	db, err := sql.Open("postgres", "postgres://localhost:5432/myapp?sslmode=disable")
+	// 1. Database adapter (e.g. PostgreSQL)
+	db, err := sql.Open("pgx", "postgres://localhost:5432/myapp?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
+	ad := postgres.New(db)
 
 	// 2. Initialize GoModularAuth with Organizations plugin
 	a, err := auth.New(auth.Config{
-		Store: coremem.New(),
-		Cache: memcache.New(),
+		Adapter: ad,
+		Cache:   memcache.New(),
 		Plugins: []auth.PluginModule{
-			organizations.New(
-				organizations.WithStore(orgpostgres.New(db)),
-			),
+			organizations.New(),
 		},
 	})
 	if err != nil {

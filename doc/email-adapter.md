@@ -50,8 +50,8 @@ import (
     "log"
 
     auth "github.com/BladiCreator/go-modular-auth"
+    adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
     "github.com/BladiCreator/go-modular-auth/adapters/smtp"
-    storemem "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func main() {
@@ -70,8 +70,8 @@ func main() {
 
     // 2. Attach to engine
     engine, err := auth.New(auth.Config{
-        Store: storemem.New(),
-        Email: mailer,
+        Adapter: adaptermem.NewAdapter(),
+        Email:   mailer,
         EmailVerification: auth.EmailVerificationConfig{
             Required:      true,
             SendOnSignUp:  true,

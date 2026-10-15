@@ -63,7 +63,7 @@ import (
 	"net/http"
 
 	"github.com/BladiCreator/go-modular-auth/auth"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 
 	oauth "github.com/BladiCreator/go-modular-auth/plugins/oauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth/plugins"
@@ -100,7 +100,7 @@ func main() {
 
 	// 3. Register Plugin in GoModularAuth
 	engine, err := auth.New(auth.Config{
-		Store:   memstore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{oauthModule},
 	})
 	if err != nil {
@@ -165,28 +165,9 @@ Automatic account linking based purely on email match creates serious account ta
 
 ---
 
-## 7. PostgreSQL Persistence & Migrations
+## 7. Persistence & Schema
 
-For production deployments, configure the PostgreSQL state store:
-
-```go
-import (
-    "database/sql"
-    _ "github.com/jackc/pgx/v5/stdlib"
-    pgstore "github.com/BladiCreator/go-modular-auth/plugins/oauth/store/postgres"
-)
-
-db, _ := sql.Open("pgx", "postgres://user:pass@localhost:5432/auth_db")
-oauthModule := oauth.New(
-    oauth.WithStore(pgstore.New(db)),
-    // ...
-)
-```
-
-Run schema migration:
-```bash
-psql -d auth_db -f migrations/001_create_oauth_tables.sql
-```
+OAuth state parameters, PKCE verifiers, and external account linkages are automatically persisted and managed through the database adapter configured in `auth.New(auth.Config{ Adapter: ... })` via the compiled schema models.
 
 ---
 

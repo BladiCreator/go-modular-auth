@@ -1,6 +1,6 @@
 # GoModularAuth Plugins
 
-This directory contains standalone, detailed documentation guides for all **33 official plugins** of **GoModularAuth**. Each plugin has its own comprehensive reference covering problem definition, architecture, installation, configuration, capability interfaces, and copy-pasteable usage examples.
+This directory contains standalone, detailed documentation guides for all **35 official plugins** of **GoModularAuth**. Each plugin has its own comprehensive reference covering problem definition, architecture, installation, configuration, capability interfaces, and copy-pasteable usage examples.
 
 ---
 
@@ -14,7 +14,7 @@ Plugins provide modular capabilities beyond the minimal core authentication engi
 
 ---
 
-## Directory Index (All 33 Plugins)
+## Directory Index (All 35 Plugins)
 
 ### 1. Authentication Factors & Passwordless
 - [**Passkeys** (`passkeys.md`)](passkeys.md): FIDO2 / WebAuthn discoverable biometric and security key credentials.
@@ -64,3 +64,7 @@ Plugins provide modular capabilities beyond the minimal core authentication engi
 - [**Password Policy** (`password-policy.md`)](password-policy.md): Configurable password strength rules and dictionary attack protections.
 - [**Last Login** (`lastlogin.md`)](lastlogin.md): Automatic user login activity, timestamp, and IP tracking.
 - [**OpenAPI Generator** (`openapi.md`)](openapi.md): Dynamic OpenAPI 3.0 specification generator reflecting all installed plugins.
+
+### 9. Monetization & Subscriptions
+- [**Stripe** (`stripe.md`)](stripe.md): Enterprise subscription billing, customer portal, checkout sessions, and webhook processing.
+- [**Polar** (`polar.md`)](polar.md): Polar.sh SaaS billing, subscription verification, digital benefit & license management.

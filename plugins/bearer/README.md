@@ -73,7 +73,7 @@ import (
     "log"
 
     "github.com/BladiCreator/go-modular-auth/auth"
-    storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
     bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
     "github.com/BladiCreator/go-modular-auth/plugins/bearer/plugins"
 )
@@ -81,7 +81,7 @@ import (
 func main() {
     // 1. Initialize GoModularAuth engine with Bearer plugin
     authApp, err := auth.New(auth.Config{
-        Store: storememory.New(),
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{
             bearer.New(
                 bearer.WithTokenPrefix("gmb_"), // Default prefix
@@ -308,16 +308,14 @@ type Store interface {
 1. **In-Memory Store (`store/memory`)**:
    Thread-safe in-process store with `sync.RWMutex`. Used for tests and ephemeral environments.
    ```go
-   import "github.com/BladiCreator/go-modular-auth/plugins/bearer/store/memory"
 
-   module := bearer.New(bearer.WithStore(memory.New()))
+   module := bearer.New())
    ```
 2. **PostgreSQL Store (`store/postgres`)**:
    Production-ready implementation compatible with `*sql.DB` and connection poolers (PgBouncer).
    ```go
-   import "github.com/BladiCreator/go-modular-auth/plugins/bearer/store/postgres"
 
-   module := bearer.New(bearer.WithStore(postgres.New(db)))
+   module := bearer.New())
    ```
 
 Database schema migrations are located in `migrations/001_create_bearer_tokens.sql`.

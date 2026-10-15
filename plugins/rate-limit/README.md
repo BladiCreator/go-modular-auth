@@ -63,7 +63,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
 	"github.com/BladiCreator/go-modular-auth/plugins/rate-limit/plugins"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
@@ -92,7 +92,7 @@ func main() {
 	)
 
 	appAuth, err := auth.New(auth.Config{
-		Store:   corememory.New(),
+		Adapter: adaptermem.New(),
 		Cache:   corecache.New(),
 		Plugins: []auth.PluginModule{rlModule},
 	})

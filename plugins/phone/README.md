@@ -80,10 +80,9 @@ import (
 	"time"
 
 	"github.com/BladiCreator/go-modular-auth/auth"
-	corestore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
 	"github.com/BladiCreator/go-modular-auth/plugins/phone/plugins"
-	phonestore "github.com/BladiCreator/go-modular-auth/plugins/phone/store/memory"
 )
 
 // Example Twilio or custom SMS provider
@@ -96,15 +95,13 @@ func (s *CustomSMSProvider) Send(ctx context.Context, msg phone.Message) error {
 
 func main() {
 	smsProvider := &CustomSMSProvider{}
-	pStore := phonestore.New()
 
 	// 1. Initialize GoModularAuth engine with the Phone plugin
 	engine, err := auth.New(auth.Config{
-		Store: corestore.New(),
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(smsProvider),
-				phone.WithStore(pStore),
 				phone.WithTTL(5*time.Minute),
 				phone.WithMaxAttempts(3),
 				phone.WithAllowSignUp(true),
@@ -153,7 +150,6 @@ The plugin is configured using functional options passed to `phone.New()`:
 | Option | Description | Default |
 |---|---|---|
 | `WithProvider(p PhoneProvider)` | Sets the SMS/voice message delivery provider. | Required |
-| `WithStore(s store.Store)` | Sets the authoritative persistence store. | In-memory (`memory.New()`) |
 | `WithTTL(d time.Duration)` | Sets the validity duration of issued OTP codes. | `5 minutes` |
 | `WithOTPLength(n int)` | Numeric digit length of generated OTP codes (4-12). | `6` |
 | `WithMaxAttempts(n int)` | Maximum failed verification attempts before permanent token lockout. | `3` |

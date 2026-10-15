@@ -48,18 +48,18 @@ import (
     "log"
 
     auth "github.com/BladiCreator/go-modular-auth"
+    "github.com/BladiCreator/go-modular-auth/adapters/memory"
     accountlinking "github.com/BladiCreator/go-modular-auth/plugins/account-linking"
     "github.com/BladiCreator/go-modular-auth/plugins/account-linking/plugins"
-    linkingmem "github.com/BladiCreator/go-modular-auth/plugins/account-linking/store/memory"
 )
 
 func main() {
-    ticketStore := linkingmem.New()
+    ad := memory.NewAdapter()
 
     engine, err := auth.New(auth.Config{
+        Adapter: ad,
         Plugins: []auth.PluginModule{
             accountlinking.New(
-                accountlinking.WithStore(ticketStore),
                 accountlinking.WithAllowOrphanByDefault(false),
             ),
         },
@@ -73,6 +73,8 @@ func main() {
     if err != nil {
         log.Fatalf("failed to resolve AccountLinking capability: %v", err)
     }
+
+    _ = linking
 }
 ```
 

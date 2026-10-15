@@ -35,7 +35,7 @@ func main() {
     scimMod := scim.New()
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{scimMod},
     })
     if err != nil {

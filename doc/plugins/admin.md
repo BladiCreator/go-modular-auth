@@ -59,26 +59,22 @@ import (
 	"log"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/adapters/memory"
 	admin "github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin/plugins"
-	adminmemory "github.com/BladiCreator/go-modular-auth/plugins/admin/store/memory"
-	corememory "github.com/BladiCreator/go-modular-auth/store/memory"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// 1. Initialize Stores
-	coreStore := corememory.New()
-	adminStore := adminmemory.New()
+	// 1. Initialize Adapter
+	ad := memory.NewAdapter()
 
 	// 2. Configure GoModularAuth with Admin Plugin
 	a, err := auth.New(auth.Config{
-		Store: coreStore,
+		Adapter: ad,
 		Plugins: []auth.PluginModule{
-			admin.New(
-				admin.WithStore(adminStore),
-			),
+			admin.New(),
 		},
 	})
 	if err != nil {

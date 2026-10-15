@@ -41,7 +41,7 @@ func main() {
 
 	// 2. Initialize Core with RBAC plugin
 	a, err := auth.New(auth.Config{
-		Store:   adaptermem.NewStore(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{rbacPlugin},
 	})
 	if err != nil {

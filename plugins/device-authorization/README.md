@@ -78,23 +78,19 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
 	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
-	devicemem "github.com/BladiCreator/go-modular-auth/plugins/device-authorization/store/memory"
-	coremem "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
 	ctx := context.Background()
 
 	// 1. Initialize storage adapters
-	coreStore := coremem.New()
-	devStore := devicemem.New()
 
 	// 2. Configure GoModularAuth with Device Authorization Plugin
 	a, err := auth.New(auth.Config{
-		Store: coreStore,
+		Adapter: adaptermem.New(),
 		Plugins: []auth.PluginModule{
 			deviceauth.New(
-				deviceauth.WithStore(devStore),
 				deviceauth.WithVerificationURI("https://auth.example.com/device"),
 				deviceauth.WithExpiresIn(10*time.Minute),
 				deviceauth.WithPollingInterval(5*time.Second),

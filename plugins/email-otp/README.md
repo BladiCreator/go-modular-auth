@@ -60,7 +60,7 @@ import (
 	emailotp "github.com/BladiCreator/go-modular-auth/plugins/email-otp"
 	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/plugins"
 	"github.com/BladiCreator/go-modular-auth/auth"
-	storememory "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	emailmemory "github.com/BladiCreator/go-modular-auth/email/memory"
 )
 
@@ -71,7 +71,7 @@ func main() {
 
 	// Initialize GoModularAuth with Email OTP plugin
 	engine, err := auth.New(auth.Config{
-		Store: storeAdapter,
+		Adapter: adaptermem.New(),
 		Email: emailAdapter,
 		Plugins: []auth.PluginModule{
 			emailotp.New(
@@ -119,7 +119,6 @@ func main() {
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `WithStore(store.Store)` | `store.Store` | In-memory store | Authoritative store adapter for OTP state. |
 | `WithEmailSender(email.Sender)` | `email.Sender` | Host's email sender | Email delivery adapter. |
 | `WithTTL(time.Duration)` | `time.Duration` | `10m` | Validity window for issued OTP codes. |
 | `WithOTPLength(int)` | `int` | `6` | Length of numeric code (between 4 and 12). |

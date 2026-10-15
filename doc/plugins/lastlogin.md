@@ -33,7 +33,7 @@ func main() {
     lastLoginMod := lastlogin.New()
 
     engine, err := auth.New(auth.Config{
-        Store:   store,
+        Adapter: adaptermem.New(),
         Plugins: []auth.PluginModule{lastLoginMod},
     })
     if err != nil {

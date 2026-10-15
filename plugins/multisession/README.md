@@ -60,7 +60,7 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/auth"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	memstore "github.com/BladiCreator/go-modular-auth/store/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	multisession "github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession/plugins"
 )
@@ -70,7 +70,7 @@ func main() {
 
 	// 1. Initialize GoModularAuth with MultiSession plugin
 	app, err := auth.New(auth.Config{
-		Store: memstore.New(),
+		Adapter: adaptermem.New(),
 		Cache: memcache.New(),
 		Plugins: []auth.PluginModule{
 			multisession.New(
