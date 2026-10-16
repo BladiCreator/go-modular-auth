@@ -1,6 +1,25 @@
-# GoModularAuth - Passkey Plugin (`gomodularauth-passkey`)
+# GoModularAuth Passkeys Plugin (`gomodularauth-passkeys`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/passkeys.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/passkeys)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Provides WebAuthn and Passkey registration and authentication as an optional server-side authentication mechanism for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Registration in GoModularAuth](#registration-in-gomodularauth)
+- [Public API (`Passkeys`)](#public-api-passkeys)
+- [Transport Integration Example (HTTP Handlers)](#transport-integration-example-http-handlers)
+- [Events](#events)
+- [Security Architecture](#security-architecture)
+- [License](#license)
+
+---
 
 ## Features
 
@@ -68,10 +87,10 @@ import (
 	"log"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	passkey "github.com/BladiCreator/go-modular-auth/plugins/passkeys"
 	"github.com/BladiCreator/go-modular-auth/plugins/passkeys/plugins"
-	"github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
@@ -81,7 +100,7 @@ func main() {
 	)
 
 	authEngine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{passkeyMod},
 	})
 	if err != nil {

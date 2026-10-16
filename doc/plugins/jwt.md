@@ -9,6 +9,22 @@ It provides stateless, cryptographically signed token issuance and verification 
 
 ---
 
+## Table of Contents
+
+- [1. Architectural Principles](#1-architectural-principles)
+- [2. Installation](#2-installation)
+- [3. Supported Cryptographic Algorithms](#3-supported-cryptographic-algorithms)
+- [4. Quickstart](#4-quickstart)
+- [5. Primary Capability API (`JWT`)](#5-primary-capability-api-jwt)
+- [6. Key Rotation](#6-key-rotation)
+- [6. JWKS Export (RFC 7517)](#6-jwks-export-rfc-7517)
+- [7. Optional Revocation & Blocklist](#7-optional-revocation--blocklist)
+- [8. Configuration Options](#8-configuration-options)
+- [9. Security Defenses](#9-security-defenses)
+- [10. License](#10-license)
+
+---
+
 ## 1. Architectural Principles
 
 - **Sessions Remain Default**: Core GoModularAuth server-side opaque Sessions remain the primary session mechanism. JWT is strictly an opt-in capability for external integrations and never displaces or alters Core Session semantics.
@@ -52,10 +68,10 @@ import (
 	"log"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	jwt "github.com/BladiCreator/go-modular-auth/plugins/jwt"
 	"github.com/BladiCreator/go-modular-auth/plugins/jwt/plugins"
-	"github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
@@ -72,7 +88,7 @@ func main() {
 
 	// Initialize GoModularAuth
 	app, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(), // Core opaque session store
+		Adapter: adaptermem.NewAdapter(), // Core opaque session store
 		Plugins: []auth.PluginModule{
 			jwt.New(
 				jwt.WithKey(rsaKey),
@@ -122,7 +138,39 @@ func main() {
 
 ---
 
-## 5. Key Rotation
+## 5. Primary Capability API (`JWT`)
+
+```go
+type JWT interface {
+	// Issue signs and issues a new JWT token using the active signing key.
+	Issue(ctx context.Context, claims Claims) (string, error)
+
+	// IssueWithKey signs and issues a new JWT token using a specific key identifier (kid).
+	IssueWithKey(ctx context.Context, keyID string, claims Claims) (string, error)
+
+	// Verify parses the token, validates cryptographic signatures, standard claims, and revocation.
+	Verify(ctx context.Context, tokenString string, opts ...VerifyOption) (*Claims, error)
+
+	// Revoke invalidates a specific token identifier (jti) until its expiration time.
+	Revoke(ctx context.Context, jti string, expiresAt time.Time, reason string) error
+
+	// RevokeSubject invalidates all tokens issued to the given subject before the cutoff timestamp.
+	RevokeSubject(ctx context.Context, subject string, cutoff time.Time, reason string) error
+
+	// IsRevoked checks if a token or subject has been marked as revoked.
+	IsRevoked(ctx context.Context, jti string, subject string, issuedAt time.Time) (bool, error)
+
+	// JWKS exports the public keys formatted as an RFC 7517 JSON Web Key Set.
+	JWKS(ctx context.Context) (*JWKS, error)
+
+	// Keys returns the active KeyManager for key registration and rotation.
+	Keys() KeyManager
+}
+```
+
+---
+
+## 6. Key Rotation
 
 Key rotation allows adding new signing keys without invalidating active tokens signed with previous keys:
 

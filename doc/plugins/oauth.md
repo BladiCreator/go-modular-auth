@@ -1,8 +1,26 @@
 # GoModularAuth OAuth Plugin (`gomodularauth-oauth`)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/oauth.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/oauth)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Generic, provider-agnostic OAuth 2.0 and OpenID Connect (OIDC) client plugin for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
 
 Provides enterprise-grade authentication via external identity providers (Google, GitHub, GitLab, Discord, Microsoft, Keycloak, Auth0, etc.) with strict adherence to RFC 6749, RFC 7636 (PKCE), cryptographically validated state anti-replay protection, safe account linking policies, and native integration with GoModularAuth Core.
+
+---
+
+## Table of Contents
+
+- [1. Features](#1-features)
+- [2. Architecture](#2-architecture)
+- [3. Installation](#3-installation)
+- [4. Configuration and Registration](#4-configuration-and-registration)
+- [5. Public Capability API](#5-public-capability-api)
+- [6. Safe Account Linking Policies](#6-safe-account-linking-policies)
+- [7. Persistence & Schema](#7-persistence--schema)
+- [8. Events & Hooks](#8-events--hooks)
+- [9. Testing](#9-testing)
+- [10. License](#10-license)
 
 ---
 
@@ -62,8 +80,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 
 	oauth "github.com/BladiCreator/go-modular-auth/plugins/oauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth/plugins"
@@ -100,7 +118,7 @@ func main() {
 
 	// 3. Register Plugin in GoModularAuth
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{oauthModule},
 	})
 	if err != nil {

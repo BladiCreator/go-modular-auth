@@ -1,4 +1,4 @@
-# gomodularauth-phone
+# GoModularAuth Phone Plugin (`gomodularauth-phone`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/phone.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/phone)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -79,8 +79,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	phone "github.com/BladiCreator/go-modular-auth/plugins/phone"
 	"github.com/BladiCreator/go-modular-auth/plugins/phone/plugins"
 )
@@ -98,7 +98,7 @@ func main() {
 
 	// 1. Initialize GoModularAuth engine with the Phone plugin
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{
 			phone.New(
 				phone.WithProvider(smsProvider),
@@ -228,30 +228,13 @@ type Phone interface {
 
 ---
 
-## Persistence & Migrations
+## Persistence & Schema
 
-The plugin defines a clean domain persistence contract:
+Phone identities and OTP verifications are persisted via GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    CreatePhone(ctx context.Context, p *PhoneRecord) error
-    GetPhoneByUserID(ctx context.Context, userID string) (*PhoneRecord, error)
-    GetPhoneByNumber(ctx context.Context, phoneNumber string) (*PhoneRecord, error)
-    UpdatePhone(ctx context.Context, p *PhoneRecord) error
-    DeletePhone(ctx context.Context, userID string) error
-
-    CreateOTP(ctx context.Context, o *OTPRecord) error
-    GetActiveOTP(ctx context.Context, phoneNumber, purpose string, now time.Time) (*OTPRecord, error)
-    IncrementOTPAttempts(ctx context.Context, id string) (int, error)
-    MarkOTPUsed(ctx context.Context, id string, at time.Time) error
-    RevokeOTPsByPhone(ctx context.Context, phoneNumber, purpose string) error
-    DeleteExpiredOTPs(ctx context.Context, before time.Time) (int, error)
-}
-```
-
-### PostgreSQL
-
-A production adapter is provided in `store/postgres`, with migration schema in `migrations/001_create_phone_tables.sql`:
+- Tables: `phones` (`sdk.Model[PhoneRecord]`) and `phone_otps` (`sdk.Model[OTPRecord]`).
+- Indexes: `uq_phones_user_id`, `uq_phones_phone_number`, `idx_phone_otps_lookup`.
+- Database schema migrations are located in `migrations/001_create_phone_tables.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS phones (

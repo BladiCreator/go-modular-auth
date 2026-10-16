@@ -2,16 +2,6 @@
 
 `gomodularauth-rbac` provides decoupled, deterministic role-based access control (RBAC) authorization for GoModularAuth applications. It operates purely over Core `Principal` identities independently of authentication mechanisms and transport protocols.
 
-## Features
-
-- **Decoupled Authorization**: Consumes `auth.Principal` without binding to sessions, passwords, or HTTP layers.
-- **Multidimensional Scopes**: Supports `global`, `organization`, and `service` scopes for role assignments.
-- **Flexible Permission Matching**: Deterministic exact matching and wildcard patterns (`*`, `users:*`, `billing:invoices:*`).
-- **Targeted Resources**: Evaluates access against structured `Resource` entities (supporting optional organization and service namespaces).
-- **Fast Authorization Cache**: Caches derived decisions with automatic invalidation upon role or assignment mutations.
-- **Event-Driven Observability**: Emits structured audit events (`rbac.role.created`, `rbac.role.assigned`, `rbac.access.evaluated`).
-- **Pluggable Persistence**: Decoupled `store.Store` contract with included in-memory store and production PostgreSQL schema.
-
 ## Installation
 
 ```bash
@@ -92,61 +82,4 @@ func main() {
 }
 ```
 
-## Scopes & Target Resources
-
-The plugin evaluates whether an assigned role matches the target resource:
-
-| Scope | Role Scope | Target Resource Matching Rule |
-| :--- | :--- | :--- |
-| `ScopeGlobal` | `"global"` | Applies to any resource across the system. |
-| `ScopeOrganization` | `"organization"` | Applies only when `resource.OrganizationID == assignment.ScopeID`. |
-| `ScopeService` | `"service"` | Applies only when `resource.ServiceID == assignment.ScopeID`. |
-
-### Multi-Tenant Example
-
-```go
-// Organization role
-err := authz.CreateRole(ctx, &rbac.Role{
-    ID:          "org-admin",
-    Name:        "organization_admin",
-    Scope:       rbac.ScopeOrganization,
-    Permissions: []string{"org:*"},
-})
-
-// Assign to Org 123
-err = authz.AssignRole(ctx, &rbac.RoleAssignment{
-    RoleID:           "org-admin",
-    PrincipalSubject: "usr_alice",
-    PrincipalType:    auth.PrincipalUser,
-    Scope:            rbac.ScopeOrganization,
-    ScopeID:          "org_123",
-})
-
-// Access in Org 123 is allowed
-res123 := rbac.NewOrganizationResource("document", "doc_1", "org_123")
-err = authz.Authorize(ctx, principal, "org:view", res123) // returns nil
-
-// Access in Org 456 is forbidden
-res456 := rbac.NewOrganizationResource("document", "doc_2", "org_456")
-err = authz.Authorize(ctx, principal, "org:view", res456) // returns rbac.ErrForbidden
-```
-
-## Cache & Invalidation
-
-When GoModularAuth Core Cache is configured, derived authorization decisions are automatically cached using namespaced keys (`gomodularauth:rbac:eval:...`).
-
-Cache is invalidated automatically when:
-- A role definition is updated or deleted.
-- A role assignment is created or revoked.
-- Explicitly via `authz.InvalidatePrincipalCache(ctx, subject)`.
-
-## Events
-
-The plugin emits observational audit events via GoModularAuth Core:
-
-- `rbac.role.created`
-- `rbac.role.updated`
-- `rbac.role.deleted`
-- `rbac.role.assigned`
-- `rbac.role.revoked`
-- `rbac.access.evaluated`
+Detailed guide: [**`doc/plugins/rbac.md`**](../../doc/plugins/rbac.md).

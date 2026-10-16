@@ -1,8 +1,27 @@
-# GoModularAuth OpenID Connect (OIDC) Relying Party Plugin
+# GoModularAuth OIDC Plugin (`gomodularauth-oidc`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/oidc.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/oidc)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-oidc` provides OpenID Connect Relying Party (client) authentication and federated identity integration for GoModularAuth.
 
 It implements RFC 6749, RFC 7636 (PKCE), and OpenID Connect Core 1.0 specifications with rigorous zero-trust ID token verification, strict nonce binding, multi-provider discovery, and account linking.
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Installation](#2-installation)
+- [3. Configuration](#3-configuration)
+- [4. Registration in GoModularAuth](#4-registration-in-gomodularauth)
+- [5. Public API](#5-public-api)
+- [6. Dependencies](#6-dependencies)
+- [7. Persistence & Schema](#7-persistence--schema)
+- [8. Cache](#8-cache)
+- [9. Events](#9-events)
+- [10. Security Invariants](#10-security-invariants)
+- [11. Testing](#11-testing)
 
 ---
 
@@ -93,11 +112,11 @@ type OIDC interface {
     // BeginAuth initiates an OIDC authorization code flow with PKCE and Nonce.
     BeginAuth(ctx context.Context, in BeginAuthInput) (*BeginAuthResult, error)
 
-    // CompleteAuth exchanges the authorization code, validates the ID token, and issues a Core Session.
-    CompleteAuth(ctx context.Context, in CompleteAuthInput) (*AuthResult, error)
-
     // BeginLink initiates an explicit account linking ceremony for an authenticated user.
     BeginLink(ctx context.Context, in BeginLinkInput) (*BeginAuthResult, error)
+
+    // CompleteAuth exchanges the authorization code, validates the ID token, and issues a Core Session.
+    CompleteAuth(ctx context.Context, in CompleteAuthInput) (*AuthResult, error)
 
     // CompleteLink finalizes account linking.
     CompleteLink(ctx context.Context, in CompleteLinkInput) (*LinkResult, error)
@@ -108,11 +127,14 @@ type OIDC interface {
     // ListAccounts lists all external OIDC accounts linked to a user.
     ListAccounts(ctx context.Context, userID string) ([]*account.Account, error)
 
+    // ValidateIDToken cryptographically verifies a raw ID token against the provider's JWKS and issuer rules.
+    ValidateIDToken(ctx context.Context, providerID, rawIDToken, expectedNonce string) (*IDTokenClaims, error)
+
     // GetProvider returns the configuration for a registered provider.
     GetProvider(providerID string) (*ProviderConfig, error)
 
-    // RegisterProvider dynamically adds or updates an OIDC provider.
-    RegisterProvider(cfg ProviderConfig) error
+    // Discover queries an OpenID Provider's discovery document (.well-known/openid-configuration).
+    Discover(ctx context.Context, issuerURL string) (*DiscoveryDocument, error)
 }
 ```
 
@@ -128,22 +150,13 @@ type OIDC interface {
 
 ---
 
-## 7. Persistence
+## 7. Persistence & Schema
 
-The plugin defines a clean persistence contract for in-flight state sessions:
+In-flight state sessions are persisted through GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    SaveState(ctx context.Context, s *StateSession) error
-    GetState(ctx context.Context, state string) (*StateSession, error)
-    ConsumeState(ctx context.Context, state string, now time.Time) (*StateSession, error)
-    DeleteState(ctx context.Context, state string) error
-    PurgeExpired(ctx context.Context, before time.Time) (int, error)
-}
-```
-
-State sessions are stored persistently with atomic single-use (`consumed_at`) guarantees.
-PostgreSQL migration schemas are located in `migrations/001_create_oidc_tables.sql`.
+- Table: `oidc_states` (accessed via `sdk.Model[StateSession]`).
+- Single-Use Guarantees: Atomic `consumed_at` timestamp updates ensure protection against authorization code replay attacks.
+- Migrations: PostgreSQL migration schemas are located in `migrations/001_create_oidc_tables.sql`.
 
 ---
 

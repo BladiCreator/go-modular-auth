@@ -1,9 +1,23 @@
-# GoModularAuth API Keys Plugin (`gomodularauth-api-key`)
+# GoModularAuth API Keys Plugin (`gomodularauth-api-keys`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/api-keys.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/api-keys)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Production-grade API key authentication, lifecycle management, and identity resolution plugin for **[GoModularAuth](https://github.com/BladiCreator/go-modular-auth)**.
+
+---
+
+## Table of Contents
+
+- [1. Overview](#1-overview)
+- [2. Installation](#2-installation)
+- [3. Configuration & Registration](#3-configuration--registration)
+- [4. Public API](#4-public-api)
+- [5. Usage Examples](#5-usage-examples)
+- [6. Persistence & Schema](#6-persistence--schema)
+- [7. Caching & Abuse Prevention](#7-caching--abuse-prevention)
+- [8. Events & Hooks](#8-events--hooks)
+- [9. Testing](#9-testing)
 
 ---
 
@@ -38,18 +52,16 @@ package main
 import (
 	"log"
 
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	apikeys "github.com/BladiCreator/go-modular-auth/plugins/api-keys"
 	"github.com/BladiCreator/go-modular-auth/plugins/api-keys/plugins"
-	"github.com/BladiCreator/go-modular-auth/auth"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func main() {
-
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Cache: corecache.New(),
+		Adapter: adaptermem.NewAdapter(),
+		Cache:   adaptermem.NewCache(),
 		Plugins: []auth.PluginModule{
 			apikeys.New(
 				apikeys.WithKeyPrefix("gma_live_"),
@@ -172,27 +184,13 @@ if err := apiKeyService.Revoke(ctx, keyID); err != nil {
 
 ---
 
-## 6. Persistence & Store Adapters
+## 6. Persistence & Schema
 
-The plugin defines a clear, domain-specific persistence contract:
+API keys are persisted through GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-	Create(ctx context.Context, key *APIKey) error
-	GetByID(ctx context.Context, id string) (*APIKey, error)
-	GetByHash(ctx context.Context, keyHash string) (*APIKey, error)
-	Update(ctx context.Context, key *APIKey) error
-	Revoke(ctx context.Context, id string, revokedAt time.Time) error
-	TouchLastUsed(ctx context.Context, id string, at time.Time, ip string, ua string) error
-	List(ctx context.Context, filter ListFilter) ([]*APIKey, error)
-	Delete(ctx context.Context, id string) error
-	DeleteExpired(ctx context.Context, before time.Time) (int, error)
-}
-```
-
-### Available Implementations:
-- `store/memory`: Fully thread-safe, concurrency-tested memory store for tests and development.
-- `store/postgres`: Production-ready PostgreSQL adapter using `database/sql`.
+- Table: `api_keys` (accessed via `sdk.Model[APIKey]`).
+- Indexes: `key_hash` (unique SHA-256 lookup), `user_id` / `organization_id` (multitenancy and ownership lookup).
+- Migrations: Database schema migrations are located in `migrations/001_create_api_keys.sql`.
 
 ---
 

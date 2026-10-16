@@ -1,8 +1,24 @@
-# gomodularauth-saml
+# GoModularAuth SAML Plugin (`gomodularauth-saml`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/saml.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/saml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-saml` provides enterprise-grade SAML 2.0 (Security Assertion Markup Language) identity federation for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
 
 It acts as a compliant SAML 2.0 Service Provider (SP), abstracting all XML, XMLDSig, and cryptographic complexity away from Core authentication while seamlessly integrating federated identities into Core `User`, `Account` (`saml:<provider_id>`), and `Session` entities.
+
+---
+
+## Table of Contents
+
+- [1. Features](#1-features)
+- [2. Installation](#2-installation)
+- [3. Configuration & Registration](#3-configuration--registration)
+- [4. Primary API](#4-primary-api)
+- [5. Usage Example](#5-usage-example)
+- [6. Persistence & Schema](#6-persistence--schema)
+- [7. Audit Events](#7-audit-events)
+- [8. Security Model](#8-security-model)
 
 ---
 
@@ -50,14 +66,15 @@ package main
 import (
     "log"
 
-    "github.com/BladiCreator/go-modular-auth/core"
+    auth "github.com/BladiCreator/go-modular-auth"
+    adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
     saml "github.com/BladiCreator/go-modular-auth/plugins/saml"
 )
 
 func main() {
-
-    auth, err := core.New(core.Config{
-        Plugins: []core.PluginModule{
+    engine, err := auth.New(auth.Config{
+        Adapter: adaptermem.NewAdapter(),
+        Plugins: []auth.PluginModule{
             saml.New(
                 saml.WithSPEntityID("https://myapp.com/saml/metadata"),
                 saml.WithSPACSURL("https://myapp.com/saml/acs"),
@@ -70,7 +87,7 @@ func main() {
     }
 
     // Resolve typed capability
-    samlPlugin, err := core.Get[saml.SAML](auth)
+    samlPlugin, err := auth.Get[saml.SAML](engine)
     if err != nil {
         log.Fatalf("failed to resolve SAML capability: %v", err)
     }
@@ -81,7 +98,7 @@ func main() {
 
 ## 4. Primary API
 
-The plugin exposes the strongly-typed `saml.SAML` interface via `core.Get[saml.SAML]()`:
+The plugin exposes the strongly-typed `saml.SAML` interface via `auth.Get[saml.SAML]()`:
 
 ```go
 type SAML interface {
@@ -89,6 +106,7 @@ type SAML interface {
     RegisterIdP(ctx context.Context, in RegisterIdPInput) (*IdPConfig, error)
     RegisterIdPFromMetadata(ctx context.Context, id, orgID string, metadataXML []byte) (*IdPConfig, error)
     GetIdP(ctx context.Context, id string) (*IdPConfig, error)
+    GetIdPByEntityID(ctx context.Context, entityID string) (*IdPConfig, error)
     ListIdPs(ctx context.Context, orgID string) ([]*IdPConfig, error)
     UpdateIdP(ctx context.Context, in UpdateIdPInput) (*IdPConfig, error)
     DeleteIdP(ctx context.Context, id string) error
@@ -101,7 +119,7 @@ type SAML interface {
     ProcessACS(ctx context.Context, in ProcessACSInput) (*AuthResult, error)
 
     // Account Management
-    ListLinkedAccounts(ctx context.Context, userID string) ([]*core.Account, error)
+    ListLinkedAccounts(ctx context.Context, userID string) ([]*account.Account, error)
     UnlinkAccount(ctx context.Context, userID, providerID string) error
 }
 ```
@@ -155,33 +173,13 @@ fmt.Printf("Redirect target: %s\n", authResult.RedirectURI)
 
 ---
 
-## 6. Persistence & Store Contract
+## 6. Persistence & Schema
 
-The plugin defines an explicit persistence interface `store.Store`:
+SAML provider configurations, request sessions, and processed assertion tracking are persisted via GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    SaveIdP(ctx context.Context, cfg *IdPConfig) error
-    GetIdP(ctx context.Context, id string) (*IdPConfig, error)
-    GetIdPByEntityID(ctx context.Context, entityID string) (*IdPConfig, error)
-    ListIdPs(ctx context.Context, orgID string) ([]*IdPConfig, error)
-    DeleteIdP(ctx context.Context, id string) error
-
-    SaveRequest(ctx context.Context, req *RequestSession) error
-    GetRequest(ctx context.Context, id string) (*RequestSession, error)
-    GetRequestByRelayState(ctx context.Context, relayState string) (*RequestSession, error)
-    ConsumeRequest(ctx context.Context, id string, now time.Time) (*RequestSession, error)
-    DeleteRequest(ctx context.Context, id string) error
-    PurgeExpiredRequests(ctx context.Context, before time.Time) (int, error)
-
-    RecordAssertion(ctx context.Context, assertionID, providerID string, expiresAt, now time.Time) error
-    PurgeExpiredAssertions(ctx context.Context, before time.Time) (int, error)
-}
-```
-
-Included implementations:
-- `store/memory`: In-memory thread-safe implementation for tests and local development.
-- `migrations/001_create_saml_tables.sql`: Production schema for PostgreSQL.
+- Models: `saml_idps` (`IdPConfig`), `saml_requests` (`RequestSession`), and `saml_assertions` (`AssertionRecord`).
+- Assertion Deduping: Records processed assertion IDs to prevent replay attacks across distributed cluster nodes.
+- Migrations: Located in `migrations/001_create_saml_tables.sql`.
 
 ---
 

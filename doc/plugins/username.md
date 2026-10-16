@@ -89,9 +89,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/BladiCreator/go-modular-auth/auth"
-	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
@@ -100,10 +99,10 @@ func main() {
 
 	// 1. Initialize GoModularAuth with the Username plugin
 	app, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Cache: memcache.New(),
+		Adapter: adaptermem.NewAdapter(),
+		Cache:   adaptermem.NewCache(),
 		Plugins: []auth.PluginModule{
-			username.New(), // Uses in-memory username store by default
+			username.New(),
 		},
 	})
 	if err != nil {
@@ -214,21 +213,23 @@ Sentinel errors allow explicit error handling:
 
 ---
 
-## Persistence & Store Contract
+## Persistence & Schema
 
-The Store interface provides strict separation of storage mechanisms:
+`gomodularauth-username` persists user handle mappings directly through GoModularAuth's unified schema engine (`schema.RegisterSchema`), avoiding fragmented external store implementations.
+
+### Data Model (`Record`)
 
 ```go
-type Store interface {
-    Create(ctx context.Context, rec *Record) error
-    GetByNormalized(ctx context.Context, normalized string) (*Record, error)
-    GetByUserID(ctx context.Context, userID string) (*Record, error)
-    Update(ctx context.Context, rec *Record) error
-    Delete(ctx context.Context, userID string) error
+type Record struct {
+	UserID     string    `json:"user_id"`
+	Username   string    `json:"username"`   // Original casing for display
+	Normalized string    `json:"normalized"` // Canonical lowercase search key for uniqueness
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 ```
 
-An in-memory implementation (`github.com/BladiCreator/go-modular-auth/plugins/username/store/memory`) is provided for testing and lightweight development.
+The plugin registers its `usernames` table model with a unique index on `normalized` via `sdk.Model[Record](ctx, ModelUsernames)` into the host's configured `adapter.Adapter`.
 
 ---
 

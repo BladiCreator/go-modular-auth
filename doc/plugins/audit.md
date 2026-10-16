@@ -1,8 +1,26 @@
 # GoModularAuth Audit Plugin (`gomodularauth-audit`)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/audit.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/audit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Structured, tamper-evident security audit logging for **GoModularAuth**.
 
 The Audit plugin functions as a zero-trust observational event consumer across GoModularAuth Core and all installed plugins (such as `organizations`, `admin`, `api-keys`, `device-authorization`, and authentication methods). It captures security-relevant actions into an immutable ledger while strictly sanitizing passwords, authentication tokens, OTP codes, and sensitive secrets.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Architecture](#architecture)
+- [Registration and Configuration](#registration-and-configuration)
+- [Capability Public API](#capability-public-api)
+- [Domain Model: `AuditRecord`](#domain-model-auditrecord)
+- [Security Model and Sanitization](#security-model-and-sanitization)
+- [Persistence & SQL Schema](#persistence--sql-schema)
+- [Testing](#testing)
+- [License](#license)
 
 ---
 
@@ -56,7 +74,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 	"github.com/BladiCreator/go-modular-auth/plugins/audit/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 )
 
 func main() {
@@ -71,7 +89,7 @@ func main() {
 	)
 
 	appAuth, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{auditModule},
 	})
 	if err != nil {

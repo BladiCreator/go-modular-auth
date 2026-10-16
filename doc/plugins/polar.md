@@ -1,6 +1,20 @@
-# GoModularAuth Polar Billing Plugin
+# GoModularAuth Polar Plugin (`gomodularauth-polar`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/polar.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/polar)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-polar` provides subscription billing, automated customer provisioning, customer portal sessions, and license benefit checks integrated with [Polar.sh](https://polar.sh) for **GoModularAuth**.
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Features](#2-features)
+- [3. Installation](#3-installation)
+- [4. Configuration & Registration](#4-configuration--registration)
+- [5. Primary Capability API](#5-primary-capability-api)
+- [6. Usage Examples](#6-usage-examples)
 
 ---
 

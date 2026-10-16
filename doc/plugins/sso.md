@@ -1,6 +1,25 @@
-# GoModularAuth Enterprise Single Sign-On (SSO) Plugin
+# GoModularAuth SSO Plugin (`gomodularauth-sso`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/sso.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/sso)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-sso` provides enterprise Single Sign-On (SSO) configuration, domain discovery, and multi-tenant identity federation across OpenID Connect (OIDC) and SAML 2.0 protocols for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Installation](#2-installation)
+- [3. Configuration](#3-configuration)
+- [4. Registration in GoModularAuth](#4-registration-in-gomodularauth)
+- [5. Public API](#5-public-api)
+- [6. Dependencies](#6-dependencies)
+- [7. Persistence](#7-persistence)
+- [8. Cache](#8-cache)
+- [9. Events](#9-events)
+- [10. Security Invariants](#10-security-invariants)
+- [11. Testing](#11-testing)
 
 ---
 

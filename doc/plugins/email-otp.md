@@ -1,9 +1,24 @@
-# gomodularauth-email-otp
+# GoModularAuth Email OTP Plugin (`gomodularauth-email-otp`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/email-otp.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/email-otp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A production-ready, passwordless authentication plugin for **GoModularAuth** providing short-lived, single-use email One-Time Password (OTP) verification codes.
+
+---
+
+## Table of Contents
+
+- [1. Overview](#1-overview)
+- [2. Architecture](#2-architecture)
+- [3. Installation](#3-installation)
+- [4. Quick Start](#4-quick-start)
+- [5. Configuration Options](#5-configuration-options)
+- [6. Public Capability Interface](#6-public-capability-interface)
+- [7. Security Architecture](#7-security-architecture)
+- [8. Database Migrations](#8-database-migrations)
+- [9. Observability & Events](#9-observability--events)
+- [10. License](#10-license)
 
 ---
 
@@ -57,22 +72,19 @@ import (
 	"log"
 	"time"
 
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	emailotp "github.com/BladiCreator/go-modular-auth/plugins/email-otp"
 	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/plugins"
-	"github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	emailmemory "github.com/BladiCreator/go-modular-auth/email/memory"
 )
 
 func main() {
 	ctx := context.Background()
-	storeAdapter := storememory.New()
-	emailAdapter := emailmemory.New()
 
 	// Initialize GoModularAuth with Email OTP plugin
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Email: emailAdapter,
+		Adapter: adaptermem.NewAdapter(),
+		Email:   adaptermem.NewEmail(),
 		Plugins: []auth.PluginModule{
 			emailotp.New(
 				emailotp.WithOTPLength(6),

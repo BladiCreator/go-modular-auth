@@ -1,6 +1,23 @@
-# gomodularauth-account-linking
+# GoModularAuth Account Linking Plugin (`gomodularauth-account-linking`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/account-linking.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/account-linking)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-account-linking` provides secure linking and unlinking of authentication accounts while preserving a single canonical Core User identity in [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Features](#2-features)
+- [3. Installation](#3-installation)
+- [4. Configuration & Registration](#4-configuration--registration)
+- [5. Primary API](#5-primary-api)
+- [6. Usage Examples](#6-usage-examples)
+- [7. Persistence & Schema](#7-persistence--schema)
+- [8. Audit Events](#8-audit-events)
+- [9. Security Model](#9-security-model)
 
 ---
 
@@ -164,23 +181,13 @@ if errors.Is(err, accountlinking.ErrCannotUnlinkFinalAuthMethod) {
 
 ---
 
-## 7. Persistence & Store Contract
+## 7. Persistence & Schema
 
-Tickets are persisted via `store.Store`:
+Linking tickets are persisted via GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    SaveTicket(ctx context.Context, ticket *LinkingTicket) error
-    GetTicketByHash(ctx context.Context, tokenHash string) (*LinkingTicket, error)
-    ConsumeTicket(ctx context.Context, tokenHash string, now time.Time) (*LinkingTicket, error)
-    DeleteTicket(ctx context.Context, id string) error
-    PurgeExpiredTickets(ctx context.Context, before time.Time) (int, error)
-}
-```
-
-Implementations:
-- `store/memory`: In-memory thread-safe implementation.
-- `migrations/001_create_account_linking_tables.sql`: PostgreSQL production migration.
+- Table: `linking_tickets` (accessed via `sdk.Model[LinkingTicket]`).
+- Indexes: `token_hash` (unique SHA-256 hash lookup) and `expires_at` (expiration indexing).
+- Migrations: Located in `migrations/001_create_account_linking_tables.sql`.
 
 ---
 

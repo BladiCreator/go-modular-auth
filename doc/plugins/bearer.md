@@ -1,9 +1,27 @@
-# gomodularauth-bearer
+# GoModularAuth Bearer Plugin (`gomodularauth-bearer`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/bearer.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/bearer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-bearer` provides transport-independent Bearer token authentication for server-side APIs built with [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Installation](#2-installation)
+- [3. Architecture](#3-architecture)
+- [4. Registering in GoModularAuth](#4-registering-in-gomodularauth)
+- [5. Public Capability API](#5-public-capability-api)
+- [6. Issuing & Authenticating Tokens](#6-issuing--authenticating-tokens)
+- [7. Transport Adapter Integration](#7-transport-adapter-integration)
+- [8. Persistence & Schema](#8-persistence--schema)
+- [9. Cache Acceleration](#9-cache-acceleration)
+- [10. Events & Observability](#10-events--observability)
+- [11. Security Model](#11-security-model)
+- [12. Running Tests](#12-running-tests)
+- [13. License](#13-license)
 
 ---
 
@@ -72,8 +90,8 @@ package main
 import (
     "log"
 
-    "github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+    auth "github.com/BladiCreator/go-modular-auth"
+    adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
     bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
     "github.com/BladiCreator/go-modular-auth/plugins/bearer/plugins"
 )
@@ -81,7 +99,7 @@ import (
 func main() {
     // 1. Initialize GoModularAuth engine with Bearer plugin
     authApp, err := auth.New(auth.Config{
-        Adapter: adaptermem.New(),
+        Adapter: adaptermem.NewAdapter(),
         Plugins: []auth.PluginModule{
             bearer.New(
                 bearer.WithTokenPrefix("gmb_"), // Default prefix
@@ -196,7 +214,7 @@ package transport
 import (
     "net/http"
 
-    "github.com/BladiCreator/go-modular-auth/auth"
+    auth "github.com/BladiCreator/go-modular-auth"
     bearer "github.com/BladiCreator/go-modular-auth/plugins/bearer"
 )
 
@@ -286,39 +304,13 @@ func UnaryBearerInterceptor(b bearer.Bearer) grpc.UnaryServerInterceptor {
 
 ---
 
-## 8. Persistence & Stores
+## 8. Persistence & Schema
 
-The plugin decouples persistence through `store.Store`:
+Bearer tokens are persisted via GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    Create(ctx context.Context, record *TokenRecord) error
-    GetByID(ctx context.Context, id string) (*TokenRecord, error)
-    GetByTokenHash(ctx context.Context, tokenHash string) (*TokenRecord, error)
-    Update(ctx context.Context, record *TokenRecord) error
-    Revoke(ctx context.Context, id string, revokedAt time.Time) error
-    RevokeBySubject(ctx context.Context, subject string, revokedAt time.Time) error
-    Delete(ctx context.Context, id string) error
-    DeleteExpired(ctx context.Context, before time.Time) (int, error)
-    ListBySubject(ctx context.Context, subject string) ([]*TokenRecord, error)
-}
-```
-
-### Available Adapters:
-1. **In-Memory Store (`store/memory`)**:
-   Thread-safe in-process store with `sync.RWMutex`. Used for tests and ephemeral environments.
-   ```go
-
-   module := bearer.New())
-   ```
-2. **PostgreSQL Store (`store/postgres`)**:
-   Production-ready implementation compatible with `*sql.DB` and connection poolers (PgBouncer).
-   ```go
-
-   module := bearer.New())
-   ```
-
-Database schema migrations are located in `migrations/001_create_bearer_tokens.sql`.
+- Table: `bearer_tokens` (accessed via `sdk.Model[TokenRecord]`).
+- Indexes: `token_hash` (unique SHA-256 token lookup), `subject` (user token revocation and listing).
+- Migrations: Database schema migrations are located in `migrations/001_create_bearer_tokens.sql`.
 
 ---
 

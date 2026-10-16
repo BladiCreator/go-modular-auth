@@ -1,6 +1,23 @@
-# GoModularAuth Policy Plugin
+# GoModularAuth Policy Plugin (`gomodularauth-policy`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/policy.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/policy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-policy` provides composable policy-based and attribute-based access control (ABAC) for GoModularAuth applications. It evaluates complex multidimensional authorization requirements over `Principal`, `User`, `Organization`, `Resource`, `Action`, and `Context` attributes using idiomatic Go constructs without forcing a proprietary policy language.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Public Capability API](#public-capability-api)
+- [Step-Up Challenge Decisions](#step-up-challenge-decisions)
+- [Policy Composition Combinators](#policy-composition-combinators)
+- [Cache Invalidation Semantics](#cache-invalidation-semantics)
+
+---
 
 ## Features
 
@@ -81,6 +98,44 @@ func main() {
 	log.Println("Access granted!")
 }
 ```
+
+---
+
+## Public Capability API
+
+```go
+type Policy interface {
+	// Authorize evaluates all registered policies against the request.
+	// Returns nil if allowed, ErrForbidden if denied, or ErrChallengeRequired if challenge is needed.
+	Authorize(ctx context.Context, req Request) error
+
+	// Evaluate runs deterministic evaluation and returns the detailed structured Decision.
+	Evaluate(ctx context.Context, req Request) (Decision, error)
+
+	// RegisterPolicy registers a new composable policy evaluator.
+	RegisterPolicy(p Evaluator) error
+
+	// RemovePolicy unregisters an evaluator by its unique ID.
+	RemovePolicy(policyID string) error
+
+	// GetPolicy retrieves a registered policy evaluator by ID.
+	GetPolicy(policyID string) (Evaluator, error)
+
+	// ListPolicies returns all currently registered policy evaluators.
+	ListPolicies() []Evaluator
+
+	// InvalidatePrincipalCache evicts cached decisions for a specific principal.
+	InvalidatePrincipalCache(ctx context.Context, principalSubject string) error
+
+	// InvalidateResourceCache evicts cached decisions for a specific resource.
+	InvalidateResourceCache(ctx context.Context, resourceType, resourceID string) error
+
+	// InvalidateAllCache purges all cached policy decisions.
+	InvalidateAllCache(ctx context.Context) error
+}
+```
+
+---
 
 ## Step-Up Challenge Decisions
 

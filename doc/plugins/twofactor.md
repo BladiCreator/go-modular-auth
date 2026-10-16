@@ -1,6 +1,22 @@
-# GoModularAuth Two-Factor (MFA) Plugin
+# GoModularAuth Two-Factor Plugin (`gomodularauth-twofactor`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/twofactor.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/twofactor)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-twofactor` provides enterprise-grade, strongly typed Multi-Factor Authentication (MFA) capabilities—including **Time-based One-Time Passwords (TOTP / RFC 6238)** and **single-use Backup Recovery Codes**—for **GoModularAuth**, without coupling the Core authentication model to any specific second factor.
+
+---
+
+## Table of Contents
+
+- [1. Overview & Capabilities](#1-overview--capabilities)
+- [2. Installation](#2-installation)
+- [3. Configuration & Registration](#3-configuration--registration)
+- [4. Primary API (`plugins.TwoFactor`)](#4-primary-api-pluginstwofactor)
+- [5. Security Model & Architecture](#5-security-model--architecture)
+- [6. Events](#6-events)
+- [7. Database Migrations](#7-database-migrations)
+- [8. License](#8-license)
 
 ---
 
@@ -37,8 +53,8 @@ package main
 import (
     "log"
 
-    "github.com/BladiCreator/go-modular-auth/auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+    auth "github.com/BladiCreator/go-modular-auth"
+    adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
     twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
     "github.com/BladiCreator/go-modular-auth/plugins/twofactor/plugins"
 )
@@ -47,7 +63,7 @@ func main() {
     masterKey, _ := twofactor.GenerateRandomKey() // 32 bytes for AES-256-GCM
 
     authEngine, err := auth.New(auth.Config{
-        Adapter: adaptermem.New(),
+        Adapter: adaptermem.NewAdapter(),
         Plugins: []auth.PluginModule{
             twofactor.New(
                 twofactor.WithEncryptionKey(masterKey),
@@ -73,6 +89,36 @@ func main() {
 ---
 
 ## 4. Primary API (`plugins.TwoFactor`)
+
+```go
+type TwoFactor interface {
+	// Status & Factors
+	GetStatus(ctx context.Context, userID string) (*Status, error)
+	IsEnabled(ctx context.Context, userID string) (bool, error)
+	ListFactors(ctx context.Context, userID string) ([]Factor, error)
+
+	// TOTP Enrollment & Lifecycle
+	EnrollTOTP(ctx context.Context, userID string, opts ...EnrollOption) (*TOTPEnrollment, error)
+	ConfirmTOTP(ctx context.Context, userID, factorID, code string) error
+
+	// Verification
+	VerifyTOTP(ctx context.Context, userID, code string) (*VerifyResult, error)
+	VerifyRecoveryCode(ctx context.Context, userID, code string) (*VerifyResult, error)
+
+	// Two-Step Challenges
+	CreateChallenge(ctx context.Context, userID string) (*Challenge, error)
+	VerifyChallenge(ctx context.Context, challengeID, code string) (*VerifyResult, error)
+
+	// Backup Recovery Codes
+	GenerateRecoveryCodes(ctx context.Context, userID string, count int) ([]string, error)
+	RotateRecoveryCodes(ctx context.Context, userID string) ([]string, error)
+	GetRemainingRecoveryCodesCount(ctx context.Context, userID string) (int, error)
+
+	// Deactivation
+	Disable(ctx context.Context, userID string) error
+	DisableFactor(ctx context.Context, userID, factorID string) error
+}
+```
 
 ### 4.1 Enrollment & Confirmation Lifecycle
 

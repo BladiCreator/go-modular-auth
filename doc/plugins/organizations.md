@@ -1,9 +1,21 @@
-# GoModularAuth Organizations Plugin
+# GoModularAuth Organizations Plugin (`gomodularauth-organizations`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/organizations.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/organizations)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-organizations` provides multi-tenant organizations, memberships, role-based member permissions, teams, team memberships, invitations, organization metadata, ownership lifecycle, and organization-scoped authorization for GoModularAuth.
+
+---
+
+## Table of Contents
+
+- [Architecture & Design Principles](#architecture--design-principles)
+- [Installation](#installation)
+- [Quick Start & Registration](#quick-start--registration)
+- [Public API & Capability Contract](#public-api--capability-contract)
+- [Organization-Scoped Authorization](#organization-scoped-authorization)
+- [Events](#events)
+- [Store & Migrations](#store--migrations)
 
 ---
 

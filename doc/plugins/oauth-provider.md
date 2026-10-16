@@ -1,6 +1,25 @@
-# gomodularauth-oauth-provider
+# GoModularAuth OAuth Provider Plugin (`gomodularauth-oauth-provider`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/oauth-provider.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/oauth-provider)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-oauth-provider` is a pure Go modular library plugin that implements an **OAuth 2.1 Authorization Server** for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth). It enables GoModularAuth instances to act as Identity Providers (IdP) for first-party single-page apps (SPAs), mobile applications, and third-party API clients.
+
+---
+
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Public Capability API](#public-capability-api)
+- [Core Operations](#core-operations)
+- [Configuration Options](#configuration-options)
+- [Security Model](#security-model)
+- [Testing](#testing)
+
+---
 
 ## Key Features
 
@@ -58,7 +77,7 @@ import (
 	"log"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/plugins"
 )
@@ -73,7 +92,7 @@ func main() {
 
 	// Initialize GoModularAuth Engine
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{oauthMod},
 	})
 	if err != nil {
@@ -87,6 +106,37 @@ func main() {
 	}
 
 	_ = provider
+}
+```
+
+---
+
+## Public Capability API
+
+```go
+type OAuthProvider interface {
+	// RegisterClient registers a new OAuth 2.1 client application.
+	RegisterClient(ctx context.Context, in RegisterClientInput) (*RegisterClientOutput, error)
+
+	// GetClient retrieves client metadata by client ID.
+	GetClient(ctx context.Context, id string) (*Client, error)
+
+	// RevokeClient revokes a client, deactivating it and invalidating its active tokens.
+	RevokeClient(ctx context.Context, id string) error
+
+	// Authorize performs the OAuth 2.1 authorization step, validating redirect URIs, scopes,
+	// PKCE parameters, and issuing an authorization code after user consent.
+	Authorize(ctx context.Context, in AuthorizeInput) (*AuthorizeOutput, error)
+
+	// Token handles the OAuth 2.1 token endpoint (authorization_code, client_credentials, refresh_token),
+	// enforcing PKCE, single-use code consumption, and refresh token rotation.
+	Token(ctx context.Context, in TokenInput) (*TokenOutput, error)
+
+	// RevokeToken implements RFC 7009 token revocation.
+	RevokeToken(ctx context.Context, in RevokeTokenInput) error
+
+	// IntrospectToken implements RFC 7662 token introspection.
+	IntrospectToken(ctx context.Context, in IntrospectTokenInput) (*IntrospectTokenOutput, error)
 }
 ```
 

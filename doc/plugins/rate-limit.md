@@ -1,8 +1,25 @@
 # GoModularAuth Rate Limit Plugin (`gomodularauth-rate-limit`)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/rate-limit.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/rate-limit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Configurable authentication and security rate limiting for **GoModularAuth** with distributed counter support via the optional Cache Adapter.
 
 The Rate Limit plugin prevents brute-force attacks, credential stuffing, enumeration, and denial-of-service against authentication workflows (SignIn, SignUp, PasswordReset, Email OTP, Magic Link, Phone OTP, API Keys, and Administrative actions).
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Architecture](#architecture)
+- [Registration and Configuration](#registration-and-configuration)
+- [Supported Standard Actions](#supported-standard-actions)
+- [Capability Public API](#capability-public-api)
+- [Security Model](#security-model)
+- [Testing](#testing)
+- [License](#license)
 
 ---
 
@@ -61,10 +78,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
 	"github.com/BladiCreator/go-modular-auth/plugins/rate-limit/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 func main() {
@@ -92,8 +108,8 @@ func main() {
 	)
 
 	appAuth, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Cache:   corecache.New(),
+		Adapter: adaptermem.NewAdapter(),
+		Cache:   adaptermem.NewCache(),
 		Plugins: []auth.PluginModule{rlModule},
 	})
 	if err != nil {

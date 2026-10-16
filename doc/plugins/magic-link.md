@@ -1,9 +1,22 @@
-# gomodularauth-magic-link
+# GoModularAuth Magic Link Plugin (`gomodularauth-magic-link`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/magic-link.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/magic-link)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-magic-link` provides passwordless authentication through secure, single-use, expiring email magic links for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [1. Overview](#1-overview)
+- [2. Installation](#2-installation)
+- [3. Registration](#3-registration)
+- [4. Capability API](#4-capability-api)
+- [5. Configuration Options](#5-configuration-options)
+- [6. Events](#6-events)
+- [7. Security Architecture](#7-security-architecture)
+- [8. License](#8-license)
 
 ---
 
@@ -40,16 +53,18 @@ package main
 
 import (
     "log"
+    "time"
 
-    "github.com/BladiCreator/go-modular-auth/auth"
-    "github.com/BladiCreator/go-modular-auth/plugins/magic-link"
+    auth "github.com/BladiCreator/go-modular-auth"
+    adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
+    magiclink "github.com/BladiCreator/go-modular-auth/plugins/magic-link"
 )
 
 func main() {
     a, err := auth.New(auth.Config{
-        Adapter: adaptermem.New(),
-        Cache: cacheAdapter,
-        Email: emailAdapter,
+        Adapter: adaptermem.NewAdapter(),
+        Cache:   adaptermem.NewCache(),
+        Email:   adaptermem.NewEmail(),
 
         Plugins: []auth.PluginModule{
             magiclink.New(

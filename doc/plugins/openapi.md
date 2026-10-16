@@ -1,119 +1,240 @@
-# OpenAPI 3.0 Specification Generator Plugin
+# GoModularAuth OpenAPI Plugin (`gomodularauth-openapi`)
 
-The **OpenAPI Plugin** (`plugins/openapi`) automatically inspects the GoModularAuth engine registry and dynamically generates an **OpenAPI 3.0 Document** representing all available endpoints, request bodies, query parameters, schemas, and error responses.
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/openapi.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/openapi)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+The **OpenAPI Plugin** (`gomodularauth-openapi`) inspects the active [GoModularAuth](https://github.com/BladiCreator/go-modular-auth) engine and dynamically generates an OpenAPI 3.0 specification reflecting installed authentication modules and their HTTP routes.
 
 ---
 
-## 1. Problem Solved
+## Table of Contents
 
-Maintaining Swagger/OpenAPI documentation manually across modular authentication plugins is error-prone. When plugins are added or removed (e.g. enabling passkeys, organizations, or MFA), the API surface changes.
+- [Overview & Problem Solved](#overview--problem-solved)
+- [Architecture & Design Principles](#architecture--design-principles)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration Options](#configuration-options)
+- [Primary Capability API](#primary-capability-api)
+- [Persistence & Unified Schema](#persistence--unified-schema)
+- [Cache Semantics](#cache-semantics)
+- [Observational Events](#observational-events)
+- [Security Model & Invariants](#security-model--invariants)
+- [Testing & Examples](#testing--examples)
+- [License](#license)
+
+---
+
+## Overview & Problem Solved
+
+Maintaining API documentation in modular systems is notoriously error-prone:
+- As plugins are added or removed (e.g., adding `passkeys`, enabling `twofactor`, disabling `magic-link`), manually maintained Swagger/OpenAPI files become out of sync.
+- Frontend developers and API client generators require accurate schemas for request payloads, response bodies, and authentication headers.
 
 The `openapi` plugin solves this by:
-- Dynamically discovering all installed plugin IDs via `engine.Registry().Modules()`.
-- Generating valid, standardized OpenAPI 3.0 specifications in JSON or struct format.
-- Documenting request/response models for core operations (Sign-Up, Sign-In, Session verification) and active plugins.
-- Ready for plug-and-play serving via Swagger UI, Scalar, or Redoc.
+- Inspecting the GoModularAuth module registry at runtime (`Core().Registry().Modules()`).
+- Generating an accurate **OpenAPI 3.0** document for all core authentication endpoints plus any active plugins.
+- Serializing directly to structured Go structs (`*spec.Document`) or indented/compact JSON.
 
 ---
 
-## 2. Installation & Registration
+## Architecture & Design Principles
+
+```text
+HTTP Router (Swagger UI / Scalar / Redoc)
+            │
+            ▼
+auth.Get[openapi.OpenAPIGenerator](engine)
+            │
+            ▼
+┌────────────────────────────────────────────────────────┐
+│           gomodularauth-openapi (Plugin)               │
+│                                                        │
+│  - Inspects Engine Registry Modules                    │
+│  - Assembles OpenAPI 3.0 PathItems & Schemas           │
+│  - Serializes to JSON                                  │
+└──────────────┬─────────────────────────────────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Core Engine Host             │
+│ ctx.Core().Registry()        │
+└──────────────────────────────┘
+```
+
+The plugin adheres strictly to GoModularAuth's architectural principles:
+- **Stateless & Pure**: Generates documentation on-demand without database dependencies or background threads.
+- **Dynamic Module Discovery**: Automatically adapts endpoints based on the exact slice of plugins configured in `auth.New(...)`.
+
+---
+
+## Installation
 
 ```bash
 go get github.com/BladiCreator/go-modular-auth/plugins/openapi
 ```
 
-Register the plugin:
+---
+
+## Quick Start
 
 ```go
 package main
 
 import (
-    auth "github.com/BladiCreator/go-modular-auth"
-    "github.com/BladiCreator/go-modular-auth/plugins/openapi"
+	"fmt"
+	"log"
+	"net/http"
+
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/openapi"
 )
 
 func main() {
-    openAPIMod := openapi.New(
-        openapi.WithTitle("Acme Identity & Auth API"),
-        openapi.WithVersion("v1.0.0"),
-        openapi.WithDescription("Authentication endpoints powered by GoModularAuth"),
-    )
+	// 1. Initialize GoModularAuth engine with OpenAPI generator
+	engine, err := auth.New(auth.Config{
+		Adapter: adaptermem.NewAdapter(),
+		Plugins: []auth.PluginModule{
+			openapi.New(
+				openapi.WithTitle("Platform Authentication API"),
+				openapi.WithVersion("2.1.0"),
+				openapi.WithDescription("Authentication and Identity API generated dynamically by GoModularAuth."),
+			),
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize auth: %v", err)
+	}
 
-    engine, err := auth.New(auth.Config{
-        Adapter: adaptermem.New(),
-        Plugins: []auth.PluginModule{openAPIMod, ...otherPlugins},
-    })
-    if err != nil {
-        panic(err)
-    }
+	// 2. Resolve OpenAPIGenerator capability
+	docGen, err := auth.Get[openapi.OpenAPIGenerator](engine)
+	if err != nil {
+		log.Fatalf("failed to resolve OpenAPIGenerator: %v", err)
+	}
 
-    // Resolve capability
-    gen := auth.MustGet[openapi.OpenAPIGenerator](engine)
-    _ = gen
+	// 3. Serve generated OpenAPI 3.0 JSON over HTTP
+	http.HandleFunc("/docs/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		jsonBytes, err := docGen.GenerateJSON(true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(jsonBytes)
+	})
+
+	fmt.Println("OpenAPI documentation endpoint available at http://localhost:8080/docs/openapi.json")
 }
 ```
 
 ---
 
-## 3. Capability Interface: `openapi.OpenAPIGenerator`
+## Configuration Options
+
+Configure the plugin using functional options in `openapi.New(opts ...Option)`:
 
 ```go
-type OpenAPIGenerator interface {
-    // Generate returns the OpenAPI 3.0 AST document.
-    Generate() (*spec.Document, error)
-
-    // GenerateJSON serializes the OpenAPI 3.0 specification to JSON bytes.
-    GenerateJSON(indent bool) ([]byte, error)
-}
+openapi.New(
+    openapi.WithTitle("Customer Auth API"),
+    openapi.WithVersion("1.0.0"),
+    openapi.WithDescription("API specification for authentication endpoints"),
+)
 ```
+
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `WithTitle(title string)` | `"Go Modular Auth API"` | Sets the title of the API specification (`info.title`). |
+| `WithVersion(v string)` | `"1.0.0"` | Sets the API version (`info.version`). |
+| `WithDescription(desc string)` | `"Authentication and Identity API generated by go-modular-auth"` | Sets the API description (`info.description`). |
 
 ---
 
-## 4. Serving with HTTP Routers
+## Primary Capability API
 
-Serve the OpenAPI specification to power interactive API documentation tools:
+The primary capability is exposed through `openapi.OpenAPIGenerator`, resolved via `auth.Get[openapi.OpenAPIGenerator](engine)`.
+
+### Interface Definition
 
 ```go
-package main
+package openapi
 
 import (
-    "net/http"
-    "github.com/BladiCreator/go-modular-auth/plugins/openapi"
+	"github.com/BladiCreator/go-modular-auth/plugins/openapi/spec"
 )
 
-func RegisterOpenAPIRoutes(mux *http.ServeMux, gen openapi.OpenAPIGenerator) {
-    // 1. Serve OpenAPI 3.0 JSON specification
-    mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
-        jsonBytes, err := gen.GenerateJSON(true) // Indented JSON
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
+type OpenAPIGenerator interface {
+	// Generate builds and returns an OpenAPI 3.0 Document struct reflecting active plugins.
+	Generate() (*spec.Document, error)
 
-        w.Header().Set("Content-Type", "application/json; charset=utf-8")
-        w.Write(jsonBytes)
-    })
-
-    // 2. Serve Swagger UI pointing to /openapi.json
-    mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        w.Write([]byte(`<!DOCTYPE html>
-<html>
-<head>
-    <title>API Documentation</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script>
-        window.ui = SwaggerUIBundle({
-            url: '/openapi.json',
-            dom_id: '#swagger-ui',
-        });
-    </script>
-</body>
-</html>`))
-    })
+	// GenerateJSON serializes the OpenAPI 3.0 specification to JSON.
+	// If indent is true, the JSON is formatted with 2 spaces.
+	GenerateJSON(indent bool) ([]byte, error)
 }
 ```
+
+---
+
+## Persistence & Unified Schema
+
+- **Stateless**: The plugin requires no database tables, no schema migrations, and no persistent store.
+
+---
+
+## Cache Semantics
+
+- The generated OpenAPI specification is deterministic for a given engine configuration.
+- Applications can safely cache `GenerateJSON(true)` in memory upon startup to serve HTTP documentation requests instantly with zero CPU overhead.
+
+---
+
+## Observational Events
+
+- As a stateless documentation utility, the OpenAPI plugin does not emit runtime observational events.
+
+---
+
+## Security Model & Invariants
+
+1. **Zero Secret Exposure**: The generator documents request/response contract schemas only. Secret keys, cryptographic seeds, and adapter credentials are never included in the output.
+2. **Standard Security Schemes**: Security definitions document standard Bearer JWT and Session Cookie security schemes.
+
+---
+
+## Testing & Examples
+
+Unit test verifying dynamic OpenAPI generation:
+
+```go
+func TestOpenAPIGeneration(t *testing.T) {
+	engine, err := auth.New(auth.Config{
+		Adapter: adaptermem.NewAdapter(),
+		Plugins: []auth.PluginModule{
+			openapi.New(openapi.WithTitle("Test Suite Auth")),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected engine init error: %v", err)
+	}
+
+	docGen, err := auth.Get[openapi.OpenAPIGenerator](engine)
+	if err != nil {
+		t.Fatalf("unexpected capability error: %v", err)
+	}
+
+	doc, err := docGen.Generate()
+	if err != nil || doc.Info.Title != "Test Suite Auth" {
+		t.Fatalf("unexpected doc: %+v", doc)
+	}
+
+	jsonBytes, err := docGen.GenerateJSON(false)
+	if err != nil || len(jsonBytes) == 0 {
+		t.Fatalf("failed to render JSON: %v", err)
+	}
+}
+```
+
+---
+
+## License
+
+MIT License. See [LICENSE](file:///media/vladimir/Storage/Projects/Go/go-modular-auth/LICENSE) for details.

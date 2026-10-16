@@ -1,6 +1,23 @@
 # GoModularAuth Admin Plugin (`gomodularauth-admin`)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/admin.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/admin)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 `gomodularauth-admin` is a high-security administrative management plugin for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth). It provides privileged operations over Core authentication identities, accounts, credentials, sessions, and multi-tenant organization state.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Public API (`Admin`)](#public-api-admin)
+- [Organization-Scoped Administration](#organization-scoped-administration)
+- [Audit Events](#audit-events)
+- [Security Invariants](#security-invariants)
+- [License](#license)
 
 ---
 
@@ -74,7 +91,15 @@ func main() {
 	a, err := auth.New(auth.Config{
 		Adapter: ad,
 		Plugins: []auth.PluginModule{
-			admin.New(),
+			admin.New(
+				// Optional: Configure authorization policy
+				admin.WithAuthorizerFunc(func(ctx context.Context, p auth.Principal, action, targetUserID string) error {
+					if p.Subject == "admin_user_id" {
+						return nil // authorized
+					}
+					return admin.ErrUnauthorized
+				}),
+			),
 		},
 	})
 	if err != nil {
@@ -89,9 +114,6 @@ func main() {
 
 	// 4. Perform Administrative Operations
 	adminPrincipal := auth.Principal{Subject: "admin_user_id", Type: auth.PrincipalUser}
-
-	// Bootstrap admin status
-	_ = adminStore.SetAdminRole(ctx, "admin_user_id", true, "superadmin")
 
 	// Disable a user
 	err = adm.DisableUser(ctx, adminPrincipal, "usr_target_123", "Terms of Service violation")

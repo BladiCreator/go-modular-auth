@@ -1,4 +1,4 @@
-# gomodularauth-anonymous
+# GoModularAuth Anonymous Plugin (`gomodularauth-anonymous`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/anonymous.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/anonymous)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -93,22 +93,18 @@ package main
 
 import (
 	"log"
+	"time"
 
-	"github.com/BladiCreator/go-modular-auth/auth"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/anonymous"
 	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/plugins"
 )
 
 func main() {
-	storeAdapter := corestore.New()
-	cacheAdapter := corecache.New()
-
 	engine, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Cache: cacheAdapter,
+		Adapter: adaptermem.NewAdapter(),
+		Cache:   adaptermem.NewCache(),
 		Plugins: []auth.PluginModule{
 			anonymous.New(
 				anonymous.WithIdentityTTL(14 * 24 * time.Hour),

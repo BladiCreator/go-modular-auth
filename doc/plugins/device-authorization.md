@@ -1,6 +1,23 @@
 # GoModularAuth Device Authorization Plugin (`gomodularauth-device-authorization`)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/device-authorization.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/device-authorization)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 `gomodularauth-device-authorization` implements the **RFC 8628 OAuth 2.0 Device Authorization Grant** for [GoModularAuth](https://github.com/BladiCreator/go-modular-auth). It enables authentication on internet-connected devices with limited user input capabilities (Smart TVs, CLI tools, media streamers, game consoles, IoT devices) through a secondary browser session.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Public API (`DeviceAuthorization`)](#public-api-deviceauthorization)
+- [Protocol Error Codes (RFC 8628 §3.5)](#protocol-error-codes-rfc-8628-35)
+- [Audit Events](#audit-events)
+- [Security Invariants](#security-invariants)
+- [License](#license)
 
 ---
 
@@ -78,7 +95,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
 	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 )
 
 func main() {
@@ -88,7 +105,7 @@ func main() {
 
 	// 2. Configure GoModularAuth with Device Authorization Plugin
 	a, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
+		Adapter: adaptermem.NewAdapter(),
 		Plugins: []auth.PluginModule{
 			deviceauth.New(
 				deviceauth.WithVerificationURI("https://auth.example.com/device"),

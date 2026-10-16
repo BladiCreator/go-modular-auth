@@ -1,6 +1,23 @@
-# gomodularauth-password-policy
+# GoModularAuth Password Policy Plugin (`gomodularauth-password-policy`)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/password-policy.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/password-policy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-password-policy` provides configurable password-strength, complexity, reuse prevention, and compromised-password detection through Core authentication hooks in [GoModularAuth](https://github.com/BladiCreator/go-modular-auth).
+
+---
+
+## Table of Contents
+
+- [1. Problem Solved](#1-problem-solved)
+- [2. Features](#2-features)
+- [3. Installation](#3-installation)
+- [4. Configuration & Registration](#4-configuration--registration)
+- [5. Primary API](#5-primary-api)
+- [6. Usage Examples](#6-usage-examples)
+- [7. Persistence & Schema](#7-persistence--schema)
+- [8. Audit Events](#8-audit-events)
+- [9. Security Model](#9-security-model)
 
 ---
 
@@ -141,22 +158,13 @@ if errors.Is(err, passwordpolicy.ErrPasswordInHistory) {
 
 ---
 
-## 7. Persistence & Store Contract
+## 7. Persistence & Schema
 
-Password history is maintained via `store.Store`:
+Password history records are persisted via GoModularAuth's unified schema engine (`schema.RegisterSchema`) using the global database adapter:
 
-```go
-type Store interface {
-    SaveHistory(ctx context.Context, entry *PasswordHistory) error
-    GetHistory(ctx context.Context, userID string, limit int) ([]*PasswordHistory, error)
-    PruneHistory(ctx context.Context, userID string, keepCount int) error
-    DeleteHistoryByUser(ctx context.Context, userID string) error
-}
-```
-
-Implementations:
-- `store/memory`: In-memory thread-safe implementation.
-- `migrations/001_create_password_policy_tables.sql`: PostgreSQL production migration.
+- Table: `password_histories` (accessed via `sdk.Model[PasswordHistory]`).
+- Indexes: `user_id` and `created_at` for rapid retrieval and pruning of previous password hashes.
+- Migrations: Located in `migrations/001_create_password_policy_tables.sql`.
 
 ---
 

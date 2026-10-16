@@ -1,9 +1,26 @@
-# GoModularAuth MultiSession Plugin
+# GoModularAuth Multi-Session Plugin (`gomodularauth-multisession`)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/BladiCreator/go-modular-auth/plugins/multisession.svg)](https://pkg.go.dev/github.com/BladiCreator/go-modular-auth/plugins/multisession)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `gomodularauth-multi-session` provides advanced management of multiple concurrent Core Sessions for GoModularAuth users while strictly preserving Core session semantics.
+
+---
+
+## Table of Contents
+
+- [Architecture & Design Principles](#architecture--design-principles)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Public API](#public-api)
+- [Device & Session Metadata](#device--session-metadata)
+- [Persistence & SQL Migrations](#persistence--sql-migrations)
+- [Cache Invalidation Strategy](#cache-invalidation-strategy)
+- [Observational Events](#observational-events)
+- [Security Model](#security-model)
+- [Testing](#testing)
+- [License](#license)
 
 ---
 
@@ -58,9 +75,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/BladiCreator/go-modular-auth/auth"
-	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapters/memory"
 	multisession "github.com/BladiCreator/go-modular-auth/plugins/multisession"
 	"github.com/BladiCreator/go-modular-auth/plugins/multisession/plugins"
 )
@@ -70,8 +86,8 @@ func main() {
 
 	// 1. Initialize GoModularAuth with MultiSession plugin
 	app, err := auth.New(auth.Config{
-		Adapter: adaptermem.New(),
-		Cache: memcache.New(),
+		Adapter: adaptermem.NewAdapter(),
+		Cache:   adaptermem.NewCache(),
 		Plugins: []auth.PluginModule{
 			multisession.New(
 				multisession.WithMaxConcurrentSessions(5, multisession.OverflowRevokeOldest),
@@ -133,9 +149,6 @@ mod := multisession.New(
 
     // Or reject new session creation when limit is reached:
     // multisession.WithMaxConcurrentSessions(3, multisession.OverflowReject),
-
-    // Custom metadata persistence store (defaults to thread-safe in-memory store)
-    multisession.WithMetadataStore(customStore),
 
     // Metadata cache TTL (default: 10 minutes)
     multisession.WithMetadataCacheTTL(15 * time.Minute),
