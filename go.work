@@ -1,0 +1,16 @@
+go 1.27.1
+
+use (
+	.
+	./adapters/grpc
+	./adapters/http
+	./adapters/memory
+	./adapters/mysql
+	./adapters/postgres
+	./adapters/redis
+	./adapters/smtp
+	./adapters/sqlite
+	./adapters/surrealdb
+	./adapters/valkey
+	./plugins/passkeys
+)
