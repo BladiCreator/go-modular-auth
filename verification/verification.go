@@ -17,13 +17,13 @@ const (
 
 // Token is a single-use verification token. Only TokenHash is persisted.
 type Token struct {
-	ID        string
-	Purpose   Purpose
-	Subject   string
-	TokenHash string
-	ExpiresAt time.Time
-	UsedAt    *time.Time
-	CreatedAt time.Time
+	ID        string     `json:"id"`
+	Purpose   Purpose    `json:"purpose"`
+	Subject   string     `json:"subject"`
+	TokenHash string     `json:"token_hash"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // Used reports whether the token has already been consumed.

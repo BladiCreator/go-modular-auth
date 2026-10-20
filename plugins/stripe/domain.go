@@ -32,32 +32,32 @@ const (
 
 // Customer models a synchronized Stripe customer mapped to a user or organization.
 type Customer struct {
-	ID               string                 `json:"id"`
-	ReferenceID      string                 `json:"reference_id"`
-	ReferenceType    ReferenceType          `json:"reference_type"`
-	StripeCustomerID string                 `json:"stripe_customer_id"`
-	Email            string                 `json:"email"`
-	Metadata         map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt        time.Time              `json:"created_at"`
-	UpdatedAt        time.Time              `json:"updated_at"`
+	ID               string         `json:"id"`
+	ReferenceID      string         `json:"reference_id"`
+	ReferenceType    ReferenceType  `json:"reference_type"`
+	StripeCustomerID string         `json:"stripe_customer_id"`
+	Email            string         `json:"email"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 }
 
 // Subscription models a synchronized Stripe subscription.
 type Subscription struct {
-	ID                   string                 `json:"id"`
-	CustomerID           string                 `json:"customer_id"`
-	ReferenceID          string                 `json:"reference_id"`
-	ReferenceType        ReferenceType          `json:"reference_type"`
-	StripeSubscriptionID string                 `json:"stripe_subscription_id"`
-	StripePriceID        string                 `json:"stripe_price_id"`
-	Status               SubscriptionStatus     `json:"status"`
-	Seats                int64                  `json:"seats,omitempty"`
-	CancelAtPeriodEnd    bool                   `json:"cancel_at_period_end"`
-	CurrentPeriodStart   time.Time              `json:"current_period_start"`
-	CurrentPeriodEnd     time.Time              `json:"current_period_end"`
-	Metadata             map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt            time.Time              `json:"created_at"`
-	UpdatedAt            time.Time              `json:"updated_at"`
+	ID                   string             `json:"id"`
+	CustomerID           string             `json:"customer_id"`
+	ReferenceID          string             `json:"reference_id"`
+	ReferenceType        ReferenceType      `json:"reference_type"`
+	StripeSubscriptionID string             `json:"stripe_subscription_id"`
+	StripePriceID        string             `json:"stripe_price_id"`
+	Status               SubscriptionStatus `json:"status"`
+	Seats                int64              `json:"seats,omitempty"`
+	CancelAtPeriodEnd    bool               `json:"cancel_at_period_end"`
+	CurrentPeriodStart   time.Time          `json:"current_period_start"`
+	CurrentPeriodEnd     time.Time          `json:"current_period_end"`
+	Metadata             map[string]any     `json:"metadata,omitempty"`
+	CreatedAt            time.Time          `json:"created_at"`
+	UpdatedAt            time.Time          `json:"updated_at"`
 }
 
 // Active reports whether the subscription grants current access.
@@ -67,13 +67,13 @@ func (s *Subscription) Active() bool {
 
 // CreateCheckoutInput contains parameters for creating a Stripe Checkout Session.
 type CreateCheckoutInput struct {
-	Target     TargetReference        `json:"target"`
-	PriceID    string                 `json:"price_id"`
-	SuccessURL string                 `json:"success_url"`
-	CancelURL  string                 `json:"cancel_url"`
-	Mode       string                 `json:"mode,omitempty"` // "subscription" or "payment"
-	Seats      int64                  `json:"seats,omitempty"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	Target     TargetReference `json:"target"`
+	PriceID    string          `json:"price_id"`
+	SuccessURL string          `json:"success_url"`
+	CancelURL  string          `json:"cancel_url"`
+	Mode       string          `json:"mode,omitempty"` // "subscription" or "payment"
+	Seats      int64           `json:"seats,omitempty"`
+	Metadata   map[string]any  `json:"metadata,omitempty"`
 }
 
 // CheckoutSession represents the created Stripe Checkout Session result.
@@ -89,8 +89,8 @@ type BillingPortalSession struct {
 
 // WebhookEvent represents a processed webhook event.
 type WebhookEvent struct {
-	ID        string                 `json:"id"`
-	Type      string                 `json:"type"`
-	Data      map[string]interface{} `json:"data"`
-	HandledAt time.Time              `json:"handled_at"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Data      map[string]any `json:"data"`
+	HandledAt time.Time      `json:"handled_at"`
 }

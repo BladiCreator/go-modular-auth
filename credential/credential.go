@@ -16,14 +16,14 @@ const TypePassword Type = "password"
 // Secret never holds plaintext secrets: for passwords it stores the encoded
 // hash produced by password.Hasher; plugins must apply equivalent care.
 type Credential struct {
-	ID        string
-	UserID    string
-	AccountID string
-	Type      Type
-	Secret    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	RevokedAt *time.Time
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	AccountID string     `json:"account_id"`
+	Type      Type       `json:"type"`
+	Secret    string     `json:"secret"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 }
 
 // Active reports whether the credential has not been revoked.

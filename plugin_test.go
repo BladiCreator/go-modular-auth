@@ -45,7 +45,8 @@ func (g greeter) Greet(ctx context.Context, userID string) (string, error) {
 }
 
 func TestTypedPluginAccess(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+	ctx := t.Context()
 	var order []string
 	a, err := auth.New(auth.Config{
 		Adapter: adaptermem.New(),
@@ -79,6 +80,7 @@ func TestTypedPluginAccess(t *testing.T) {
 }
 
 func TestPluginDependencyValidation(t *testing.T) {
+	t.Parallel()
 	var order []string
 	_, err := auth.New(auth.Config{
 		Adapter: adaptermem.New(),
@@ -106,5 +108,63 @@ func TestPluginDependencyValidation(t *testing.T) {
 	})
 	if !errors.Is(err, plugin.ErrDuplicate) {
 		t.Fatalf("duplicate module must be rejected, got %v", err)
+	}
+}
+
+type lifecycleMockModule struct {
+	id     string
+	deps   []string
+	events *[]string
+}
+
+func (m lifecycleMockModule) ID() string             { return m.id }
+func (m lifecycleMockModule) Dependencies() []string { return m.deps }
+func (m lifecycleMockModule) Init(h *auth.Host) error {
+	*m.events = append(*m.events, "init:"+m.id)
+	return nil
+}
+func (m lifecycleMockModule) Start(ctx context.Context) error {
+	*m.events = append(*m.events, "start:"+m.id)
+	return nil
+}
+func (m lifecycleMockModule) Stop(ctx context.Context) error {
+	*m.events = append(*m.events, "stop:"+m.id)
+	return nil
+}
+
+func TestAuth_GracefulShutdown(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	var events []string
+
+	m1 := lifecycleMockModule{id: "mod1", events: &events}
+	m2 := lifecycleMockModule{id: "mod2", deps: []string{"mod1"}, events: &events}
+
+	a, err := auth.New(auth.Config{
+		Adapter: adaptermem.New(),
+		Hasher:  fastHasher,
+		Plugins: []auth.PluginModule{m2, m1},
+	})
+	if err != nil {
+		t.Fatalf("auth.New failed: %v", err)
+	}
+
+	if len(events) < 2 || events[0] != "init:mod1" || events[1] != "init:mod2" {
+		t.Fatalf("unexpected init order: %v", events)
+	}
+
+	if err := a.Close(ctx); err != nil {
+		t.Fatalf("a.Close failed: %v", err)
+	}
+
+	if len(events) != 4 || events[2] != "stop:mod2" || events[3] != "stop:mod1" {
+		t.Fatalf("unexpected stop order (expected mod2 then mod1): %v", events)
+	}
+
+	if err := a.Close(ctx); err != nil {
+		t.Fatalf("second a.Close failed: %v", err)
+	}
+	if len(events) != 4 {
+		t.Fatalf("expected no additional stop events on second Close, got: %v", events)
 	}
 }

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"slices"
 	"time"
@@ -24,6 +25,20 @@ type PluginModule interface {
 	ID() string
 	Init(host *Host) error
 }
+
+// Lifecycle is optionally implemented by plugin modules or services that manage
+// background tasks, workers, or buffers requiring graceful startup or shutdown.
+type Lifecycle interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+type closerLifecycle struct {
+	closer io.Closer
+}
+
+func (c *closerLifecycle) Start(context.Context) error { return nil }
+func (c *closerLifecycle) Stop(context.Context) error  { return c.closer.Close() }
 
 // SchemaProvider is optionally implemented by PluginModule instances that contribute
 // to the persistent database schema (registering new models or extending existing models).
@@ -75,10 +90,20 @@ func (h *Host) Logger() *slog.Logger { return h.a.logger.With("plugin", h.module
 // Now returns the current time according to the configured clock.
 func (h *Host) Now() time.Time { return h.a.Now() }
 
+// RegisterLifecycle registers a Lifecycle callback for graceful shutdown.
+func (h *Host) RegisterLifecycle(l Lifecycle) {
+	h.a.registerLifecycle(l)
+}
+
 // Provide registers impl as the capability T exposed by the module. T is
 // usually an interface exported by the plugin; applications retrieve it with
 // auth.Get[T](a).
 func Provide[T any](h *Host, impl T) error {
+	if l, ok := any(impl).(Lifecycle); ok {
+		h.a.registerLifecycle(l)
+	} else if c, ok := any(impl).(io.Closer); ok {
+		h.a.registerLifecycle(&closerLifecycle{closer: c})
+	}
 	return plugin.Provide(h.a.registry, h.module, impl)
 }
 
@@ -120,6 +145,11 @@ func (a *Auth) initPlugins(modules []PluginModule) error {
 		return err
 	}
 	for _, m := range order {
+		if l, ok := m.(Lifecycle); ok {
+			a.registerLifecycle(l)
+		} else if c, ok := m.(io.Closer); ok {
+			a.registerLifecycle(&closerLifecycle{closer: c})
+		}
 		if err := m.Init(&Host{a: a, module: m.ID()}); err != nil {
 			return fmt.Errorf("auth: init plugin %q: %w", m.ID(), err)
 		}

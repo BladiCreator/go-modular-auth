@@ -170,7 +170,7 @@ func (s *service) HandleWebhook(ctx context.Context, payload []byte, signature s
 		}
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, ErrInvalidPayload
 	}

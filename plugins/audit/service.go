@@ -25,7 +25,10 @@ type service struct {
 	stopCh   chan struct{}
 }
 
-var _ Audit = (*service)(nil)
+var (
+	_ Audit          = (*service)(nil)
+	_ auth.Lifecycle = (*service)(nil)
+)
 
 func newService(ctx *sdk.Context, cfg Config) *service {
 	var logger *slog.Logger
@@ -431,6 +434,16 @@ func (s *service) workerLoop() {
 			}
 		}
 	}
+}
+
+// Start implements auth.Lifecycle.
+func (s *service) Start(ctx context.Context) error {
+	return nil
+}
+
+// Stop implements auth.Lifecycle by gracefully flushing workers.
+func (s *service) Stop(ctx context.Context) error {
+	return s.Close()
 }
 
 // Close gracefully flushes pending asynchronous records and waits for workers.

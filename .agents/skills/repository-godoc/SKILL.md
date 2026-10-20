@@ -5,26 +5,29 @@ description: >-
   Usar al crear nuevos plugins, refactorizar repositorios existentes o agregar comentarios GoDoc a interfaces y métodos Repository.
 ---
 
-# Estándar de Documentación GoDoc para Repositorios (`repository.go`)
+# Estándar de Documentación GoDoc para Persistencia y Repositorios
 
-En `go-modular-auth`, cada plugin define un contrato de persistencia desacoplado mediante una interfaz `Repository` en `plugins/<nombre_plugin>/repository.go`.
+En `go-modular-auth`, la persistencia se gestiona en dos niveles arquitectónicos desacoplados:
+1. **Contratos Core (`store.Store`)**: Persistencia de identidades principales (`Users`, `Accounts`, `Credentials`, `Sessions`, `Tokens`).
+2. **Modelos Esquematizados de Plugins (`plugin-sdk.Model[T]`)**: Los plugins declaran modelos (`schema.Model`) y operan sobre el adaptador genérico mediante `*sdk.Repository[T]`.
 
-Para mantener una documentación clara, profesional y consistente para los desarrolladores que implementan adaptadores (GORM, PostgreSQL, MySQL, Redis, MongoDB), **todos los archivos `repository.go` deben cumplir estrictamente con el siguiente estándar de GoDoc**.
-
----
-
-## 1. Estructura General del Archivo `repository.go`
-
-Un archivo `repository.go` estándar se compone de las siguientes secciones documentadas:
-
-1. **Constantes / Errores Sentinela (`var (...)`)**
-2. **Interfaz `Repository` (Cabecera + Ejemplo GORM + Recomendación de Caché opcional para alta frecuencia)**
-3. **Métodos de la Interfaz `Repository` (Documentación Estructurada en 5+ Secciones)**
-4. **Implementación In-Memory (`MemoryRepository` y sus Métodos)**
+Cuando se definen interfaces de repositorio específicas, contratos de persistencia de plugins o adaptadores de base de datos personalizados (GORM, PostgreSQL, MySQL, Redis, MongoDB, SurrealDB), **todos los contratos de persistencia deben cumplir estrictamente con el siguiente estándar de GoDoc**.
 
 ---
 
-## 2. Documentación de Cabecera de la Interfaz `Repository`
+## 1. Estructura General del Contrato de Persistencia
+
+Un contrato de persistencia estándar se compone de las siguientes secciones documentadas:
+
+1. **Constantes / Errores Sentinela (`var (...)`)** con comentarios individuales.
+2. **Interfaz de Persistencia / Repositorio (Cabecera + Ejemplo GORM / SQL + Recomendación de Caché opcional)**
+3. **Métodos de la Interfaz (Documentación Estructurada en 5+ Secciones: Function, Storage, Arguments, Returns, Example SQL)**
+4. **Implementación In-Memory y sus Métodos Documentados**
+
+---
+
+## 2. Documentación de Cabecera de la Interfaz
+
 
 La cabecera del tipo `type Repository interface` debe explicar qué entidad persiste la interfaz y proveer ejemplos ejecutables. Para consultas de **alta frecuencia** (ej: validación de tokens Bearer, sesiones, JWKS), debe incluir la recomendación de estrategia **Cache-Aside (Redis)**.
 

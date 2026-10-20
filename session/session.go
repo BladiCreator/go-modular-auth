@@ -7,14 +7,14 @@ import "time"
 // Session is a server-side session. The plaintext token is only returned to
 // the client once, at creation; the store keeps TokenHash exclusively.
 type Session struct {
-	ID        string
-	UserID    string
-	TokenHash string
-	IPAddress string
-	UserAgent string
-	ExpiresAt time.Time
-	RevokedAt *time.Time
-	CreatedAt time.Time
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	TokenHash string     `json:"token_hash"`
+	IPAddress string     `json:"ip_address"`
+	UserAgent string     `json:"user_agent"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // Expired reports whether the session is expired at the given instant.

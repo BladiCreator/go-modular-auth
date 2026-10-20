@@ -10,7 +10,12 @@ import (
 	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 	"github.com/BladiCreator/go-modular-auth/plugins/audit/plugins"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func setupTestAuth(t *testing.T, opts ...audit.Option) (*auth.Auth, plugins.Audit) {
 	t.Helper()
@@ -27,6 +32,10 @@ func setupTestAuth(t *testing.T, opts ...audit.Option) (*auth.Auth, plugins.Audi
 	if err != nil {
 		t.Fatalf("auth.New failed: %v", err)
 	}
+
+	t.Cleanup(func() {
+		_ = a.Close(context.Background())
+	})
 
 	audCap, err := auth.Get[plugins.Audit](a)
 	if err != nil {
@@ -201,3 +210,37 @@ func TestAudit_AsyncBufferProcessing(t *testing.T) {
 		t.Fatalf("expected 15 records in async store, got %d", res.Total)
 	}
 }
+
+func TestAudit_GracefulShutdownThroughAuth(t *testing.T) {
+	ctx := context.Background()
+	a, audCap := setupTestAuth(t,
+		audit.WithAsync(2, 50, 5, 10*time.Second), // 10s ticker: flush won't happen from ticker
+	)
+
+	for i := 0; i < 10; i++ {
+		err := audCap.Record(ctx, &audit.AuditRecord{
+			Event:        "shutdown.test",
+			ActorSubject: "user_test",
+			Outcome:      audit.OutcomeSuccess,
+		})
+		if err != nil {
+			t.Fatalf("Record failed: %v", err)
+		}
+	}
+
+	// Calling a.Close(ctx) must gracefully flush all pending records immediately!
+	if err := a.Close(ctx); err != nil {
+		t.Fatalf("a.Close failed: %v", err)
+	}
+
+	res, err := audCap.Query(ctx, audit.ListFilter{
+		Event: "shutdown.test",
+	})
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if res.Total != 10 {
+		t.Fatalf("expected 10 records after graceful shutdown flush, got %d", res.Total)
+	}
+}
+

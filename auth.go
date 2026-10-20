@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"reflect"
 	"sync"
 	"time"
 
@@ -43,6 +44,8 @@ type Auth struct {
 	registry     *plugin.Registry
 	logger       *slog.Logger
 	dummyHash    func() string
+	lifecycles   []Lifecycle
+	closeOnce    sync.Once
 }
 
 // New builds an Auth instance and initializes its plugin modules.
@@ -134,4 +137,47 @@ func (a *Auth) PurgeExpired(ctx context.Context) (sessions, tokens int, err erro
 
 func (a *Auth) publish(ctx context.Context, name EventName, subject string, payload any) {
 	a.events.Publish(ctx, Event{Name: name, Time: a.Now(), Subject: subject, Payload: payload})
+}
+
+func (a *Auth) registerLifecycle(l Lifecycle) {
+	if l == nil {
+		return
+	}
+	for _, existing := range a.lifecycles {
+		if isSameLifecycle(existing, l) {
+			return
+		}
+	}
+	a.lifecycles = append(a.lifecycles, l)
+}
+
+func isSameLifecycle(a, b Lifecycle) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	va := reflect.ValueOf(a)
+	vb := reflect.ValueOf(b)
+	if va.Kind() == reflect.Pointer && vb.Kind() == reflect.Pointer {
+		return va.Pointer() == vb.Pointer()
+	}
+	ta := reflect.TypeOf(a)
+	tb := reflect.TypeOf(b)
+	if ta == tb && ta.Comparable() {
+		return a == b
+	}
+	return false
+}
+
+// Close gracefully stops the authentication engine and all registered plugin lifecycles.
+// Modules are stopped in reverse registration order (LIFO).
+func (a *Auth) Close(ctx context.Context) error {
+	var errs error
+	a.closeOnce.Do(func() {
+		for i := len(a.lifecycles) - 1; i >= 0; i-- {
+			if err := a.lifecycles[i].Stop(ctx); err != nil {
+				errs = errors.Join(errs, err)
+			}
+		}
+	})
+	return errs
 }

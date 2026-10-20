@@ -12,10 +12,10 @@ const ProviderPassword = "password"
 // ProviderID is the identifier of the user inside the provider. For the
 // password provider the core uses the user's ID.
 type Account struct {
-	ID         string
-	UserID     string
-	Provider   string
-	ProviderID string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID         string    `json:"id"`
+	UserID     string    `json:"user_id"`
+	Provider   string    `json:"provider"`
+	ProviderID string    `json:"provider_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
