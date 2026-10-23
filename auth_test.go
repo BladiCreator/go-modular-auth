@@ -11,6 +11,7 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	sqladapter "github.com/BladiCreator/go-modular-auth/adapter/sql"
 	"github.com/BladiCreator/go-modular-auth/cache"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
@@ -523,3 +524,52 @@ func TestAdapterDrivenAuthAndSchemaProvider(t *testing.T) {
 	}
 }
 
+func TestAuth_SchemaAndExportSchema(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Memory adapter does NOT support schema export
+	engineMem, err := auth.New(auth.Config{
+		Adapter: adaptermem.New(),
+		Hasher:  fastHasher,
+	})
+	if err != nil {
+		t.Fatalf("auth.New with memory adapter failed: %v", err)
+	}
+
+	if s := engineMem.Schema(); s == nil {
+		t.Fatal("expected non-nil compiled schema from engine.Schema()")
+	} else if _, ok := s.GetModel("users"); !ok {
+		t.Fatal("expected users model in compiled schema")
+	}
+
+	_, err = engineMem.ExportSchema(ctx)
+	if !errors.Is(err, auth.ErrSchemaExportUnsupported) {
+		t.Fatalf("expected ErrSchemaExportUnsupported, got: %v", err)
+	}
+
+	// 2. SQL adapter DOES support schema export
+	sqlAdapter := sqladapter.New(nil, sqladapter.Postgres)
+	engineSQL, err := auth.New(auth.Config{
+		Adapter: sqlAdapter,
+		Hasher:  fastHasher,
+	})
+	if err != nil {
+		t.Fatalf("auth.New with sql adapter failed: %v", err)
+	}
+
+	stmts, err := engineSQL.ExportSchema(ctx)
+	if err != nil {
+		t.Fatalf("ExportSchema failed: %v", err)
+	}
+	if len(stmts) == 0 {
+		t.Fatal("expected non-empty DDL statements from ExportSchema")
+	}
+
+	joined := strings.Join(stmts, "\n")
+	if !strings.Contains(joined, `CREATE TABLE IF NOT EXISTS "users"`) {
+		t.Errorf("missing users table DDL in:\n%s", joined)
+	}
+	if !strings.Contains(joined, `CREATE TABLE IF NOT EXISTS "sessions"`) {
+		t.Errorf("missing sessions table DDL in:\n%s", joined)
+	}
+}

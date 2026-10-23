@@ -15,6 +15,7 @@ import (
 
 func TestInterfaceCompliance(t *testing.T) {
 	var _ adapter.Adapter = (*surrealdb.Adapter)(nil)
+	var _ adapter.SchemaExporter = (*surrealdb.Adapter)(nil)
 }
 
 func TestAdapterInstantiation(t *testing.T) {
@@ -149,5 +150,70 @@ func TestModelDDLGeneration(t *testing.T) {
 	err := ad.Migrate(context.Background())
 	if err == nil {
 		t.Fatal("expected error attempting to execute DDL with nil DB")
+	}
+}
+
+func TestExportSchema(t *testing.T) {
+	ad := surrealdb.New(nil)
+	ctx := context.Background()
+
+	// 1. Should fail when no schema registered
+	if _, err := ad.ExportSchema(ctx); err == nil {
+		t.Fatal("expected error when exporting schema without registration")
+	}
+
+	// 2. Register valid schema with multiple models and fields
+	s := schema.New()
+	mUsers := schema.NewModel("users", "users", "id")
+	_ = mUsers.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = mUsers.AddField(schema.Field{Name: "email", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mUsers.AddField(schema.Field{Name: "name", Type: schema.TypeString})
+	_ = s.AddModel(mUsers)
+
+	mSessions := schema.NewModel("sessions", "sessions", "id")
+	_ = mSessions.AddField(schema.Field{Name: "id", Type: schema.TypeString, Required: true})
+	_ = mSessions.AddField(schema.Field{Name: "token", Type: schema.TypeString, Required: true, Unique: true})
+	_ = mSessions.AddField(schema.Field{Name: "user_id", Type: schema.TypeString, Required: true})
+	_ = s.AddModel(mSessions)
+
+	if err := ad.RegisterSchema(ctx, s); err != nil {
+		t.Fatalf("RegisterSchema failed: %v", err)
+	}
+
+	stmts1, err := ad.ExportSchema(ctx)
+	if err != nil {
+		t.Fatalf("ExportSchema failed: %v", err)
+	}
+	if len(stmts1) == 0 {
+		t.Fatal("expected non-empty DDL statements")
+	}
+
+	// 3. Verify deterministic output (repeated calls yield identical ordering)
+	stmts2, err := ad.ExportSchema(ctx)
+	if err != nil {
+		t.Fatalf("second ExportSchema failed: %v", err)
+	}
+	if len(stmts1) != len(stmts2) {
+		t.Fatalf("expected identical length: %d vs %d", len(stmts1), len(stmts2))
+	}
+	for i := range stmts1 {
+		if stmts1[i] != stmts2[i] {
+			t.Fatalf("non-deterministic output at statement %d: %q vs %q", i, stmts1[i], stmts2[i])
+		}
+	}
+
+	// Check that specific expected DDL statements are present
+	joined := strings.Join(stmts1, "\n")
+	expectedSubstrings := []string{
+		"DEFINE TABLE IF NOT EXISTS users SCHEMALESS;",
+		"DEFINE FIELD IF NOT EXISTS `email` ON TABLE users TYPE string;",
+		"DEFINE INDEX IF NOT EXISTS idx_users_email_unique ON TABLE users FIELDS `email` UNIQUE;",
+		"DEFINE TABLE IF NOT EXISTS sessions SCHEMALESS;",
+		"DEFINE FIELD IF NOT EXISTS `token` ON TABLE sessions TYPE string;",
+	}
+	for _, expected := range expectedSubstrings {
+		if !strings.Contains(joined, expected) {
+			t.Errorf("missing expected DDL substring %q in:\n%s", expected, joined)
+		}
 	}
 }

@@ -3,6 +3,7 @@ package surrealdb
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/BladiCreator/go-modular-auth/schema"
@@ -23,22 +24,41 @@ func (a *Adapter) RegisterSchema(ctx context.Context, s *schema.Schema) error {
 	return nil
 }
 
-// Migrate applies SurrealQL DDL definitions for tables, fields, and indexes based on the registered schema.
-func (a *Adapter) Migrate(ctx context.Context) error {
+// ExportSchema returns all SurrealQL DDL statements (DEFINE TABLE, DEFINE FIELD, DEFINE INDEX)
+// for the registered schema, sorted deterministically.
+func (a *Adapter) ExportSchema(ctx context.Context) ([]string, error) {
 	a.mu.RLock()
 	s := a.schema
 	a.mu.RUnlock()
 
 	if s == nil {
-		return fmt.Errorf("surrealdb: cannot migrate without a registered schema")
+		return nil, fmt.Errorf("surrealdb: cannot export schema: no schema registered")
 	}
 
-	for _, m := range s.Models() {
-		ddls := a.buildModelDDL(m)
-		for _, stmt := range ddls {
-			if _, err := query[any](ctx, a, stmt, nil); err != nil {
-				return fmt.Errorf("surrealdb: migration failed on statement %q: %w", stmt, a.mapError(err))
-			}
+	models := s.Models()
+	names := make([]string, 0, len(models))
+	for name := range models {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var stmts []string
+	for _, name := range names {
+		stmts = append(stmts, a.buildModelDDL(models[name])...)
+	}
+	return stmts, nil
+}
+
+// Migrate applies SurrealQL DDL definitions for tables, fields, and indexes based on the registered schema.
+func (a *Adapter) Migrate(ctx context.Context) error {
+	stmts, err := a.ExportSchema(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, stmt := range stmts {
+		if _, err := query[any](ctx, a, stmt, nil); err != nil {
+			return fmt.Errorf("surrealdb: migration failed on statement %q: %w", stmt, a.mapError(err))
 		}
 	}
 
@@ -55,7 +75,14 @@ func (a *Adapter) buildModelDDL(m *schema.Model) []string {
 	// Define table as SCHEMALESS to support dynamic plugin extension fields while enforcing declared indexes
 	stmts = append(stmts, fmt.Sprintf("DEFINE TABLE IF NOT EXISTS %s SCHEMALESS;", table))
 
-	for _, f := range m.Fields {
+	fieldNames := make([]string, 0, len(m.Fields))
+	for fName := range m.Fields {
+		fieldNames = append(fieldNames, fName)
+	}
+	sort.Strings(fieldNames)
+
+	for _, fName := range fieldNames {
+		f := m.Fields[fName]
 		dbName := f.EffectiveDBName()
 		if dbName == "id" {
 			continue
@@ -77,7 +104,13 @@ func (a *Adapter) buildModelDDL(m *schema.Model) []string {
 		}
 	}
 
-	for _, idx := range m.Indexes {
+	indexes := make([]schema.Index, len(m.Indexes))
+	copy(indexes, m.Indexes)
+	sort.Slice(indexes, func(i, j int) bool {
+		return indexes[i].Name < indexes[j].Name
+	})
+
+	for _, idx := range indexes {
 		fields := make([]string, len(idx.Fields))
 		for i, fieldName := range idx.Fields {
 			col := fieldName

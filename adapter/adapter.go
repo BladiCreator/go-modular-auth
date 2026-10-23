@@ -131,3 +131,10 @@ type Adapter interface {
 	// Nested transactions join the parent transaction.
 	Transaction(ctx context.Context, fn func(ctx context.Context, tx Adapter) error) error
 }
+
+// SchemaExporter is an optional capability interface implemented by storage adapters
+// that can export their compiled schema definitions as executable DDL statements (e.g. SQL, SurrealQL).
+type SchemaExporter interface {
+	// ExportSchema returns the raw DDL statements required to provision the registered schema.
+	ExportSchema(ctx context.Context) ([]string, error)
+}

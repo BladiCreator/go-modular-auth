@@ -6,11 +6,11 @@ package surrealdb
 
 import (
 	"context"
-	"time"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	"github.com/BladiCreator/go-modular-auth/schema"
@@ -27,6 +27,7 @@ type Adapter struct {
 }
 
 var _ adapter.Adapter = (*Adapter)(nil)
+var _ adapter.SchemaExporter = (*Adapter)(nil)
 
 // New creates a SurrealDB adapter wrapping an established *surreal.DB client.
 func New(db *surreal.DB) *Adapter {

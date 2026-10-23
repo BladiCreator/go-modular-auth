@@ -17,6 +17,7 @@ type Adapter struct {
 }
 
 var _ adapter.Adapter = (*Adapter)(nil)
+var _ adapter.SchemaExporter = (*Adapter)(nil)
 
 // New creates a MySQL storage adapter satisfying adapter.Adapter.
 func New(db *sql.DB) *Adapter {

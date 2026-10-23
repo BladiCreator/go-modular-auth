@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ type BaseAdapter struct {
 }
 
 var _ adapter.Adapter = (*BaseAdapter)(nil)
+var _ adapter.SchemaExporter = (*BaseAdapter)(nil)
 
 // New creates a new BaseAdapter configured with the provided sql.DB and Dialect.
 func New(db *sql.DB, d Dialect) *BaseAdapter {
@@ -57,29 +59,54 @@ func (a *BaseAdapter) RegisterSchema(ctx context.Context, s *schema.Schema) erro
 	return nil
 }
 
-// Migrate applies DDL to create missing tables, columns and indexes based on the compiled schema.
-func (a *BaseAdapter) Migrate(ctx context.Context) error {
+// ExportSchema returns the raw DDL statements for creating all tables and indexes.
+func (a *BaseAdapter) ExportSchema(ctx context.Context) ([]string, error) {
 	a.mu.RLock()
 	s := a.schema
 	a.mu.RUnlock()
 
 	if s == nil {
-		return fmt.Errorf("cannot migrate: no schema registered")
+		return nil, fmt.Errorf("sqladapter: cannot export schema: no schema registered")
 	}
 
-	for _, m := range s.Models() {
-		ddl := a.buildCreateTableDDL(m)
-		if _, err := a.executor(ctx).ExecContext(ctx, ddl); err != nil {
-			return fmt.Errorf("migration failed for table %s: %w", m.TableName, err)
-		}
+	models := s.Models()
+	names := make([]string, 0, len(models))
+	for name := range models {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 
-		for _, idx := range m.Indexes {
+	var stmts []string
+	for _, name := range names {
+		m := models[name]
+		stmts = append(stmts, a.buildCreateTableDDL(m))
+
+		indexes := make([]schema.Index, len(m.Indexes))
+		copy(indexes, m.Indexes)
+		sort.Slice(indexes, func(i, j int) bool {
+			return indexes[i].Name < indexes[j].Name
+		})
+
+		for _, idx := range indexes {
 			idxDDL := a.buildCreateIndexDDL(m.TableName, idx)
 			if idxDDL != "" {
-				if _, err := a.executor(ctx).ExecContext(ctx, idxDDL); err != nil {
-					return fmt.Errorf("migration index %s failed: %w", idx.Name, err)
-				}
+				stmts = append(stmts, idxDDL)
 			}
+		}
+	}
+	return stmts, nil
+}
+
+// Migrate applies DDL to create missing tables, columns and indexes based on the compiled schema.
+func (a *BaseAdapter) Migrate(ctx context.Context) error {
+	stmts, err := a.ExportSchema(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot migrate: %w", err)
+	}
+
+	for _, stmt := range stmts {
+		if _, err := a.executor(ctx).ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("migration failed for statement %q: %w", stmt, err)
 		}
 	}
 	return nil
@@ -402,8 +429,24 @@ func (a *BaseAdapter) buildCondition(m *schema.Model, cond adapter.Condition, st
 }
 
 func (a *BaseAdapter) buildCreateTableDDL(m *schema.Model) string {
-	cols := make([]string, 0, len(m.Fields))
-	for _, f := range m.Fields {
+	fieldNames := make([]string, 0, len(m.Fields))
+	for fName := range m.Fields {
+		if fName != m.PrimaryKey {
+			fieldNames = append(fieldNames, fName)
+		}
+	}
+	sort.Strings(fieldNames)
+
+	orderedFields := make([]schema.Field, 0, len(m.Fields))
+	if pk, ok := m.Fields[m.PrimaryKey]; ok {
+		orderedFields = append(orderedFields, pk)
+	}
+	for _, fName := range fieldNames {
+		orderedFields = append(orderedFields, m.Fields[fName])
+	}
+
+	cols := make([]string, 0, len(orderedFields))
+	for _, f := range orderedFields {
 		sqlType := a.dialect.DataType(f.Type)
 		colDef := fmt.Sprintf("%s %s", a.dialect.Quote(f.EffectiveDBName()), sqlType)
 		if f.Name == m.PrimaryKey {
