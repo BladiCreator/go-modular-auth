@@ -3,8 +3,8 @@ package oauth
 import (
 	"context"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 	"github.com/BladiCreator/go-modular-auth/account"
+	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
 )
 
 // OAuth is the strongly typed capability provided by the OAuth plugin.

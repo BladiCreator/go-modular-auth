@@ -7,10 +7,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
-	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
+	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
 )
 
 func setupTestAuth(t *testing.T) (*auth.Auth, plugins.DeviceAuthorization, *adaptermem.Adapter) {

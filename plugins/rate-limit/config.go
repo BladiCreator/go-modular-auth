@@ -22,66 +22,66 @@ func defaultConfig() Config {
 
 	// Standard out-of-the-box production defaults
 	cfg.registerDefault(Policy{
-		Action:     ActionSignIn,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      5,
-		Window:     1 * time.Minute,
-		KeyType:    KeyTypeComposite,
-		FailMode:   FailOpen,
+		Action:    ActionSignIn,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     5,
+		Window:    1 * time.Minute,
+		KeyType:   KeyTypeComposite,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionSignUp,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      5,
-		Window:     10 * time.Minute,
-		KeyType:    KeyTypeIP,
-		FailMode:   FailOpen,
+		Action:    ActionSignUp,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     5,
+		Window:    10 * time.Minute,
+		KeyType:   KeyTypeIP,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionPasswordReset,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      3,
-		Window:     15 * time.Minute,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionPasswordReset,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     3,
+		Window:    15 * time.Minute,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionEmailOTP,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      3,
-		Window:     5 * time.Minute,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionEmailOTP,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     3,
+		Window:    5 * time.Minute,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionMagicLink,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      3,
-		Window:     15 * time.Minute,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionMagicLink,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     3,
+		Window:    15 * time.Minute,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionPhoneOTP,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      3,
-		Window:     5 * time.Minute,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionPhoneOTP,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     3,
+		Window:    5 * time.Minute,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionAccountRecovery,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      2,
-		Window:     1 * time.Hour,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionAccountRecovery,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     2,
+		Window:    1 * time.Hour,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	cfg.registerDefault(Policy{
@@ -94,12 +94,12 @@ func defaultConfig() Config {
 	})
 
 	cfg.registerDefault(Policy{
-		Action:     ActionAdmin,
-		Algorithm:  AlgorithmSlidingWindow,
-		Limit:      30,
-		Window:     1 * time.Minute,
-		KeyType:    KeyTypeIdentity,
-		FailMode:   FailOpen,
+		Action:    ActionAdmin,
+		Algorithm: AlgorithmSlidingWindow,
+		Limit:     30,
+		Window:    1 * time.Minute,
+		KeyType:   KeyTypeIdentity,
+		FailMode:  FailOpen,
 	})
 
 	return cfg

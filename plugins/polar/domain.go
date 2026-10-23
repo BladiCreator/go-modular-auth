@@ -23,23 +23,23 @@ type TargetReference struct {
 type SubscriptionStatus string
 
 const (
-	StatusActive    SubscriptionStatus = "active"
-	StatusCanceled  SubscriptionStatus = "canceled"
-	StatusPastDue   SubscriptionStatus = "past_due"
-	StatusTrialing  SubscriptionStatus = "trialing"
+	StatusActive     SubscriptionStatus = "active"
+	StatusCanceled   SubscriptionStatus = "canceled"
+	StatusPastDue    SubscriptionStatus = "past_due"
+	StatusTrialing   SubscriptionStatus = "trialing"
 	StatusIncomplete SubscriptionStatus = "incomplete"
 )
 
 // Customer models a synchronized Polar customer mapped to a user or organization.
 type Customer struct {
-	ID              string          `json:"id"`
-	ReferenceID     string          `json:"reference_id"`
-	ReferenceType   ReferenceType   `json:"reference_type"`
-	PolarCustomerID string          `json:"polar_customer_id"`
-	Email           string          `json:"email"`
-	Metadata        map[string]any  `json:"metadata,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              string         `json:"id"`
+	ReferenceID     string         `json:"reference_id"`
+	ReferenceType   ReferenceType  `json:"reference_type"`
+	PolarCustomerID string         `json:"polar_customer_id"`
+	Email           string         `json:"email"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 // Subscription models a synchronized Polar subscription.
@@ -84,10 +84,10 @@ type Benefit struct {
 
 // CreateCheckoutInput contains parameters for generating a Polar checkout URL.
 type CreateCheckoutInput struct {
-	Target      TargetReference `json:"target"`
-	ProductID   string          `json:"product_id"`
-	SuccessURL  string          `json:"success_url"`
-	Metadata    map[string]any  `json:"metadata,omitempty"`
+	Target     TargetReference `json:"target"`
+	ProductID  string          `json:"product_id"`
+	SuccessURL string          `json:"success_url"`
+	Metadata   map[string]any  `json:"metadata,omitempty"`
 }
 
 // CheckoutResult represents the generated Polar Checkout Session.

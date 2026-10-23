@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
 )
 
 func TestCacheLimiter_WithCoreCache(t *testing.T) {

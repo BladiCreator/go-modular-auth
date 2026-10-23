@@ -18,12 +18,12 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	organizations "github.com/BladiCreator/go-modular-auth/plugins/organizations"
 	sso "github.com/BladiCreator/go-modular-auth/plugins/sso"
 	"github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
 	"github.com/BladiCreator/go-modular-auth/plugins/sso/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 type mockIdPServer struct {

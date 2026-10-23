@@ -8,11 +8,11 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
-	"github.com/BladiCreator/go-modular-auth/plugins/multisession/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	memcache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/multisession"
+	"github.com/BladiCreator/go-modular-auth/plugins/multisession/plugins"
 	"github.com/BladiCreator/go-modular-auth/session"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"

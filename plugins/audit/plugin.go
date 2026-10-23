@@ -72,4 +72,3 @@ func (m *Module) Close() error {
 	}
 	return nil
 }
-

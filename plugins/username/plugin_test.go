@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/username"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/username"
 )
 
 func TestPluginModuleRegistration(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	v2 "github.com/BladiCreator/go-modular-auth/plugins/scim/v2"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
-	v2 "github.com/BladiCreator/go-modular-auth/plugins/scim/v2"
 )
 
 type SCIMProvider interface {

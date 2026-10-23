@@ -72,10 +72,12 @@ func (m *mockTx) Rollback() error {
 
 type mockStmt struct{}
 
-func (s *mockStmt) Close() error                                    { return nil }
-func (s *mockStmt) NumInput() int                                   { return -1 }
-func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) { return driver.RowsAffected(1), nil }
-func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error)  { return &mockRows{}, nil }
+func (s *mockStmt) Close() error  { return nil }
+func (s *mockStmt) NumInput() int { return -1 }
+func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return driver.RowsAffected(1), nil
+}
+func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) { return &mockRows{}, nil }
 
 type mockRows struct{}
 

@@ -8,14 +8,14 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	emailotp "github.com/BladiCreator/go-modular-auth/plugins/email-otp"
-	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
-	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/plugins"
-	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"github.com/BladiCreator/go-modular-auth/email"
 	emailmemory "github.com/BladiCreator/go-modular-auth/email/memory"
+	emailotp "github.com/BladiCreator/go-modular-auth/plugins/email-otp"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/plugins"
 	"github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )

@@ -8,10 +8,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/twofactor/cache"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/plugins/twofactor/cache"
 	"github.com/BladiCreator/go-modular-auth/schema"
 )
 

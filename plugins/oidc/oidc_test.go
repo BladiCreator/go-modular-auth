@@ -17,10 +17,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	oidc "github.com/BladiCreator/go-modular-auth/plugins/oidc"
-	"github.com/BladiCreator/go-modular-auth/plugins/oidc/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	oidc "github.com/BladiCreator/go-modular-auth/plugins/oidc"
+	"github.com/BladiCreator/go-modular-auth/plugins/oidc/plugins"
 )
 
 type mockOIDCServer struct {

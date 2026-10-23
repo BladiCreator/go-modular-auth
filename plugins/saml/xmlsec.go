@@ -14,10 +14,10 @@ import (
 )
 
 type XMLSignature struct {
-	SignatureValue  string
-	SignatureMethod string
-	DigestValue     string
-	DigestMethod    string
+	SignatureValue   string
+	SignatureMethod  string
+	DigestValue      string
+	DigestMethod     string
 	X509Certificates []string
 }
 

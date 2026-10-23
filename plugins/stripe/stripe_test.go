@@ -10,8 +10,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	stripe "github.com/BladiCreator/go-modular-auth/plugins/stripe"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	stripe "github.com/BladiCreator/go-modular-auth/plugins/stripe"
 )
 
 func setupStripeApp(t *testing.T) (*auth.Auth, stripe.Stripe) {

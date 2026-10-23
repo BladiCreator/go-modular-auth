@@ -8,8 +8,8 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 )
 
 func TestSecurityCrossTenantIsolation(t *testing.T) {
@@ -255,4 +255,3 @@ func TestOrganizationService_UnauthorizedMutationRejection(t *testing.T) {
 		t.Fatalf("Owner TransferOwnership failed: %v", err)
 	}
 }
-

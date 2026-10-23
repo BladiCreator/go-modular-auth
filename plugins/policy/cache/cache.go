@@ -17,11 +17,11 @@ const DefaultTTL = 5 * time.Minute
 
 // CachedDecision is the stored authorization decision payload.
 type CachedDecision struct {
-	Effect      string         `json:"effect"`
-	Reason      string         `json:"reason,omitempty"`
-	Challenge   map[string]any `json:"challenge,omitempty"`
-	PolicyID    string         `json:"policy_id,omitempty"`
-	CachedAt    time.Time      `json:"cached_at"`
+	Effect    string         `json:"effect"`
+	Reason    string         `json:"reason,omitempty"`
+	Challenge map[string]any `json:"challenge,omitempty"`
+	PolicyID  string         `json:"policy_id,omitempty"`
+	CachedAt  time.Time      `json:"cached_at"`
 }
 
 // Cache defines the semantic contract for caching authorization decisions.

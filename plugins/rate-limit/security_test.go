@@ -110,21 +110,21 @@ func TestSecurity_Concurrency_RateLimitAccuracy(t *testing.T) {
 
 func TestSecurity_FailModes(t *testing.T) {
 	policyFailClosed := ratelimit.Policy{
-		Action:     "test_fail_closed",
-		Algorithm:  ratelimit.AlgorithmSlidingWindow,
-		Limit:      5,
-		Window:     time.Minute,
-		KeyType:    ratelimit.KeyTypeIP,
-		FailMode:   ratelimit.FailClosed,
+		Action:    "test_fail_closed",
+		Algorithm: ratelimit.AlgorithmSlidingWindow,
+		Limit:     5,
+		Window:    time.Minute,
+		KeyType:   ratelimit.KeyTypeIP,
+		FailMode:  ratelimit.FailClosed,
 	}
 
 	policyFailOpen := ratelimit.Policy{
-		Action:     "test_fail_open",
-		Algorithm:  ratelimit.AlgorithmSlidingWindow,
-		Limit:      5,
-		Window:     time.Minute,
-		KeyType:    ratelimit.KeyTypeIP,
-		FailMode:   ratelimit.FailOpen,
+		Action:    "test_fail_open",
+		Algorithm: ratelimit.AlgorithmSlidingWindow,
+		Limit:     5,
+		Window:    time.Minute,
+		KeyType:   ratelimit.KeyTypeIP,
+		FailMode:  ratelimit.FailOpen,
 	}
 
 	if policyFailClosed.FailMode != ratelimit.FailClosed {
@@ -183,4 +183,3 @@ func TestDistributedTokenBucket_ConcurrentExecution(t *testing.T) {
 		t.Fatalf("expected exactly 20 denied requests under concurrent token bucket, got %d", deniedCount)
 	}
 }
-

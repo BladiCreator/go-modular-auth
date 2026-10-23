@@ -11,12 +11,12 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
-	"github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
-	"github.com/BladiCreator/go-modular-auth/plugins/sso/saml"
 	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
+	"github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
+	"github.com/BladiCreator/go-modular-auth/plugins/sso/saml"
 	corestore "github.com/BladiCreator/go-modular-auth/store"
 	"github.com/BladiCreator/go-modular-auth/user"
 )

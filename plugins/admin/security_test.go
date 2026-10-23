@@ -7,10 +7,10 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	admin "github.com/BladiCreator/go-modular-auth/plugins/admin"
 	"github.com/BladiCreator/go-modular-auth/plugins/admin/plugins"
 	orgplugin "github.com/BladiCreator/go-modular-auth/plugins/organizations"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 func TestAdmin_Security_AuthorizationEnforced(t *testing.T) {

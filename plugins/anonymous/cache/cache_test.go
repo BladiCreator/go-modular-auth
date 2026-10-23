@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
+	"github.com/BladiCreator/go-modular-auth/plugins/anonymous/cache"
 )
 
 type mockCoreCache struct {

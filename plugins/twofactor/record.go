@@ -40,9 +40,9 @@ type ChallengeRecord struct {
 }
 
 const (
-	ModelTwoFactors       = "twofactor_factors"
-	ModelRecoveryCodes    = "twofactor_recovery_codes"
-	ModelMFAChallenges    = "twofactor_challenges"
+	ModelTwoFactors    = "twofactor_factors"
+	ModelRecoveryCodes = "twofactor_recovery_codes"
+	ModelMFAChallenges = "twofactor_challenges"
 )
 
 // RegisterSchema registers all two-factor authentication models into the compiled schema.

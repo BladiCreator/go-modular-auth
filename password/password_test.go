@@ -58,4 +58,3 @@ func TestArgon2id_EntropyFailure(t *testing.T) {
 		t.Fatalf("expected entropy error message, got: %v", err)
 	}
 }
-

@@ -469,5 +469,3 @@ func matchGreater(v1, v2 any) bool {
 	}
 	return fmt.Sprintf("%v", v1) > fmt.Sprintf("%v", v2)
 }
-
-

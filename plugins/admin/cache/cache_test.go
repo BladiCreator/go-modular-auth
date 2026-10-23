@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/admin/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/admin/cache"
 )
 
 func TestCache_DisabledFlag(t *testing.T) {

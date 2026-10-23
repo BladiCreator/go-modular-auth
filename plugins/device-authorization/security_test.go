@@ -7,11 +7,11 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
-	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
+	deviceauth "github.com/BladiCreator/go-modular-auth/plugins/device-authorization"
+	"github.com/BladiCreator/go-modular-auth/plugins/device-authorization/plugins"
 )
 
 func TestDeviceAuth_Security_SlowDown(t *testing.T) {
@@ -50,7 +50,7 @@ func TestDeviceAuth_Security_Expiration(t *testing.T) {
 	cCache := corecache.New()
 
 	devModule := deviceauth.New(
-		deviceauth.WithExpiresIn(50*time.Millisecond), // Short TTL for testing
+		deviceauth.WithExpiresIn(50 * time.Millisecond), // Short TTL for testing
 	)
 
 	a, err := auth.New(auth.Config{

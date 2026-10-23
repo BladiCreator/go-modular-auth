@@ -10,11 +10,11 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	"github.com/BladiCreator/go-modular-auth/plugins/magic-link"
-	"github.com/BladiCreator/go-modular-auth/plugins/magic-link/plugins"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	mememail "github.com/BladiCreator/go-modular-auth/email/memory"
 	"github.com/BladiCreator/go-modular-auth/password"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/magic-link"
+	"github.com/BladiCreator/go-modular-auth/plugins/magic-link/plugins"
 )
 
 var fastHasher = password.NewArgon2id(password.Argon2idParams{

@@ -4,9 +4,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/plugins/sso/oidc"
 	"github.com/BladiCreator/go-modular-auth/plugins/sso/saml"
-	"github.com/BladiCreator/go-modular-auth/account"
 	"github.com/BladiCreator/go-modular-auth/schema"
 	"github.com/BladiCreator/go-modular-auth/session"
 	"github.com/BladiCreator/go-modular-auth/user"

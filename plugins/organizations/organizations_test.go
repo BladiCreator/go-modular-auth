@@ -6,16 +6,16 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/organizations"
 	"github.com/BladiCreator/go-modular-auth/plugins/organizations/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func setupTestApp(t *testing.T) (*auth.Auth, organizations.Organization) {
 	t.Helper()
 
 	orgModule := organizations.New(
-		organizations.WithCacheTTL(10*time.Minute),
+		organizations.WithCacheTTL(10 * time.Minute),
 	)
 
 	a, err := auth.New(auth.Config{

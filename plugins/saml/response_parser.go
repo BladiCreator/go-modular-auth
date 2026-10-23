@@ -27,14 +27,14 @@ type samlStatusXML struct {
 }
 
 type samlAssertionXML struct {
-	ID                  string                  `xml:"ID,attr"`
-	IssueInstant        string                  `xml:"IssueInstant,attr"`
-	Issuer              string                  `xml:"Issuer"`
-	Subject             samlSubjectXML          `xml:"Subject"`
-	Conditions          samlConditionsXML       `xml:"Conditions"`
-	AuthnStatement      samlAuthnStatementXML   `xml:"AuthnStatement"`
-	AttributeStatement  samlAttributeStatement  `xml:"AttributeStatement"`
-	Signature           samlSignatureXML        `xml:"Signature"`
+	ID                 string                 `xml:"ID,attr"`
+	IssueInstant       string                 `xml:"IssueInstant,attr"`
+	Issuer             string                 `xml:"Issuer"`
+	Subject            samlSubjectXML         `xml:"Subject"`
+	Conditions         samlConditionsXML      `xml:"Conditions"`
+	AuthnStatement     samlAuthnStatementXML  `xml:"AuthnStatement"`
+	AttributeStatement samlAttributeStatement `xml:"AttributeStatement"`
+	Signature          samlSignatureXML       `xml:"Signature"`
 }
 
 type samlSubjectXML struct {

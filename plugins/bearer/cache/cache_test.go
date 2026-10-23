@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 	corecache "github.com/BladiCreator/go-modular-auth/cache"
 	corecpmem "github.com/BladiCreator/go-modular-auth/cache/memory"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 )
 
 func TestCache_SetAndGet(t *testing.T) {

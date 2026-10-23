@@ -51,11 +51,11 @@ func BuildKey(principal auth.Principal, permission string, resType, resID, orgID
 
 // CoreCacheAdapter implements Cache using the shared GoModularAuth Core Cache adapter.
 type CoreCacheAdapter struct {
-	coreCache corecache.Cache
+	coreCache  corecache.Cache
 	defaultTTL time.Duration
 
-	mu             sync.Mutex
-	principalKeys  map[string]map[string]struct{}
+	mu            sync.Mutex
+	principalKeys map[string]map[string]struct{}
 }
 
 var _ Cache = (*CoreCacheAdapter)(nil)

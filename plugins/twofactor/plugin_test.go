@@ -7,10 +7,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
-	"github.com/BladiCreator/go-modular-auth/plugins/twofactor/plugins"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	cachememory "github.com/BladiCreator/go-modular-auth/cache/memory"
+	twofactor "github.com/BladiCreator/go-modular-auth/plugins/twofactor"
+	"github.com/BladiCreator/go-modular-auth/plugins/twofactor/plugins"
 )
 
 func TestPlugin_RegistrationAndCapabilityResolution(t *testing.T) {

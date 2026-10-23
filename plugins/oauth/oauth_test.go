@@ -7,10 +7,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth/plugins"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth/provider"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 // mockProvider implements provider.Provider for testing without live HTTP network.

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
 	"github.com/BladiCreator/go-modular-auth/email"
+	"github.com/BladiCreator/go-modular-auth/plugins/email-otp/cache"
 )
 
 // MessageBuilder builds a transactional email message for OTP delivery.

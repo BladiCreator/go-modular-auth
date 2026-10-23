@@ -37,15 +37,15 @@ type OIDCConfig struct {
 }
 
 var (
-	ErrDiscoveryFailed   = errors.New("sso oidc: provider discovery failed")
-	ErrTokenExchange     = errors.New("sso oidc: token exchange failed")
-	ErrInvalidIDToken    = errors.New("sso oidc: invalid id_token")
-	ErrSignatureInvalid  = errors.New("sso oidc: id_token signature invalid")
-	ErrIssuerMismatch    = errors.New("sso oidc: issuer mismatch")
-	ErrAudienceMismatch  = errors.New("sso oidc: audience mismatch")
-	ErrNonceMismatch     = errors.New("sso oidc: nonce mismatch")
-	ErrTokenExpired      = errors.New("sso oidc: token expired")
-	ErrKeyNotFound       = errors.New("sso oidc: signing key not found in jwks")
+	ErrDiscoveryFailed  = errors.New("sso oidc: provider discovery failed")
+	ErrTokenExchange    = errors.New("sso oidc: token exchange failed")
+	ErrInvalidIDToken   = errors.New("sso oidc: invalid id_token")
+	ErrSignatureInvalid = errors.New("sso oidc: id_token signature invalid")
+	ErrIssuerMismatch   = errors.New("sso oidc: issuer mismatch")
+	ErrAudienceMismatch = errors.New("sso oidc: audience mismatch")
+	ErrNonceMismatch    = errors.New("sso oidc: nonce mismatch")
+	ErrTokenExpired     = errors.New("sso oidc: token expired")
+	ErrKeyNotFound      = errors.New("sso oidc: signing key not found in jwks")
 )
 
 type DiscoveryDocument struct {

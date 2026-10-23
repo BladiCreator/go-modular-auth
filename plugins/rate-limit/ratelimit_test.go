@@ -7,10 +7,10 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	ratelimit "github.com/BladiCreator/go-modular-auth/plugins/rate-limit"
 	"github.com/BladiCreator/go-modular-auth/plugins/rate-limit/plugins"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func setupTestAuth(t *testing.T, opts ...ratelimit.Option) (*auth.Auth, plugins.RateLimit) {

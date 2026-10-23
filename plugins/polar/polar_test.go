@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	auth "github.com/BladiCreator/go-modular-auth"
-	polar "github.com/BladiCreator/go-modular-auth/plugins/polar"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	polar "github.com/BladiCreator/go-modular-auth/plugins/polar"
 )
 
 func setupPolarApp(t *testing.T) (*auth.Auth, polar.Polar) {

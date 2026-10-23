@@ -7,9 +7,9 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	audit "github.com/BladiCreator/go-modular-auth/plugins/audit"
 	"github.com/BladiCreator/go-modular-auth/plugins/audit/plugins"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	"go.uber.org/goleak"
 )
 
@@ -243,4 +243,3 @@ func TestAudit_GracefulShutdownThroughAuth(t *testing.T) {
 		t.Fatalf("expected 10 records after graceful shutdown flush, got %d", res.Total)
 	}
 }
-

@@ -8,8 +8,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
-	"github.com/BladiCreator/go-modular-auth/user"
 	samlprovider "github.com/BladiCreator/go-modular-auth/plugins/saml-provider"
+	"github.com/BladiCreator/go-modular-auth/user"
 )
 
 func TestSAMLProvider_Lifecycle(t *testing.T) {

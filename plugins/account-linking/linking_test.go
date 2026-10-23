@@ -9,9 +9,9 @@ import (
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
 	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
+	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 	accountlinking "github.com/BladiCreator/go-modular-auth/plugins/account-linking"
 	"github.com/BladiCreator/go-modular-auth/plugins/account-linking/plugins"
-	corecache "github.com/BladiCreator/go-modular-auth/cache/memory"
 )
 
 func setupTestAuth(t *testing.T) (*auth.Auth, plugins.AccountLinking, adapter.Adapter) {

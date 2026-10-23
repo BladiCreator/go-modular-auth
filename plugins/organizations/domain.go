@@ -134,7 +134,7 @@ func OrganizationFromContext(ctx context.Context) (string, bool) {
 }
 
 const (
-	ModelOrganizations          = "organizations"
+	ModelOrganizations           = "organizations"
 	ModelOrganizationMemberships = "organization_memberships"
 	ModelOrganizationTeams       = "organization_teams"
 	ModelOrganizationTeamMembers = "organization_team_members"

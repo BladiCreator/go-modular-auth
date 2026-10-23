@@ -50,7 +50,7 @@ func TestTypedPluginAccess(t *testing.T) {
 	var order []string
 	a, err := auth.New(auth.Config{
 		Adapter: adaptermem.New(),
-		Hasher: fastHasher,
+		Hasher:  fastHasher,
 		Plugins: []auth.PluginModule{
 			greeterModule{id: "greeter", deps: []string{"base"}, init: &order},
 			greeterModule{id: "base", init: &order},

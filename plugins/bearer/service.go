@@ -8,8 +8,8 @@ import (
 
 	auth "github.com/BladiCreator/go-modular-auth"
 	"github.com/BladiCreator/go-modular-auth/adapter"
-	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 	sdk "github.com/BladiCreator/go-modular-auth/plugin-sdk"
+	"github.com/BladiCreator/go-modular-auth/plugins/bearer/cache"
 )
 
 // service implements the Bearer capability interface.

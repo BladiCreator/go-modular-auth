@@ -35,14 +35,14 @@ type SAMLConfig struct {
 }
 
 var (
-	ErrMalformedResponse      = errors.New("sso saml: malformed response XML")
-	ErrStatusNotSuccess       = errors.New("sso saml: response status was not success")
-	ErrNoAssertion            = errors.New("sso saml: response contains no assertions")
-	ErrExpiredAssertion       = errors.New("sso saml: assertion validity window expired")
-	ErrAudienceMismatch       = errors.New("sso saml: audience restriction mismatch")
-	ErrSignatureInvalid       = errors.New("sso saml: assertion signature verification failed")
-	ErrMissingCertificates    = errors.New("sso saml: no trusted certificates configured for provider")
-	ErrSubjectNotFound        = errors.New("sso saml: no subject NameID in assertion")
+	ErrMalformedResponse   = errors.New("sso saml: malformed response XML")
+	ErrStatusNotSuccess    = errors.New("sso saml: response status was not success")
+	ErrNoAssertion         = errors.New("sso saml: response contains no assertions")
+	ErrExpiredAssertion    = errors.New("sso saml: assertion validity window expired")
+	ErrAudienceMismatch    = errors.New("sso saml: audience restriction mismatch")
+	ErrSignatureInvalid    = errors.New("sso saml: assertion signature verification failed")
+	ErrMissingCertificates = errors.New("sso saml: no trusted certificates configured for provider")
+	ErrSubjectNotFound     = errors.New("sso saml: no subject NameID in assertion")
 )
 
 // AuthnRequest represents an outgoing SAML 2.0 AuthnRequest message.
@@ -162,8 +162,8 @@ type AttributeStatement struct {
 }
 
 type Attribute struct {
-	Name       string   `xml:"Name,attr"`
-	Values     []string `xml:"AttributeValue"`
+	Name   string   `xml:"Name,attr"`
+	Values []string `xml:"AttributeValue"`
 }
 
 type Signature struct {

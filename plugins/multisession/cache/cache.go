@@ -18,12 +18,12 @@ type CachedDeviceRecord struct {
 
 // CachedMetadataRecord is the cached representation of session metadata.
 type CachedMetadataRecord struct {
-	SessionID string            `json:"session_id"`
-	UserID    string            `json:"user_id"`
+	SessionID string             `json:"session_id"`
+	UserID    string             `json:"user_id"`
 	Device    CachedDeviceRecord `json:"device"`
-	Custom    map[string]string `json:"custom,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	Custom    map[string]string  `json:"custom,omitempty"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
 }
 
 // KeyMetadata returns the namespaced cache key for session metadata.

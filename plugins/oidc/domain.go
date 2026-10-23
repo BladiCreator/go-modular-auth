@@ -83,15 +83,15 @@ const (
 
 // DiscoveryDocument holds the OpenID Connect discovery metadata fetched from .well-known/openid-configuration.
 type DiscoveryDocument struct {
-	Issuer                            string   `json:"issuer"`
-	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
-	TokenEndpoint                     string   `json:"token_endpoint"`
-	JWKSUri                           string   `json:"jwks_uri"`
-	UserInfoEndpoint                  string   `json:"userinfo_endpoint,omitempty"`
-	ResponseTypesSupported            []string `json:"response_types_supported,omitempty"`
-	SubjectTypesSupported             []string `json:"subject_types_supported,omitempty"`
-	IDTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported,omitempty"`
-	ScopesSupported                   []string `json:"scopes_supported,omitempty"`
+	Issuer                           string   `json:"issuer"`
+	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
+	TokenEndpoint                    string   `json:"token_endpoint"`
+	JWKSUri                          string   `json:"jwks_uri"`
+	UserInfoEndpoint                 string   `json:"userinfo_endpoint,omitempty"`
+	ResponseTypesSupported           []string `json:"response_types_supported,omitempty"`
+	SubjectTypesSupported            []string `json:"subject_types_supported,omitempty"`
+	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported,omitempty"`
+	ScopesSupported                  []string `json:"scopes_supported,omitempty"`
 }
 
 // Endpoints holds explicitly configured URLs when discovery is bypassed.
@@ -104,17 +104,17 @@ type Endpoints struct {
 
 // ProviderConfig configures an external OpenID Connect Relying Party identity provider.
 type ProviderConfig struct {
-	ID                 string         `json:"id"`
-	Issuer             string         `json:"issuer"`
-	ClientID           string         `json:"client_id"`
-	ClientSecret       string         `json:"client_secret"`
-	RedirectURI        string         `json:"redirect_uri"`
-	Scopes             []string       `json:"scopes"`
-	DiscoveryURL       string         `json:"discovery_url,omitempty"`
-	CustomEndpoints    *Endpoints     `json:"custom_endpoints,omitempty"`
-	SkipIssuerCheck            bool           `json:"skip_issuer_check,omitempty"`
-	InsecureSkipSignatureCheck bool           `json:"insecure_skip_signature_check,omitempty"`
-	ClockSkew                  time.Duration  `json:"clock_skew,omitempty"`
+	ID                         string        `json:"id"`
+	Issuer                     string        `json:"issuer"`
+	ClientID                   string        `json:"client_id"`
+	ClientSecret               string        `json:"client_secret"`
+	RedirectURI                string        `json:"redirect_uri"`
+	Scopes                     []string      `json:"scopes"`
+	DiscoveryURL               string        `json:"discovery_url,omitempty"`
+	CustomEndpoints            *Endpoints    `json:"custom_endpoints,omitempty"`
+	SkipIssuerCheck            bool          `json:"skip_issuer_check,omitempty"`
+	InsecureSkipSignatureCheck bool          `json:"insecure_skip_signature_check,omitempty"`
+	ClockSkew                  time.Duration `json:"clock_skew,omitempty"`
 }
 
 // IDTokenClaims contains cryptographically verified claims parsed from an OIDC ID Token.

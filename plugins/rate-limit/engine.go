@@ -16,10 +16,10 @@ type limiterEngine struct {
 	now   func() time.Time
 
 	// In-memory fallbacks when distributed cache is nil or in local test mode
-	mu           sync.Mutex
-	memWindows   map[string][]time.Time
-	memBuckets   map[string]*tokenBucketState
-	lastCleaned  time.Time
+	mu          sync.Mutex
+	memWindows  map[string][]time.Time
+	memBuckets  map[string]*tokenBucketState
+	lastCleaned time.Time
 }
 
 type tokenBucketState struct {

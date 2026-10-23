@@ -8,9 +8,9 @@ import (
 	"time"
 
 	auth "github.com/BladiCreator/go-modular-auth"
+	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 	oauthprovider "github.com/BladiCreator/go-modular-auth/plugins/oauth-provider"
 	"github.com/BladiCreator/go-modular-auth/plugins/oauth-provider/plugins"
-	adaptermem "github.com/BladiCreator/go-modular-auth/adapter/memory"
 )
 
 func generatePKCEPair() (verifier, challenge string) {
